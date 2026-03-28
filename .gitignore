@@ -47,6 +47,7 @@ profiles/
 .pytest_cache/
 .coverage
 htmlcov/
+references/
 
 # Claude
 .claude/
