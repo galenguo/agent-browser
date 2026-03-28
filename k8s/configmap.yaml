@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-browser-config
+  namespace: agent-browser
+data:
+  # 部署模式
+  DEPLOYMENT_MODE: "all-in-one"
+  BROWSER_MODE: "local"
+
+  # 会话配置
+  MAX_SESSIONS: "10"
+  IDLE_TIMEOUT_SECONDS: "1800"
+
+  # CDP 配置
+  CDP_PORT: "19222"
+  CDP_BIND_ADDRESS: "0.0.0.0"
+
+  # 存储配置
+  PROFILE_STORAGE: "/data/profiles"
+  LOG_LEVEL: "INFO"
+
+  # 浏览器配置
+  HEADLESS: "false"

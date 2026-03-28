@@ -1,0 +1,44 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: agent-browser
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - pvc.yaml
+  # All-in-One 模式（默认）
+  - aio-deployment.yaml
+  - aio-service.yaml
+  # 分布式模式（取消注释以启用）
+  # - api-deployment.yaml
+  # - api-service.yaml
+  # - browser-deployment.yaml
+  # - browser-service.yaml
+
+# 镜像替换（根据实际 Registry 修改）
+images:
+  - name: ${REGISTRY_URL}/agent-browser
+    newName: localhost:5000/agent-browser
+    newTag: latest
+  - name: ${REGISTRY_URL}/agent-browser-api
+    newName: localhost:5000/agent-browser-api
+    newTag: latest
+  - name: ${REGISTRY_URL}/agent-browser-browser
+    newName: localhost:5000/agent-browser-browser
+    newTag: latest
+
+# ConfigMap 生成器（可选）
+# configMapGenerator:
+#   - name: agent-browser-config
+#     literals:
+#       - DEPLOYMENT_MODE=all-in-one
+#       - MAX_SESSIONS=10
+
+# Secret 生成器（可选）
+# secretGenerator:
+#   - name: agent-browser-secret
+#     literals:
+#       - ANTHROPIC_API_KEY=your-key
+#       - OPENAI_API_KEY=your-key

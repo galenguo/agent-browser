@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-browser-api
+  namespace: agent-browser
+  labels:
+    app: agent-browser
+    component: api
+    mode: distributed
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agent-browser
+      component: api
+      mode: distributed
+  template:
+    metadata:
+      labels:
+        app: agent-browser
+        component: api
+        mode: distributed
+    spec:
+      containers:
+      - name: api
+        image: ${REGISTRY_URL}/agent-browser-api:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: api
+          protocol: TCP
+        env:
+        - name: DEPLOYMENT_MODE
+          value: "distributed"
+        - name: BROWSER_MODE
+          value: "docker"
+        - name: MAX_SESSIONS
+          value: "50"
+        - name: IDLE_TIMEOUT_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: agent-browser-config
+              key: IDLE_TIMEOUT_SECONDS
+        - name: PROFILE_STORAGE
+          valueFrom:
+            configMapKeyRef:
+              name: agent-browser-config
+              key: PROFILE_STORAGE
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: agent-browser-config
+              key: LOG_LEVEL
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: agent-browser-secret
+              key: ANTHROPIC_API_KEY
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: agent-browser-secret
+              key: OPENAI_API_KEY
+        - name: OPENAI_BASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: agent-browser-secret
+              key: OPENAI_BASE_URL
+        volumeMounts:
+        - name: profiles
+          mountPath: /data/profiles
+        - name: logs
+          mountPath: /data/logs
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: profiles
+        persistentVolumeClaim:
+          claimName: agent-browser-profiles
+      - name: logs
+        persistentVolumeClaim:
+          claimName: agent-browser-logs

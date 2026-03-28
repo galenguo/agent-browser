@@ -1,0 +1,59 @@
+{{- if eq .Values.deploymentMode "distributed" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agent-browser.fullname" . }}-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agent-browser.labels" . | nindent 4 }}
+    component: api
+    mode: distributed
+spec:
+  replicas: {{ .Values.distributed.api.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "agent-browser.selectorLabels" . | nindent 6 }}
+      component: api
+      mode: distributed
+  template:
+    metadata:
+      labels:
+        {{- include "agent-browser.selectorLabels" . | nindent 8 }}
+        component: api
+        mode: distributed
+    spec:
+      containers:
+      - name: api
+        image: {{ include "agent-browser.image" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: 8000
+          name: api
+        envFrom:
+        - configMapRef:
+            name: {{ include "agent-browser.fullname" . }}-config
+        - secretRef:
+            name: {{ include "agent-browser.fullname" . }}-secret
+        volumeMounts:
+        {{- if .Values.persistence.enabled }}
+        - name: profiles
+          mountPath: /data/profiles
+        - name: logs
+          mountPath: /data/logs
+        {{- end }}
+        resources:
+          {{- toYaml .Values.distributed.api.resources | nindent 10 }}
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 10 }}
+      volumes:
+      {{- if .Values.persistence.enabled }}
+      - name: profiles
+        persistentVolumeClaim:
+          claimName: {{ include "agent-browser.fullname" . }}-profiles
+      - name: logs
+        persistentVolumeClaim:
+          claimName: {{ include "agent-browser.fullname" . }}-logs
+      {{- end }}
+{{- end }}

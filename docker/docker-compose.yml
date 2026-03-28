@@ -1,0 +1,107 @@
+version: '3.8'
+
+# 多用户会话架构 — 支持 2 种部署模式
+#
+# CloakBrowser (Chromium):
+#   docker-compose --profile all-in-one up -d
+#   docker-compose --profile distributed up -d
+
+services:
+
+  # ══════════════════════════════════════════════════════════
+  # CloakBrowser All-in-One（API + Chromium 在同一容器）
+  # ══════════════════════════════════════════════════════════
+  all-in-one:
+    profiles: ["all-in-one"]
+    image: agent-browser:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: agent-browser
+    ports:
+      - "8000:8000"   # FastAPI API
+      - "6080:6080"   # noVNC Web 查看器
+      - "5900:5900"   # VNC 直连
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DEPLOYMENT_MODE=all-in-one
+      - BROWSER_MODE=local
+      - MAX_SESSIONS=10
+      - IDLE_TIMEOUT_SECONDS=1800
+      - CDP_PORT=19222
+      - HEADLESS=false
+      - DISPLAY=:99
+      - PROFILE_STORAGE=/data/profiles
+      - LOG_LEVEL=info
+    volumes:
+      - ./data/profiles:/data/profiles
+      - ./data/logs:/data/logs
+    shm_size: '128mb'
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 512M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ══════════════════════════════════════════════════════════
+  # CloakBrowser Distributed（API 容器 + 浏览器容器分离）
+  # ══════════════════════════════════════════════════════════
+  api-server:
+    profiles: ["distributed"]
+    image: agent-browser-api:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: agent-browser-api
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DEPLOYMENT_MODE=distributed
+      - BROWSER_MODE=docker
+      - MAX_SESSIONS=50
+      - IDLE_TIMEOUT_SECONDS=1800
+      - PROFILE_STORAGE=/data/profiles
+      - HOST_PROFILE_PATH=${HOST_PROFILE_PATH}
+      - DEBUG_CONTAINERS=${DEBUG_CONTAINERS:-false}
+      - LOG_LEVEL=info
+      # 配置后，创建会话时响应中将包含 browser_node 信息（IP/域名 + noVNC 端口）
+      # 腾讯云等 VPC 场景：设为宿主机公网 IP 或域名，端口透传时 BROWSER_PORT_OFFSET=0
+      - BROWSER_PUBLIC_HOST=${BROWSER_PUBLIC_HOST:-}
+      - BROWSER_PORT_OFFSET=${BROWSER_PORT_OFFSET:-0}
+    volumes:
+      - ./data/profiles:/data/profiles
+      - ./data/logs:/data/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - browser-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # 浏览器容器由 BrowserInstancePool 动态创建
+  # 需要先构建镜像: docker build -t agent-browser-browser:latest -f docker/Dockerfile.browser ..
+
+  # ══════════════════════════════════════════════════════════
+
+networks:
+  browser-network:
+    driver: bridge
+    name: agent-browser-network

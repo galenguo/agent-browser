@@ -1,0 +1,14 @@
+cloakbrowser
+patchright
+rebrowser-playwright
+browser-use==0.12.2
+browserforge
+curl_cffi
+fastapi
+uvicorn[standard]
+websockets
+python-dotenv
+langchain-anthropic
+langchain-openai
+docker
+aiohttp

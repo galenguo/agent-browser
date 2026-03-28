@@ -1,0 +1,58 @@
+{{- if eq .Values.deploymentMode "distributed" }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "agent-browser.fullname" . }}-browser
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agent-browser.labels" . | nindent 4 }}
+    component: browser
+    mode: distributed
+spec:
+  serviceName: {{ include "agent-browser.fullname" . }}-browser
+  replicas: {{ .Values.distributed.browser.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "agent-browser.selectorLabels" . | nindent 6 }}
+      component: browser
+      mode: distributed
+  template:
+    metadata:
+      labels:
+        {{- include "agent-browser.selectorLabels" . | nindent 8 }}
+        component: browser
+        mode: distributed
+    spec:
+      containers:
+      - name: browser
+        image: {{ include "agent-browser.browserImage" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: 19222
+          name: cdp
+        - containerPort: 6080
+          name: novnc
+        - containerPort: 5900
+          name: vnc
+        env:
+        - name: CDP_PORT
+          value: "19222"
+        - name: CDP_BIND_ADDRESS
+          value: "0.0.0.0"
+        - name: HEADLESS
+          value: "false"
+        volumeMounts:
+        {{- if .Values.shm.enabled }}
+        - name: shm
+          mountPath: /dev/shm
+        {{- end }}
+        resources:
+          {{- toYaml .Values.distributed.browser.resources | nindent 10 }}
+      volumes:
+      {{- if .Values.shm.enabled }}
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.shm.size }}
+      {{- end }}
+{{- end }}

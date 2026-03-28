@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agent-browser-browser
+  namespace: agent-browser
+  labels:
+    app: agent-browser
+    component: browser
+    mode: distributed
+spec:
+  serviceName: agent-browser-browser
+  replicas: 3
+  selector:
+    matchLabels:
+      app: agent-browser
+      component: browser
+      mode: distributed
+  template:
+    metadata:
+      labels:
+        app: agent-browser
+        component: browser
+        mode: distributed
+    spec:
+      containers:
+      - name: browser
+        image: ${REGISTRY_URL}/agent-browser-browser:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 19222
+          name: cdp
+          protocol: TCP
+        - containerPort: 6080
+          name: novnc
+          protocol: TCP
+        - containerPort: 5900
+          name: vnc
+          protocol: TCP
+        env:
+        - name: CDP_PORT
+          value: "19222"
+        - name: CDP_BIND_ADDRESS
+          value: "0.0.0.0"
+        - name: HEADLESS
+          value: "false"
+        volumeMounts:
+        - name: shm
+          mountPath: /dev/shm
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+      volumes:
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 128Mi

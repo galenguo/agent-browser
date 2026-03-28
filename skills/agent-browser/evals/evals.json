@@ -1,0 +1,23 @@
+{
+  "skill_name": "agent-browser",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我用 agent browser 打开百度，搜索「Claude Code」，截图告诉我搜索结果的前3条标题是什么",
+      "expected_output": "创建 Docker 会话，告知用户远程桌面地址（含 /vnc.html），等待启动后访问百度，执行搜索，返回前3条结果标题，最后关闭会话",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "用 docker 浏览器帮我访问 Boss直聘，打开扫码登录页面，我要扫码登录",
+      "expected_output": "创建 Docker 会话，立即告知用户 {novnc_url}/vnc.html 地址，等待启动，导航到 Boss直聘登录页，点击扫码登录，主动提示用户去远程桌面扫码，等待用户确认",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "帮我检查一下 agent browser 现在有几个活跃的浏览器会话",
+      "expected_output": "调用 browser_health 或 browser_list_sessions，返回当前活跃会话数量和状态",
+      "files": []
+    }
+  ]
+}

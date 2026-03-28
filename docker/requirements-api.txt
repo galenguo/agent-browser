@@ -1,0 +1,11 @@
+# API 层依赖（Distributed 模式 API 容器专用）
+# 不含浏览器相关包（cloakbrowser, patchright, rebrowser-playwright, browserforge）
+browser-use==0.12.2
+fastapi
+uvicorn[standard]
+websockets
+python-dotenv
+langchain-anthropic
+langchain-openai
+docker
+aiohttp
