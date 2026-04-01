@@ -29,26 +29,23 @@ async def generate_refs(
         for el in els:
             try:
                 text = (await el.text_content() or "").strip()[:80]
-                visible = await el.is_visible()
-                if not visible:
-                    continue
 
                 tag = await el.evaluate("e => e.tagName.toLowerCase()")
                 role_attr = await el.get_attribute("role") or ""
                 input_type = await el.get_attribute("type") or ""
                 placeholder = await el.get_attribute("placeholder") or ""
 
-                # 确定 role
-                if role_attr:
-                    role = role_attr
+                # 确定 role — 保持与旧 controller 一致（用 tag 名而非语义 role）
+                if role_attr and role_attr not in INTERACTIVE_ROLES:
+                    role = role_attr  # 保留自定义 role
                 elif tag == "button" or (tag == "input" and input_type in ("submit", "button", "reset")):
                     role = "button"
                 elif tag == "a":
-                    role = "link"
+                    role = "a"
                 elif tag in ("input", "textarea"):
-                    role = "textbox"
+                    role = "input"
                 elif tag == "select":
-                    role = "combobox"
+                    role = "select"
                 else:
                     role = tag
 
