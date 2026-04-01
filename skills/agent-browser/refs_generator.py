@@ -40,10 +40,17 @@ async def generate_refs(
     elements: List[Dict] = []
     seen: set = set()
 
-    for sel in SELECTORS:
-        try:
-            els = await page.query_selector_all(sel)
-        except Exception:
+    # 并行查询所有选择器
+    try:
+        all_els = await asyncio.gather(
+            *[page.query_selector_all(sel) for sel in SELECTORS],
+            return_exceptions=True
+        )
+    except Exception:
+        return elements, handles
+
+    for els in all_els:
+        if isinstance(els, Exception):
             continue
         # 并行获取所有元素属性
         attrs_list = await asyncio.gather(*[_get_el_attrs(el) for el in els])
