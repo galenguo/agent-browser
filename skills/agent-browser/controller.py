@@ -87,13 +87,18 @@ class BrowserController:
         session = self.sessions[session_id]
         idx = int(ref.replace("@e", ""))
 
-        if idx < len(session.elements):
-            try:
-                await session.elements[idx].fill(text)
-            except Exception:
-                pass  # 非输入元素忽略
-        else:
+        if idx >= len(session.elements):
             raise ValueError(f"Element {ref} not found. Call snapshot() first.")
+
+        try:
+            await session.elements[idx].fill(text)
+        except Exception as e:
+            # 尝试 click + type 作为回退（某些元素不支持 fill）
+            try:
+                await session.elements[idx].click()
+                await session.page.keyboard.type(text, delay=50)
+            except Exception:
+                pass
 
     async def snapshot(self, session_id: str, interactive_only: bool = False) -> Dict:
         """获取页面快照"""
