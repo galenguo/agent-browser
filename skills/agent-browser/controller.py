@@ -72,8 +72,11 @@ class BrowserController:
         if idx < len(session.elements):
             try:
                 await session.elements[idx].click()
-                # 短暂等待导航开始，不阻塞等 networkidle
-                await asyncio.sleep(0.3)
+                # 智能等待：如果触发导航则等待 domcontentloaded，否则快速返回
+                try:
+                    await session.page.wait_for_load_state("domcontentloaded", timeout=500)
+                except Exception:
+                    pass
             except Exception:
                 pass  # 元素不可点击时继续
         else:

@@ -38,7 +38,6 @@ async def generate_refs(
     """生成元素引用 + 元素句柄（同索引对应）"""
     handles: List[ElementHandle] = []
     elements: List[Dict] = []
-    seen: set = set()
 
     # 并行查询所有选择器
     try:
@@ -71,11 +70,6 @@ async def generate_refs(
 
                 if interactive_only and role not in INTERACTIVE_ROLES:
                     continue
-
-                key = f"{role}:{text or placeholder}"
-                if key in seen:
-                    continue
-                seen.add(key)
 
                 ref = f"@e{len(handles)}"
                 info = {"ref": ref, "text": text or placeholder, "role": role, "tag": tag}
