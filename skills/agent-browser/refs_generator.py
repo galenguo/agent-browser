@@ -10,7 +10,7 @@ INTERACTIVE_ROLES = {
     "menuitem", "tab", "slider", "treeitem",
 }
 
-SELECTORS = ["button", "a", "input", "textarea", "select", "[role]"]
+SELECTORS = ["button", "a", "input", "textarea", "select"]
 
 
 async def _get_el_attrs(el: ElementHandle) -> Tuple[str, str, str, str, str]:
