@@ -73,7 +73,7 @@ class BrowserController:
             try:
                 await session.elements[idx].click()
                 # 短暂等待导航开始，不阻塞等 networkidle
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.3)
             except Exception:
                 pass  # 元素不可点击时继续
         else:
