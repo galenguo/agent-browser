@@ -1,214 +1,217 @@
 ---
 name: agent-browser
 description: >
-  Control a remote anti-detection browser via Docker for web automation tasks.
-  Use bash tool with curl to call FastAPI endpoints (http://localhost:8000).
-  Use this skill whenever the user wants to automate browser interactions, visit websites,
-  scrape data, perform QR code login, fill forms, click elements, or do any multi-step
-  web task in a remote browser. Also trigger on Chinese phrases: "帮我访问", "打开浏览器",
-  "扫码登录", "自动化浏览", "网页采集", "浏览器操作", "帮我打开网站", "远程浏览器".
-  Proactively use this skill whenever the user mentions browser automation, web scraping,
-  remote browser, or wants Claude to interact with any website on their behalf — even if
-  they don't explicitly say "agent browser".
+  Anti-detection browser automation. Create sessions, navigate pages, click/fill elements, extract data.
+  Supports local browser (CLI) and remote API mode. Use for web scraping, form filling, search, login, data collection.
+  Trigger on: "帮我访问", "打开浏览器", "扫码登录", "自动化浏览", "网页采集", "浏览器操作", "帮我打开网站".
+  Proactively use when user mentions browser automation, web scraping, or wants Claude to interact with websites.
 ---
 
-# Agent Browser 使用指南
+# Agent Browser — ReAct 模式
 
-通过 **FastAPI REST API** 控制远程 Docker 浏览器，执行网页自动化任务。
+## 工作模式
 
-## API 端点
-
-使用 `bash` 工具通过 curl 调用 FastAPI（默认 `http://localhost:8000`）：
-
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/health` | GET | 检查 API 状态 |
-| `/sessions/create` | POST | 创建会话，body: `{"user_id": "..."}` |
-| `/sessions/{id}/task` | POST | 提交任务，body: `{"task": "...", "model": "glm-5-turbo", "max_steps": 6}` |
-| `/sessions/{id}/tasks/{task_id}` | GET | 查询任务状态 |
-| `/sessions/{id}` | DELETE | 删除会话 |
-| `/sessions` | GET | 列出所有会话 |
-
----
-
-## 核心约束：阻塞调用
-
-任务提交后需要轮询 `/sessions/{id}/tasks/{task_id}` 查询状态，直到 `status` 变为 `completed` 或 `failed`。**进度汇报只能发生在两次 API 调用之间。**
-
-解决方案：**分块执行循环**。利用 session 状态持久性（浏览器 URL/DOM/Cookie 在多次调用间保留），每次调用设置较短 timeout，调用结束后汇报进度、检测卡住状态，再决定继续/干预/结束。
-
----
-
-## 标准工作流
-
-### 第一步：创建会话
-
-```bash
-curl -X POST http://localhost:8000/sessions/create \
-  -H "Content-Type: application/json" \
-  -d '{"user_id": "任务名称"}'
+```
+本地模式（默认）: Agent → Python API → BrowserController → Chrome CDP
+远程模式:         Agent → curl → FastAPI → BrowserController → Docker Chrome
 ```
 
-返回 `session_id` 和 `browser_node`（可能为 null）。
+检测：`curl -s http://localhost:8000/health` 成功 → 远程模式，否则本地模式。
 
-**立即告知用户远程桌面地址：**
-- 如果 `browser_node.novnc_url` 存在：`远程桌面：{novnc_url}/vnc.html`
-- 如果为 null：`远程桌面：http://www.aiecho.site:6080/vnc.html`（默认地址）
+---
 
-**等待 10~15 秒**再执行任务，让 Docker 容器完全启动。
+## ReAct 循环
 
-### 第二步：提交任务并轮询状态
+每个任务按 **Observe → Reason & Act → Check** 循环执行：
+
+### 1. Observe（观察）
+
+获取当前页面状态：
+
+**本地模式（Python）：**
+```python
+import asyncio
+from agent_browser import create_session, delete_session, open_page, snapshot, click, fill
+
+# 创建会话
+session_id = await create_session()  # 默认 http://127.0.0.1:19222
+# 或指定 CDP: await create_session("http://host:port")
+
+# 打开页面
+await open_page(session_id, "https://example.com")
+
+# 获取快照 — 返回 {url, title, elements: [{ref, text, role}...]}
+snap = await snapshot(session_id)
+```
+
+**远程模式（curl）：**
+```bash
+# 创建会话
+SESSION=$(curl -s -X POST http://localhost:8000/sessions/create -d '{"user_id":"task"}')
+SID=$(echo $SESSION | jq -r '.session_id')
+
+# 打开页面 + 获取快照（通过 agent task）
+curl -s -X POST http://localhost:8000/sessions/$SID/task \
+  -d '{"task":"打开 https://example.com 并返回页面元素列表","max_steps":5}'
+```
+
+### 2. Reason & Act（推理并行动）
+
+分析快照中的元素，选择操作：
+
+```python
+# 分析 snap["elements"] 找到目标元素
+for el in snap["elements"]:
+    if "搜索" in el.get("text", ""):
+        await fill(session_id, el["ref"], "关键词")
+    if "提交" in el.get("text", ""):
+        await click(session_id, el["ref"])
+```
+
+**元素引用格式**: `@e0`, `@e1`, `@e2`...（通过 snapshot 获取）
+
+**可用操作**:
+| 操作 | 函数 | 说明 |
+|------|------|------|
+| 打开页面 | `open_page(sid, url)` | 导航到 URL |
+| 获取快照 | `snapshot(sid)` | 返回页面元素列表 |
+| 点击元素 | `click(sid, ref)` | 点击 @eN 元素 |
+| 填充输入 | `fill(sid, ref, text)` | 在 @eN 输入框填入文本 |
+| 关闭会话 | `delete_session(sid)` | 释放浏览器资源 |
+
+### 3. Check（验证结果）
+
+```python
+# 操作后重新获取快照验证
+snap2 = await snapshot(session_id)
+# 检查 URL 是否变化、是否出现目标元素、数据是否提取到
+```
+
+---
+
+## 标准流程
+
+### 简单导航/提取
+
+```
+1. create_session → open_page → snapshot → [分析元素] → delete_session
+```
+
+### 搜索任务
+
+```
+1. create_session → open_page(搜索页) → snapshot
+2. 找到搜索框 → fill(搜索词)
+3. snapshot → 找到搜索按钮 → click
+4. 等待加载 → snapshot → 提取结果
+5. delete_session
+```
+
+### 多步复合任务
+
+```
+1. create_session → open_page → snapshot
+2. 循环 { 观察 → 分析 → 操作 → 验证 } 直到目标达成
+3. 汇总结果 → delete_session
+```
+
+---
+
+## 远程模式分块执行
+
+远程 API 使用 agent task，需要轮询：
 
 ```bash
 # 提交任务
-curl -X POST http://localhost:8000/sessions/{session_id}/task \
-  -H "Content-Type: application/json" \
-  -d '{"task": "任务描述", "model": "glm-5-turbo", "max_steps": 6}'
-# 返回 task_id
+TASK=$(curl -s -X POST http://localhost:8000/sessions/$SID/task \
+  -d '{"task":"任务描述","model":"glm-5-turbo","max_steps":6}')
+TID=$(echo $TASK | jq -r '.task_id')
 
-# 轮询任务状态（每5秒查询一次）
-curl http://localhost:8000/sessions/{session_id}/tasks/{task_id}
+# 轮询状态
+while true; do
+  STATUS=$(curl -s http://localhost:8000/sessions/$SID/tasks/$TID)
+  STATE=$(echo $STATUS | jq -r '.status')
+  [ "$STATE" = "completed" ] || [ "$STATE" = "failed" ] && break
+  sleep 5
+done
 ```
 
-返回字段：
-- `status`: "running" | "completed" | "failed"
-- `current_step`: 当前执行到第几步
-- `last_step_at`: 最后一步的时间戳
-- `result`: 任务结果（completed 时）
-- `error`: 错误信息（failed 时）
-
-### 第三步：分块执行循环
-
-见下方"分块执行循环"章节。
-
-### 第四步：关闭会话
-
-```bash
-curl -X DELETE http://localhost:8000/sessions/{session_id}
-```
-
-任务完成后务必调用，否则容器资源持续占用。
-
----
-
-## 分块执行循环
-
-### 循环逻辑
+### 分块循环
 
 ```
-初始化：chunk_num=1, last_result="", stuck_count=0
-
+chunk=1, stuck=0
 LOOP:
-  1. 构建任务提示词（见"续接提示词模板"）
-  2. result = browser_run_task(session_id, task_prompt, max_steps=6, timeout=75)
-  3. 判断结果：
-     → 检测到 TASK_COMPLETE  → 汇报最终结果 → 关闭会话 → 结束
-     → is_stuck(result)      → stuck_count++
-                                stuck_count == 1 → 告知用户"进展缓慢，正在重试..."，继续
-                                stuck_count >= 2 → 进入用户干预流程
-     → 正常进展              → 汇报进度，last_result=result，chunk_num++，继续
+  task_result = run_task(session, prompt, max_steps=6)
+  if result contains TASK_COMPLETE → done
+  if result empty or same as last → stuck++
+  if stuck >= 2 → ask user for intervention
+  else → report progress, continue
 ```
 
-### 卡住检测规则
+### 续接提示词
 
-满足以下任一条件即判定为卡住，累计 `stuck_count`，≥2 进入用户干预流程：
-
-| 信号 | 条件 |
-|------|------|
-| 超时未完成（未启动）| `status == "running"` 且 `current_step == 0` |
-| 步骤停滞 | `status == "running"` 且 `current_step > 0` |
-| 失败超时 | `status == "failed"` 且 error 含 "timeout" |
-| 空结果 | `status == "completed"` 且 result 为空或 `[]` |
-| 循环 | result 内容与 last_result 完全相同 |
-
-> `status=running` 表示本次 chunk 在 timeout 内未完成，视为卡住；`current_step` 字段可用于诊断具体卡在哪一步。
-
-### 续接提示词模板
-
-**第一个 chunk（chunk_num == 1）：**
-```
-{original_task}
-
-当所有步骤完成后，最后一行输出：TASK_COMPLETE: {结果摘要}
-```
-
-**后续 chunk（chunk_num > 1）：**
-```
-任务：{original_task}
-
-当前浏览器状态（上一步已完成）：{last_result 的1~2句摘要}
-
-请从当前状态继续，不要重复已完成的步骤。
-当所有步骤完成后，最后一行输出：TASK_COMPLETE: {结果摘要}
-```
-
-### 完成信号检测
-
-检测 result 中是否包含 `TASK_COMPLETE:` 字符串。检测到后提取其后的摘要作为最终结果汇报给用户。
+**首轮**: `{任务描述}\n完成后输出 TASK_COMPLETE: {结果摘要}`
+**续轮**: `任务：{原始}\n已完成：{上次结果摘要}\n请继续。完成后输出 TASK_COMPLETE: {结果摘要}`
 
 ---
 
-## 用户干预流程
+## 错误处理
 
-当 stuck_count >= 2 时，停止循环，向用户发送（根据 current_step 选择合适描述）：
+| 错误 | 原因 | 处理 |
+|------|------|------|
+| `Element @eN not found` | 元素引用过期（页面变化） | 重新 snapshot 获取新 refs |
+| `CDP not initialized` | 浏览器未就绪 | 等待 5-10 秒重试 |
+| 任务空结果 | 反爬检测 | 引导用户 VNC 干预 |
+| 连续失败 | 会话异常 | 删除重建 |
 
-```
-任务卡住了，请打开远程桌面查看当前状态：
-👉 {novnc_url}/vnc.html
-
-当前进度：第 {current_step} 步超时未完成（current_step==0 则为初始化卡住）
-
-请告诉我：
-1. 页面上显示什么？
-2. 是否需要手动操作（验证码、登录等）？
-3. 完成后告诉我，我会继续。
-```
-
-收到用户回复后，将用户描述的状态注入续接提示词，重置 stuck_count=0，继续循环。
+**重试策略**: 同一操作失败 3 次 → 换选择器策略 → 仍失败 → 报告用户
 
 ---
 
-## 进度汇报规范
+## 扫码登录
 
-每个 chunk 完成后主动告知用户：
-- 当前处于哪个阶段（从 result 内容推断，如"已打开登录页"、"正在搜索"）
-- 是否正常进展 / 超时重试 / 空结果
-- 复杂任务每次提醒远程桌面链接
-
-示例：
 ```
-✅ 第1轮完成：已打开 Boss直聘 并进入搜索页
-   远程桌面：{novnc_url}/vnc.html
-   继续执行第2轮...
+1. create_session → 告知用户 VNC 地址
+2. 等待 15s → 导航到登录页
+3. 点击"扫码登录" → 告知用户扫码
+4. 用户确认后继续
 ```
 
 ---
 
-## 扫码登录场景
+## 使用示例
 
-扫码登录是干预流程的典型场景，按以下步骤处理：
+### 百度搜索并提取结果
+```python
+sid = await create_session()
+await open_page(sid, "https://www.baidu.com")
+snap = await snapshot(sid)
 
-1. `browser_create_session` → 告知用户 `{novnc_url}/vnc.html`
-2. 等待 15 秒
-3. 执行导航到登录页（max_steps=5, timeout=30）
-4. 执行点击"扫码登录"（max_steps=5, timeout=30）
-5. **主动告知用户**：
-   ```
-   请在远程桌面扫码：{novnc_url}/vnc.html
-   扫码完成后告诉我，我会继续后续操作。
-   ```
-6. 等用户确认后继续
+# 找搜索框
+search_ref = next(e["ref"] for e in snap["elements"] if e["role"] == "input")
+await fill(sid, search_ref, "AI coding")
 
----
+# 找搜索按钮并点击
+snap2 = await snapshot(sid)
+btn_ref = next(e["ref"] for e in snap2["elements"] if "百度一下" in e.get("text",""))
+await click(sid, btn_ref)
 
-## 常见问题处理
+# 提取结果
+import asyncio; await asyncio.sleep(3)
+snap3 = await snapshot(sid)
+results = [e["text"] for e in snap3["elements"] if e["role"] == "a" and e["text"]]
+await delete_session(sid)
+```
 
-| 现象 | 原因 | 处理方式 |
-|------|------|---------|
-| `CDP client not initialized` | 容器还没完全启动 | 等 5~10 秒重试 |
-| 任务返回空结果 `[]` | 目标页面有反爬检测 | 触发卡住检测，引导用户 VNC 干预 |
-| 任务超时 | timeout 太短或页面加载慢 | 自动重试，stuck_count 累计后干预 |
-| 连续 3 次失败 | 会话异常 | 删除会话重建 |
-| result 与上次相同 | agent 在循环 | 触发卡住检测，修改提示词重试 |
-| `status=running` 超时返回（current_step==0）| 初始化卡住（浏览器连接或第1步超时）| 触发卡住检测，stuck_count++ |
-| `status=running` 超时返回（current_step>0）| 第N步停滞（LLM/DOM超时）| 触发卡住检测，stuck_count++，干预时告知第N步 |
+### 远程模式 Boss 直聘搜索
+```bash
+# 创建会话
+SID=$(curl -s -X POST http://localhost:8000/sessions/create -d '{"user_id":"zhipin"}' | jq -r '.session_id')
+
+# 提交搜索任务
+curl -s -X POST http://localhost:8000/sessions/$SID/task \
+  -d '{"task":"访问 Boss直聘 搜索 Python 工程师，提取前10条职位信息","model":"glm-5-turbo","max_steps":10}'
+
+# 清理
+curl -s -X DELETE http://localhost:8000/sessions/$SID
+```
