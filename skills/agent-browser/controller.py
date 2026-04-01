@@ -72,10 +72,10 @@ class BrowserController:
         if idx < len(session.elements):
             try:
                 await session.elements[idx].click()
-                # 等待导航或网络空闲
-                await session.page.wait_for_load_state("networkidle", timeout=5000)
+                # 短暂等待导航开始，不阻塞等 networkidle
+                await asyncio.sleep(0.5)
             except Exception:
-                pass  # 超时继续
+                pass  # 元素不可点击时继续
         else:
             raise ValueError(f"Element {ref} not found. Call snapshot() first.")
 
