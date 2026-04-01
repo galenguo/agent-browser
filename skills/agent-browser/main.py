@@ -34,20 +34,3 @@ async def click(session_id: str, ref: str):
 async def fill(session_id: str, ref: str, text: str):
     """填充输入"""
     await _manager.controller.fill(session_id, ref, text)
-
-
-# ── ReAct 辅助方法 ──
-
-async def observe(session_id: str):
-    """Observe: 获取页面状态 + 元素分析"""
-    return await _manager.controller.observe(session_id)
-
-
-async def reason_and_act(session_id: str, goal: str, observation: dict):
-    """Reason & Act: 根据目标和观察执行操作"""
-    return await _manager.controller.reason_and_act(session_id, goal, observation)
-
-
-async def check_result(session_id: str, expected: str):
-    """Check: 验证当前页面是否符合预期"""
-    return await _manager.controller.check_result(session_id, expected)

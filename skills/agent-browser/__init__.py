@@ -6,9 +6,6 @@ from .main import (
     snapshot,
     click,
     fill,
-    observe,
-    reason_and_act,
-    check_result,
 )
 
 __all__ = [
@@ -18,7 +15,4 @@ __all__ = [
     "snapshot",
     "click",
     "fill",
-    "observe",
-    "reason_and_act",
-    "check_result",
 ]
