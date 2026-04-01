@@ -10,7 +10,8 @@ INTERACTIVE_ROLES = {
     "menuitem", "tab", "slider", "treeitem",
 }
 
-SELECTORS = ["button", "a", "input", "textarea", "select"]
+# 单一组合选择器替代多次查询
+COMBINED_SELECTOR = "button, a, input, textarea, select"
 
 
 async def _get_el_attrs(el: ElementHandle) -> Tuple[str, str, str, str, str]:
@@ -39,21 +40,15 @@ async def generate_refs(
     handles: List[ElementHandle] = []
     elements: List[Dict] = []
 
-    # 并行查询所有选择器
+    # 单次查询获取所有可交互元素
     try:
-        all_els = await asyncio.gather(
-            *[page.query_selector_all(sel) for sel in SELECTORS],
-            return_exceptions=True
-        )
+        els = await page.query_selector_all(COMBINED_SELECTOR)
     except Exception:
         return elements, handles
 
-    for els in all_els:
-        if isinstance(els, Exception):
-            continue
-        # 并行获取所有元素属性
-        attrs_list = await asyncio.gather(*[_get_el_attrs(el) for el in els])
-        for el, (text, tag, role_attr, input_type, placeholder) in zip(els, attrs_list):
+    # 并行获取所有元素属性
+    attrs_list = await asyncio.gather(*[_get_el_attrs(el) for el in els])
+    for el, (text, tag, role_attr, input_type, placeholder) in zip(els, attrs_list):
             try:
                 if role_attr and role_attr not in INTERACTIVE_ROLES:
                     role = role_attr
