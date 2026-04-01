@@ -10,7 +10,7 @@ class SessionManager:
     def __init__(self):
         self.controller = BrowserController()
 
-    async def create_session(self, cdp_url: str = "ws://127.0.0.1:19222") -> str:
+    async def create_session(self, cdp_url: str = "http://127.0.0.1:19222") -> str:
         """创建会话"""
         session_id = str(uuid.uuid4())
         await self.controller.create_session(session_id, cdp_url)

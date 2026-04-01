@@ -27,10 +27,13 @@ class BrowserController:
         if not self._playwright:
             self._playwright = await async_playwright().start()
 
+        # Playwright connect_over_cdp 需要 HTTP URL，自动转换 ws:// 为 http://
+        if cdp_url.startswith("ws://"):
+            cdp_url = "http://" + cdp_url[5:]
         browser = await self._playwright.chromium.connect_over_cdp(cdp_url)
         return browser
 
-    async def create_session(self, session_id: str, cdp_url: str = "ws://127.0.0.1:19222") -> BrowserSession:
+    async def create_session(self, session_id: str, cdp_url: str = "http://127.0.0.1:19222") -> BrowserSession:
         """创建会话"""
         browser = await self.connect(cdp_url)
         context = await browser.new_context()

@@ -6,7 +6,7 @@ from .session_manager import SessionManager
 _manager = SessionManager()
 
 
-async def create_session(cdp_url: str = "ws://127.0.0.1:19222") -> str:
+async def create_session(cdp_url: str = "http://127.0.0.1:19222") -> str:
     """创建会话"""
     return await _manager.create_session(cdp_url)
 
