@@ -1,4 +1,4 @@
-"""元素引用生成器 — 使用 query_selector_all + accessibility 快照混合"""
+"""元素引用生成器 — 使用 query_selector_all"""
 from typing import List, Dict, Tuple
 from playwright.async_api import Page, ElementHandle
 
@@ -68,27 +68,4 @@ async def generate_refs(
             except Exception:
                 continue
 
-    # 用 accessibility 快照补充空 text
-    try:
-        acc = await page.accessibility.snapshot()
-        if acc:
-            acc_names = {}
-            _collect_acc_names(acc, acc_names)
-            for info in elements:
-                if not info.get("text"):
-                    info["text"] = acc_names.get(info["role"], "")[:80]
-    except Exception:
-        pass
-
     return elements, handles
-
-
-def _collect_acc_names(node: dict, out: dict, depth: int = 0):
-    if depth > 15 or not node:
-        return
-    role = node.get("role", "")
-    name = node.get("name", "")
-    if role and name:
-        out.setdefault(role, name)
-    for child in node.get("children", []):
-        _collect_acc_names(child, out, depth + 1)
