@@ -3,6 +3,7 @@ import asyncio
 from typing import Dict, Optional, List
 from dataclasses import dataclass
 from playwright.async_api import async_playwright, Browser, Page, Playwright, ElementHandle
+from .refs_generator import generate_refs
 
 
 @dataclass
@@ -92,26 +93,14 @@ class BrowserController:
             raise ValueError(f"Element {ref} not found. Call snapshot() first.")
 
     async def snapshot(self, session_id: str, interactive_only: bool = False) -> Dict:
-        """获取页面快照"""
+        """获取页面快照（使用 refs_generator 混合检测）"""
         session = self.sessions[session_id]
         page = session.page
 
-        # 清空旧的元素句柄
-        session.elements.clear()
-        elements = []
+        elements, handles = await generate_refs(page, interactive_only)
 
-        # 获取所有可交互元素
-        selectors = ["button", "a", "input", "textarea"]
-        for sel in selectors:
-            els = await page.query_selector_all(sel)
-            for el in els:
-                text = await el.text_content() or ""
-                elements.append({
-                    "ref": f"@e{len(session.elements)}",
-                    "text": text.strip()[:50],
-                    "role": sel
-                })
-                session.elements.append(el)
+        # 更新元素句柄
+        session.elements = handles
 
         return {
             "url": page.url,
