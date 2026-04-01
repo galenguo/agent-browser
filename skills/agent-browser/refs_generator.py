@@ -1,4 +1,5 @@
 """元素引用生成器 — 使用 query_selector_all"""
+import asyncio
 from typing import List, Dict, Tuple
 from playwright.async_api import Page, ElementHandle
 
@@ -10,6 +11,24 @@ INTERACTIVE_ROLES = {
 }
 
 SELECTORS = ["button", "a", "input", "textarea", "select", "[role]"]
+
+
+async def _get_el_attrs(el: ElementHandle) -> Tuple[str, str, str, str, str]:
+    """并行获取元素属性"""
+    text, tag, role_attr, input_type, placeholder = await asyncio.gather(
+        el.text_content(),
+        el.evaluate("e => e.tagName.toLowerCase()"),
+        el.get_attribute("role"),
+        el.get_attribute("type"),
+        el.get_attribute("placeholder"),
+    )
+    return (
+        (text or "").strip()[:80],
+        tag or "",
+        role_attr or "",
+        input_type or "",
+        placeholder or "",
+    )
 
 
 async def generate_refs(
@@ -26,18 +45,12 @@ async def generate_refs(
             els = await page.query_selector_all(sel)
         except Exception:
             continue
-        for el in els:
+        # 并行获取所有元素属性
+        attrs_list = await asyncio.gather(*[_get_el_attrs(el) for el in els])
+        for el, (text, tag, role_attr, input_type, placeholder) in zip(els, attrs_list):
             try:
-                text = (await el.text_content() or "").strip()[:80]
-
-                tag = await el.evaluate("e => e.tagName.toLowerCase()")
-                role_attr = await el.get_attribute("role") or ""
-                input_type = await el.get_attribute("type") or ""
-                placeholder = await el.get_attribute("placeholder") or ""
-
-                # 确定 role — 保持与旧 controller 一致（用 tag 名而非语义 role）
                 if role_attr and role_attr not in INTERACTIVE_ROLES:
-                    role = role_attr  # 保留自定义 role
+                    role = role_attr
                 elif tag == "button" or (tag == "input" and input_type in ("submit", "button", "reset")):
                     role = "button"
                 elif tag == "a":
@@ -52,7 +65,6 @@ async def generate_refs(
                 if interactive_only and role not in INTERACTIVE_ROLES:
                     continue
 
-                # 去重
                 key = f"{role}:{text or placeholder}"
                 if key in seen:
                     continue
