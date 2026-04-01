@@ -5,7 +5,10 @@ from .main import (
     open_page,
     snapshot,
     click,
-    fill
+    fill,
+    observe,
+    reason_and_act,
+    check_result,
 )
 
 __all__ = [
@@ -14,5 +17,8 @@ __all__ = [
     "open_page",
     "snapshot",
     "click",
-    "fill"
+    "fill",
+    "observe",
+    "reason_and_act",
+    "check_result",
 ]
