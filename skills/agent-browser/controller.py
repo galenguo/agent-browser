@@ -96,17 +96,18 @@ class BrowserController:
             raise ValueError(f"Element {ref} not found. Call snapshot() first.")
 
     async def snapshot(self, session_id: str, interactive_only: bool = False) -> Dict:
-        """获取页面快照（使用 refs_generator 混合检测）"""
+        """获取页面快照"""
         session = self.sessions[session_id]
         page = session.page
 
-        elements, handles = await generate_refs(page, interactive_only)
+        # 并行获取元素列表和页面信息
+        (elements_info, url, title) = await asyncio.gather(
+            generate_refs(page, interactive_only),
+            page.evaluate("() => location.href"),
+            page.title(),
+        )
+        elements, handles = elements_info
 
-        # 更新元素句柄
         session.elements = handles
 
-        return {
-            "url": page.url,
-            "title": await page.title(),
-            "elements": elements
-        }
+        return {"url": url, "title": title, "elements": elements}
