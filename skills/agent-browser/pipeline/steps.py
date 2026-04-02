@@ -250,37 +250,6 @@ async def step_map(session_id: str, params: Any, data: Any,
     if not isinstance(params, dict):
         return data
 
-    # 浏览器端 map: 使用 JS 模板在 DOM 元素上提取字段
-    # 检查是否有 querySelector 等浏览器操作
-    first_val = next(iter(params.values()), "")
-    if isinstance(first_val, str) and "querySelector" in first_val:
-        # 这是浏览器 DOM 映射，已在 select step 处理
-        # 这里做字段映射
-        page = _get_page(session_id)
-        mapping_js = {}
-        for key, tmpl in params.items():
-            mapping_js[key] = tmpl
-
-        js = f"""
-        (() => {{
-            const items = arguments[0];
-            const mapping = {json.dumps(mapping_js)};
-            return items.map((item, index) => {{
-                const result = {{}};
-                for (const [key, tmpl] of Object.entries(mapping)) {{
-                    // 简单文本替换模板
-                    let val = tmpl;
-                    val = val.replace(/\\${{\\{{\\s*index\\s*\\}}}}/g, index + 1);
-                    val = val.replace(/\\${{\\{{\\s*item\\.([\\w.]+)\\s*\\}}}}/g,
-                        (_, path) => path.split('.').reduce((o, k) => o?.[k], item) || '');
-                    result[key] = val;
-                }}
-                return result;
-            }});
-        }})()
-        """
-        return await page.evaluate(js, data)
-
     # 纯数据映射（无浏览器依赖）
     result = []
     for i, item in enumerate(data):
