@@ -162,6 +162,7 @@ class BrowserController:
         const metaDesc = document.querySelector('meta[name="description"]')?.content || '';
         return {
             href: location.href,
+            title: document.title,
             pageText: pageText,
             scrollPercent: Math.round(scrollY / scrollMax * 100),
             scrollY: scrollY,
@@ -177,23 +178,22 @@ class BrowserController:
         session = self.sessions[session_id]
         page = session.page
 
-        # 并行获取元素列表 + 页面信息
+        # 并行获取元素列表 + 页面信息 + 截图
         results = await asyncio.gather(
             generate_refs(page, interactive_only),
-            page.title(),
             page.evaluate(self._PAGE_INFO_JS),
             page.screenshot(type="jpeg", quality=30),
             return_exceptions=True,
         )
-        elements_info, title, page_info = results[0], results[1], results[2]
-        screenshot_bytes = results[3] if not isinstance(results[3], Exception) else b""
+        elements_info, page_info = results[0], results[1]
+        screenshot_bytes = results[2] if not isinstance(results[2], Exception) else b""
         elements, handles = elements_info
 
         session.elements = handles
 
         result = {
             "url": page_info["href"],
-            "title": title,
+            "title": page_info["title"],
             "page_text": page_info["pageText"],
             "scroll_percent": page_info["scrollPercent"],
             "viewport_height": page_info["viewportHeight"],
