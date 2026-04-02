@@ -92,7 +92,7 @@ class BrowserController:
             await session.elements[idx].click()
             # 智能等待：如果触发导航则等待 domcontentloaded，否则快速返回
             try:
-                await session.page.wait_for_load_state("domcontentloaded", timeout=500)
+                await session.page.wait_for_load_state("domcontentloaded", timeout=300)
             except Exception:
                 pass
         except Exception:
