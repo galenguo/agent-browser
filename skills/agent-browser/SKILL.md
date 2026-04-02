@@ -44,17 +44,6 @@ await open_page(session_id, "https://example.com")
 snap = await snapshot(session_id)
 ```
 
-**远程模式（curl）：**
-```bash
-# 创建会话
-SESSION=$(curl -s -X POST http://localhost:8000/sessions/create -d '{"user_id":"task"}')
-SID=$(echo $SESSION | jq -r '.session_id')
-
-# 打开页面 + 获取快照（通过 agent task）
-curl -s -X POST http://localhost:8000/sessions/$SID/task \
-  -d '{"task":"打开 https://example.com 并返回页面元素列表","max_steps":5}'
-```
-
 ### 2. Reason & Act（推理并行动）
 
 分析快照中的元素，选择操作：
