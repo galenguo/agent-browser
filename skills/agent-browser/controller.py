@@ -182,7 +182,7 @@ class BrowserController:
         results = await asyncio.gather(
             generate_refs(page, interactive_only),
             page.evaluate(self._PAGE_INFO_JS),
-            page.screenshot(type="jpeg", quality=30),
+            page.screenshot(type="jpeg", quality=20),
             return_exceptions=True,
         )
         elements_info, page_info = results[0], results[1]
