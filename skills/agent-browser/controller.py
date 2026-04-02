@@ -55,8 +55,14 @@ class BrowserController:
         """删除会话"""
         if session_id in self.sessions:
             session = self.sessions[session_id]
-            await session.page.close()
-            await session.browser.close()
+            try:
+                await session.page.close()
+            except Exception:
+                pass
+            try:
+                await session.browser.close()
+            except Exception:
+                pass
             del self.sessions[session_id]
 
     async def open(self, session_id: str, url: str):
