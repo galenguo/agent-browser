@@ -96,7 +96,11 @@ class BrowserController:
             except Exception:
                 pass
         except Exception:
-            pass  # 元素不可点击时继续
+            # Fallback: use JS click() for elements that Playwright can't click
+            try:
+                await session.elements[idx].evaluate("el => el.click()")
+            except Exception:
+                pass
 
     async def fill(self, session_id: str, ref: str, text: str):
         """填充输入框"""
