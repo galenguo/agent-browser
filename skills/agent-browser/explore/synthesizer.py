@@ -192,7 +192,7 @@ def _generate_dom_adapter(
                         items.push({
                             title: titleEl ? titleEl.textContent.trim() : '',
                             url: linkEl ? linkEl.href : '',
-                            text: el.textContent.trim().substring(0, 200)
+                            text: el.textContent.trim().substring(0, 100)
                         });
                     });
                     return items;
