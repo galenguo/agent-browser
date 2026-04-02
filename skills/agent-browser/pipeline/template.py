@@ -1,6 +1,5 @@
 """模板表达式引擎 — 解析 ${{ }} 表达式"""
 import re
-import json
 from typing import Any
 from urllib.parse import quote_plus
 
@@ -126,18 +125,8 @@ def _apply_pipe(value: Any, pipe_name: str) -> Any:
     """应用管道过滤器"""
     if pipe_name == "urlencode":
         return quote_plus(str(value)) if value is not None else ""
-    elif pipe_name == "json":
-        return json.dumps(value, ensure_ascii=False)
     elif pipe_name == "lower":
         return str(value).lower()
     elif pipe_name == "upper":
         return str(value).upper()
-    elif pipe_name == "strip":
-        return str(value).strip()
-    elif pipe_name == "int":
-        return int(value) if value is not None else 0
-    elif pipe_name == "length":
-        return len(value) if value is not None else 0
-    elif pipe_name == "default":
-        return value
     return value

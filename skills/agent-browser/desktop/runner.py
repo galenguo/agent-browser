@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-from .cdp_discovery import discover_cdp, get_cached_cdp
+from .cdp_discovery import discover_cdp, get_cdp
 from .applescript import (
     run_applescript, is_app_running, activate_app, screenshot_window,
 )
@@ -111,7 +111,7 @@ async def run_desktop_command(
 
         elif "cdp_evaluate" in step:
             js_code = step["cdp_evaluate"]
-            cdp_url = await get_cached_cdp(app_name)
+            cdp_url = await get_cdp(app_name)
             if cdp_url:
                 try:
                     from ..main import _manager, create_session

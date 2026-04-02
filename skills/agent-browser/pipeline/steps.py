@@ -3,8 +3,7 @@ import asyncio
 import json
 import logging
 import random
-from typing import Any, Callable, Dict, Optional
-from urllib.parse import urlencode
+from typing import Any, Callable, Dict
 
 from .template import resolve
 
@@ -31,16 +30,6 @@ def _get_page(session_id: str):
     return session.page
 
 
-def _get_behavior():
-    """获取 HumanBehaviorSimulator（按需导入，避免循环依赖）"""
-    try:
-        from src.browser.human_behavior import HumanBehaviorSimulator
-        return HumanBehaviorSimulator()
-    except ImportError:
-        # skill 模式下可能没有 src 层，使用简化版
-        return None
-
-
 async def _stealth_delay(stealth: dict, key: str = "default"):
     """隐匿性延迟"""
     delay_range = stealth.get("request_delay", [0.3, 1.5])
@@ -62,12 +51,6 @@ async def step_navigate(session_id: str, params: Any, data: Any,
 
     await page.goto(url, wait_until="domcontentloaded", timeout=20000)
 
-    # 隐匿性：导航后模拟人类行为
-    behavior = _get_behavior()
-    if behavior:
-        await behavior._random_scroll(page)
-        await behavior._random_mouse_move(page)
-
     return data
 
 
@@ -77,12 +60,6 @@ async def step_evaluate(session_id: str, params: Any, data: Any,
     """在浏览器中执行 JS"""
     js_code = resolve(str(params), **context)
     page = _get_page(session_id)
-
-    # 隐匿性：evaluate 前随机滚动
-    if stealth.get("scroll_before"):
-        behavior = _get_behavior()
-        if behavior:
-            await behavior._random_scroll(page)
 
     result = await page.evaluate(js_code)
     return result
@@ -95,20 +72,16 @@ async def step_click(session_id: str, params: Any, data: Any,
     selector = resolve(str(params), **context)
     page = _get_page(session_id)
 
-    behavior = _get_behavior()
-    if behavior and stealth.get("human_click", True):
-        # 使用人类点击模拟
-        loc = page.locator(selector)
-        if await loc.count() > 0:
-            await loc.first.hover()
-            await asyncio.sleep(random.uniform(0.2, 0.8))
-            await loc.first.click()
-            await asyncio.sleep(random.uniform(0.3, 1.0))
-        return data
+    loc = page.locator(selector)
+    if await loc.count() > 0:
+        await loc.first.hover()
+        await asyncio.sleep(random.uniform(0.2, 0.8))
+        await loc.first.click()
+        await asyncio.sleep(random.uniform(0.3, 1.0))
+    else:
+        await page.click(selector)
+        await asyncio.sleep(random.uniform(0.3, 0.8))
 
-    # 回退：直接点击
-    await page.click(selector)
-    await asyncio.sleep(random.uniform(0.3, 0.8))
     return data
 
 
@@ -125,13 +98,9 @@ async def step_type(session_id: str, params: Any, data: Any,
 
     page = _get_page(session_id)
 
-    behavior = _get_behavior()
-    if behavior and stealth.get("human_type", True):
-        await behavior.human_type(page, selector, text, clear_first=True)
-    else:
-        loc = page.locator(selector)
-        await loc.click()
-        await page.keyboard.type(text, delay=30)
+    loc = page.locator(selector)
+    await loc.click()
+    await page.keyboard.type(text, delay=30)
 
     return data
 
@@ -218,16 +187,6 @@ async def step_fetch(session_id: str, params: Any, data: Any,
                     result = text
 
     return result
-
-
-@register("screenshot")
-async def step_screenshot(session_id: str, params: Any, data: Any,
-                          context: dict, stealth: dict) -> Any:
-    """截图（使用 page.screenshot）"""
-    page = _get_page(session_id)
-    path = resolve(str(params), **context) if params else "screenshot.png"
-    await page.screenshot(path=path)
-    return data
 
 
 # ─── 数据 Steps（不需要浏览器）─────────────────────────────
@@ -373,26 +332,6 @@ async def step_filter(session_id: str, params: Any, data: Any,
     return data
 
 
-@register("sort")
-async def step_sort(session_id: str, params: Any, data: Any,
-                    context: dict, stealth: dict) -> Any:
-    """排序"""
-    if not isinstance(data, list):
-        return data
-
-    key = params if isinstance(params, str) else params.get("key", "")
-    reverse = False
-    if isinstance(params, dict):
-        reverse = params.get("reverse", False)
-
-    if key and data and isinstance(data[0], dict):
-        data.sort(key=lambda x: x.get(key, ""), reverse=reverse)
-    else:
-        data.sort(reverse=reverse)
-
-    return data
-
-
 @register("limit")
 async def step_limit(session_id: str, params: Any, data: Any,
                      context: dict, stealth: dict) -> Any:
@@ -405,20 +344,6 @@ async def step_limit(session_id: str, params: Any, data: Any,
     if isinstance(data, list):
         return data[:n]
     return data
-
-
-@register("extract")
-async def step_extract(session_id: str, params: Any, data: Any,
-                       context: dict, stealth: dict) -> Any:
-    """从页面提取数据（evaluate + JSON 解析）"""
-    js_code = resolve(str(params), **context)
-    page = _get_page(session_id)
-    result = await page.evaluate(js_code)
-
-    # 隐匿性延迟
-    await _stealth_delay(stealth)
-
-    return result
 
 
 @register("tap")

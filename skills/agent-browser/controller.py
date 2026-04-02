@@ -2,7 +2,7 @@
 import asyncio
 from typing import Dict, Optional, List
 from dataclasses import dataclass
-from playwright.async_api import async_playwright, Browser, Page, Playwright, ElementHandle
+from playwright.async_api import async_playwright, Browser, Page, Playwright
 from .refs_generator import generate_refs, COMBINED_SELECTOR
 
 
@@ -12,7 +12,7 @@ class BrowserSession:
     session_id: str
     browser: Browser
     page: Page
-    dom_indices: List[int]  # 存储可见元素在 DOM 中的索引（延迟获取句柄）
+    dom_indices: List[int]  # 存储可见元素在 DOM 中的索引（用于 JS 直接操作）
     _snapshot_cache: Optional[Dict] = None  # open_page 后的快照缓存
 
 
@@ -43,24 +43,13 @@ class BrowserController:
                     await asyncio.sleep(0.3 * (attempt + 1))
         raise last_err
 
-    async def _get_element(self, session_id: str, ref: str) -> ElementHandle:
-        """通过 ref 延迟获取元素句柄（按 DOM 索引）"""
+    def _resolve_dom_idx(self, session_id: str, ref: str) -> int:
+        """将 ref (@eN) 解析为 DOM 索引"""
         session = self.sessions[session_id]
         idx = int(ref.replace("@e", ""))
-
         if idx >= len(session.dom_indices):
             raise ValueError(f"Element {ref} not found (have {len(session.dom_indices)} elements). Call snapshot() first.")
-
-        dom_idx = session.dom_indices[idx]
-
-        # 通过 evaluate_handle 获取指定 DOM 索引的元素
-        element = await session.page.evaluate_handle(
-            f"document.querySelectorAll('{COMBINED_SELECTOR}')[{dom_idx}]"
-        )
-        if not element:
-            raise ValueError(f"Element {ref} not found in DOM")
-
-        return element.as_element()
+        return session.dom_indices[idx]
 
     async def create_session(self, session_id: str, cdp_url: str = "http://127.0.0.1:19222") -> BrowserSession:
         """创建会话"""
@@ -110,21 +99,20 @@ class BrowserController:
             session._snapshot_cache = None
 
     async def click(self, session_id: str, ref: str):
-        """点击元素"""
-        el = await self._get_element(session_id, ref)
-        await el.click()
+        """点击元素（直接 JS，无 ElementHandle）"""
+        dom_idx = self._resolve_dom_idx(session_id, ref)
+        session = self.sessions[session_id]
+        await session.page.evaluate(f"document.querySelectorAll('{COMBINED_SELECTOR}')[{dom_idx}].click()")
 
     async def fill(self, session_id: str, ref: str, text: str):
-        """填充输入框"""
-        el = await self._get_element(session_id, ref)
-        try:
-            await el.fill(text)
-        except Exception:
-            # Fallback: JS value set（支持 contenteditable 等非标准输入元素）
-            try:
-                await el.evaluate(f"el => {{ el.value = '{text}'; }}")
-            except Exception:
-                pass
+        """填充输入框（直接 JS，无 ElementHandle）"""
+        dom_idx = self._resolve_dom_idx(session_id, ref)
+        session = self.sessions[session_id]
+        escaped = text.replace("\\", "\\\\").replace("'", "\\'")
+        await session.page.evaluate(
+            f"(el => {{ el.focus(); el.value = '{escaped}'; el.dispatchEvent(new Event('input', {{bubbles: true}})); }})"
+            f"(document.querySelectorAll('{COMBINED_SELECTOR}')[{dom_idx}])"
+        )
 
     async def scroll(self, session_id: str, direction: str = "down", amount: int = 500):
         """滚动页面"""
@@ -133,14 +121,25 @@ class BrowserController:
         await session.page.mouse.wheel(0, delta)
 
     async def select_option(self, session_id: str, ref: str, value: str):
-        """选择下拉选项"""
-        el = await self._get_element(session_id, ref)
-        await el.select_option(value)
+        """选择下拉选项（直接 JS，无 ElementHandle）"""
+        dom_idx = self._resolve_dom_idx(session_id, ref)
+        session = self.sessions[session_id]
+        escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+        await session.page.evaluate(
+            f"(el => {{ el.value = '{escaped}'; el.dispatchEvent(new Event('change', {{bubbles: true}})); }})"
+            f"(document.querySelectorAll('{COMBINED_SELECTOR}')[{dom_idx}])"
+        )
 
     async def hover(self, session_id: str, ref: str):
-        """悬停元素"""
-        el = await self._get_element(session_id, ref)
-        await el.hover()
+        """悬停元素（通过坐标 + JS 混合）"""
+        dom_idx = self._resolve_dom_idx(session_id, ref)
+        session = self.sessions[session_id]
+        box = await session.page.evaluate(
+            f"(el => {{ const r = el.getBoundingClientRect(); return {{x: r.x + r.width/2, y: r.y + r.height/2}}; }})"
+            f"(document.querySelectorAll('{COMBINED_SELECTOR}')[{dom_idx}])"
+        )
+        if box:
+            await session.page.mouse.move(box["x"], box["y"])
 
     async def press_key(self, session_id: str, key: str):
         """按键（Enter, Tab, Escape 等）"""

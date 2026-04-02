@@ -11,36 +11,20 @@ logger = logging.getLogger(__name__)
 # 内存注册表: {(site, name): adapter_dict}
 _registry: Dict[tuple, dict] = {}
 
-# 是否已加载
-_loaded = False
-
-# 默认适配器目录（相对于项目根目录）
-_DEFAULT_ADAPTER_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-    "adapters",
-)
+# 默认适配器目录（项目根目录下的 adapters/）
+_ADAPTER_DIR = str(Path(__file__).resolve().parents[2] / "adapters")
 
 
-def load_adapters(adapter_dir: Optional[str] = None) -> int:
-    """
-    扫描适配器目录，加载所有 YAML 文件。
-
-    Returns:
-        加载的适配器数量
-    """
-    global _loaded, _registry
-
-    if _loaded:
-        return len(_registry)
-
-    adapter_dir = adapter_dir or _DEFAULT_ADAPTER_DIR
+def _ensure_loaded():
+    """确保适配器已加载（惰性扫描）"""
+    if _registry:
+        return
+    adapter_dir = _ADAPTER_DIR
     if not os.path.isdir(adapter_dir):
         logger.warning(f"Adapter directory not found: {adapter_dir}")
-        return 0
+        return
 
-    count = 0
     for root, dirs, files in os.walk(adapter_dir):
-        # 跳过 _shared 目录
         if "_shared" in root:
             continue
         for fname in files:
@@ -56,20 +40,16 @@ def load_adapters(adapter_dir: Optional[str] = None) -> int:
                 key = (adapter["site"], adapter["name"])
                 adapter["_file"] = fpath
                 _registry[key] = adapter
-                count += 1
                 logger.debug(f"Loaded adapter: {key}")
             except Exception as e:
                 logger.warning(f"Failed to load adapter {fpath}: {e}")
 
-    _loaded = True
-    logger.info(f"Loaded {count} adapters from {adapter_dir}")
-    return count
+    logger.info(f"Loaded {len(_registry)} adapters from {adapter_dir}")
 
 
 def list_adapters() -> List[dict]:
     """列出所有已注册的适配器"""
-    if not _loaded:
-        load_adapters()
+    _ensure_loaded()
     return [
         {
             "site": key[0],
@@ -85,6 +65,5 @@ def list_adapters() -> List[dict]:
 
 def get_adapter(site: str, name: str) -> Optional[dict]:
     """获取指定适配器"""
-    if not _loaded:
-        load_adapters()
+    _ensure_loaded()
     return _registry.get((site, name))

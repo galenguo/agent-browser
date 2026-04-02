@@ -2,7 +2,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from .loader import get_adapter, load_adapters
+from .loader import get_adapter
 from ..pipeline.executor import execute_pipeline
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,7 @@ async def run_adapter(
     Returns:
         提取的数据列表
     """
-    # 确保 adapters 已加载
-    load_adapters()
+    # 确保 adapters 已加载（get_adapter 内部调用 _ensure_loaded）
 
     adapter = get_adapter(site, command)
     if not adapter:
