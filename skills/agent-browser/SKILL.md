@@ -76,7 +76,7 @@ for el in snap["elements"]:
     "title": "页面标题",
     "page_text": "页面可见文本前 80 字符",
     "scroll_percent": 0,   # 滚动位置百分比 (0-100)
-    "elements": [{"ref": "@e0", "text": "...", "role": "a", "tag": "a"}, ...]
+    "elements": [{"ref": "@e0", "text": "...", "role": "a"}, ...]
 }
 ```
 
