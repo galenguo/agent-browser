@@ -158,26 +158,13 @@ class BrowserController:
         session = self.sessions[session_id]
         await session.page.go_back(wait_until="domcontentloaded", timeout=10000)
 
-    # JS 提取页面标题和 URL
-    _PAGE_INFO_JS = """
-    () => {
-        return {
-            href: location.href,
-            title: document.title,
-        };
-    }
-    """
-
     async def snapshot(self, session_id: str, interactive_only: bool = False) -> Dict:
         """获取页面快照"""
         session = self.sessions[session_id]
         page = session.page
 
-        # 并行获取元素列表 + 页面信息
-        (elements, handles), page_info = await asyncio.gather(
-            generate_refs(page, interactive_only),
-            page.evaluate(self._PAGE_INFO_JS),
-        )
+        # 单次 JS 评估获取元素列表 + 页面信息 + 句柄
+        elements, handles, page_info = await generate_refs(page, interactive_only)
 
         session.elements = handles
 
