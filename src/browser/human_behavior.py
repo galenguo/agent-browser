@@ -149,7 +149,7 @@ class HumanBehaviorSimulator:
     async def _random_mouse_move(self, page: Page) -> None:
         """随机鼠标游走（使用贝塞尔曲线模拟真人轨迹）"""
         viewport = page.viewport_size or {"width": 1920, "height": 1080}
-        moves = random.randint(2, 4)
+        moves = random.randint(1, 2)
 
         # 起始位置
         cx = random.randint(200, viewport["width"] - 200)
