@@ -112,6 +112,14 @@ class BrowserController:
         delta = amount if direction == "down" else -amount
         await session.page.mouse.wheel(0, delta)
 
+    async def select_option(self, session_id: str, ref: str, value: str):
+        """选择下拉选项"""
+        session = self.sessions[session_id]
+        idx = int(ref.replace("@e", ""))
+        if idx >= len(session.elements):
+            raise ValueError(f"Element {ref} not found. Call snapshot() first.")
+        await session.elements[idx].select_option(value)
+
     # JS 提取页面可见文本摘要 + 滚动状态
     _PAGE_INFO_JS = """
     () => {

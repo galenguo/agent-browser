@@ -39,3 +39,8 @@ async def fill(session_id: str, ref: str, text: str):
 async def scroll(session_id: str, direction: str = "down", amount: int = 500):
     """滚动页面"""
     await _manager.controller.scroll(session_id, direction, amount)
+
+
+async def select_option(session_id: str, ref: str, value: str):
+    """选择下拉选项"""
+    await _manager.controller.select_option(session_id, ref, value)
