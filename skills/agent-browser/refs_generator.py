@@ -22,7 +22,7 @@ _BATCH_EXTRACT_JS = """
         const inViewport = rect.top < vh && rect.bottom > 0 && rect.left < vw && rect.right > 0;
         return {
             tag: el.tagName.toLowerCase(),
-            text: (el.innerText || el.textContent || '').trim().substring(0, 80),
+            text: (el.innerText || '').trim().substring(0, 60),
             role_attr: el.getAttribute('role') || '',
             input_type: el.getAttribute('type') || '',
             placeholder: el.getAttribute('placeholder') || '',
