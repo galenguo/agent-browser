@@ -39,7 +39,7 @@ class BrowserController:
             except Exception as e:
                 last_err = e
                 if attempt < retries - 1:
-                    await asyncio.sleep(1.0 * (attempt + 1))
+                    await asyncio.sleep(0.5 * (attempt + 1))
         raise last_err
 
     async def create_session(self, session_id: str, cdp_url: str = "http://127.0.0.1:19222") -> BrowserSession:
