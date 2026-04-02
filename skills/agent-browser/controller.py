@@ -112,14 +112,7 @@ class BrowserController:
     async def click(self, session_id: str, ref: str):
         """点击元素"""
         el = await self._get_element(session_id, ref)
-        try:
-            await el.click()
-        except Exception:
-            # Fallback: use JS click() for elements that Playwright can't click
-            try:
-                await el.evaluate("el => el.click()")
-            except Exception:
-                pass
+        await el.click()
 
     async def fill(self, session_id: str, ref: str, text: str):
         """填充输入框"""
