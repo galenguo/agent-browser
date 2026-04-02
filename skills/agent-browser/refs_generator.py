@@ -19,7 +19,6 @@ _BATCH_EXTRACT_JS = """
         const rect = el.getBoundingClientRect();
         const s = el.style;
         const hidden = s.display === 'none' || s.visibility === 'hidden' || (rect.width === 0 && rect.height === 0);
-        const disabled = el.disabled === true;
         return {
             tag: el.tagName.toLowerCase(),
             text: (el.innerText || '').trim().substring(0, 20),
@@ -29,7 +28,6 @@ _BATCH_EXTRACT_JS = """
             aria_label: el.getAttribute('aria-label') || '',
             href: (el.tagName === 'A' ? (el.href || '') : ''),
             hidden: hidden,
-            disabled: disabled,
             index: i
         };
     });
@@ -88,8 +86,6 @@ async def generate_refs(
             ref = f"@e{len(handles)}"
             display_text = text or placeholder or attrs.get("aria_label", "")
             info = {"ref": ref, "text": display_text, "role": role}
-            if attrs.get("disabled"):
-                info["disabled"] = True
             if input_type:
                 info["type"] = input_type
             if attrs.get("href"):
