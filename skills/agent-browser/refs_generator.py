@@ -25,7 +25,6 @@ _BATCH_EXTRACT_JS = """
             role_attr: el.getAttribute('role') || '',
             input_type: el.getAttribute('type') || '',
             placeholder: el.getAttribute('placeholder') || '',
-            aria_label: el.getAttribute('aria-label') || '',
             href: (el.tagName === 'A' ? (el.href || '') : ''),
             hidden: hidden,
             index: i
@@ -84,7 +83,7 @@ async def generate_refs(
                 continue
 
             ref = f"@e{len(handles)}"
-            display_text = text or placeholder or attrs.get("aria_label", "")
+            display_text = text or placeholder
             info = {"ref": ref, "text": display_text, "role": role}
             if input_type:
                 info["type"] = input_type
