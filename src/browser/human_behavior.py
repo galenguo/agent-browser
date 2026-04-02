@@ -200,45 +200,6 @@ class HumanBehaviorSimulator:
         logger.debug(f"Reading pause: {duration:.1f}s")
         await asyncio.sleep(duration)
 
-    async def natural_browse_zhipin(self, page: Page, keyword: str, city: str = "") -> None:
-        """
-        Boss 直聘专项：模拟自然搜索流程（非直达目标）。
-
-        流程：首页 → 随机浏览推荐 → 搜索框 → 输入（真人打字）→ 搜索
-        """
-        # 1. 访问首页
-        await page.goto("https://www.zhipin.com", wait_until="networkidle", timeout=30_000)
-        await self.reading_pause(2, 5)
-
-        # 2. 随机滚动首页（模拟浏览推荐职位）
-        await self._random_scroll(page, scroll_count=2)
-        await self.reading_pause(1, 3)
-
-        # 3. 找到搜索框并输入（真人打字）
-        search_selectors = [
-            "input[name='query']",
-            "input[placeholder*='搜索']",
-            "input[placeholder*='职位']",
-            ".search-input input",
-        ]
-        for sel in search_selectors:
-            try:
-                if await page.locator(sel).count() > 0:
-                    await self.human_type(page, sel, keyword)
-                    break
-            except Exception:
-                continue
-
-        await asyncio.sleep(random.uniform(0.5, 1.5))
-
-        # 4. 回车搜索
-        await page.keyboard.press("Enter")
-        await asyncio.sleep(random.uniform(2, 4))
-
-        # 5. 搜索结果页随机浏览
-        await self._random_scroll(page, scroll_count=2)
-        await self.reading_pause(2, 5)
-
     @staticmethod
     async def inject_timing_noise(page: Page, max_offset_ms: int = 5) -> None:
         """
