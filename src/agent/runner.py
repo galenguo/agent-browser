@@ -11,7 +11,6 @@ browser-use Agent 连接到工业级隐匿浏览器。
   - browser-use/browser_use/browser/session.py — BrowserSession.connect()
   - browser-use/browser_use/browser/profile.py — cdp_url 字段
 """
-import asyncio
 import logging
 import os
 from typing import Any
