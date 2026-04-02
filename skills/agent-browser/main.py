@@ -44,3 +44,8 @@ async def scroll(session_id: str, direction: str = "down", amount: int = 500):
 async def select_option(session_id: str, ref: str, value: str):
     """选择下拉选项"""
     await _manager.controller.select_option(session_id, ref, value)
+
+
+async def hover(session_id: str, ref: str):
+    """悬停元素"""
+    await _manager.controller.hover(session_id, ref)

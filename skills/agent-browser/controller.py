@@ -120,6 +120,14 @@ class BrowserController:
             raise ValueError(f"Element {ref} not found. Call snapshot() first.")
         await session.elements[idx].select_option(value)
 
+    async def hover(self, session_id: str, ref: str):
+        """悬停元素"""
+        session = self.sessions[session_id]
+        idx = int(ref.replace("@e", ""))
+        if idx >= len(session.elements):
+            raise ValueError(f"Element {ref} not found. Call snapshot() first.")
+        await session.elements[idx].hover()
+
     # JS 提取页面可见文本摘要 + 滚动状态
     _PAGE_INFO_JS = """
     () => {
