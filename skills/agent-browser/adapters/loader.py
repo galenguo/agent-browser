@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 _registry: Dict[tuple, dict] = {}
 
 # 默认适配器目录（项目根目录下的 adapters/）
-_ADAPTER_DIR = str(Path(__file__).resolve().parents[2] / "adapters")
+_ADAPTER_DIR = str(Path(__file__).resolve().parents[3] / "adapters")
 
 
 def _ensure_loaded():
