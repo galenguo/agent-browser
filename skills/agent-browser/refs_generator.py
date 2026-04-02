@@ -1,4 +1,5 @@
 """元素引用生成器 — 使用批量 JS 评估 + 可见性检测"""
+import asyncio
 from typing import List, Dict, Tuple
 from playwright.async_api import Page, ElementHandle
 
@@ -40,15 +41,12 @@ async def generate_refs(
     handles: List[ElementHandle] = []
     elements: List[Dict] = []
 
-    # 1. 单次 JS 评估获取所有元素属性（含可见性检测）
+    # 1. 并行获取元素属性 + 元素句柄
     try:
-        raw_attrs = await page.evaluate(_BATCH_EXTRACT_JS % COMBINED_SELECTOR)
-    except Exception:
-        return elements, handles
-
-    # 2. 获取元素句柄（用于 click/fill）
-    try:
-        els = await page.query_selector_all(COMBINED_SELECTOR)
+        raw_attrs, els = await asyncio.gather(
+            page.evaluate(_BATCH_EXTRACT_JS % COMBINED_SELECTOR),
+            page.query_selector_all(COMBINED_SELECTOR),
+        )
     except Exception:
         return elements, handles
 
