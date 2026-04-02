@@ -3,7 +3,6 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from .steps import STEPS
-from .template import resolve
 
 logger = logging.getLogger(__name__)
 
