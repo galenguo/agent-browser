@@ -107,12 +107,6 @@ async def explore(
 
         result.endpoints = intercepted
 
-        # 框架检测（使用 querySelector，不暴露全局变量）
-        result.frameworks = await _detect_frameworks(page)
-
-        # Store 检测
-        result.stores = await _detect_stores(page)
-
         # 分析端点，生成能力候选项
         result.capabilities = _analyze_endpoints(intercepted, url)
 
