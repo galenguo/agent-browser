@@ -82,7 +82,7 @@ class BrowserController:
     async def open(self, session_id: str, url: str):
         """打开 URL"""
         session = self.sessions[session_id]
-        await session.page.goto(url, wait_until="domcontentloaded", timeout=10000)
+        await session.page.goto(url, wait_until="domcontentloaded", timeout=8000)
 
         # 预计算快照缓存（open 后立即 snapshot 的场景可复用）
         try:
