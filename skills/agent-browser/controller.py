@@ -164,7 +164,7 @@ class BrowserController:
     # JS 提取页面可见文本摘要 + 滚动状态 + 标题
     _PAGE_INFO_JS = """
     () => {
-        const pageText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 100);
+        const pageText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 80);
         const scrollMax = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
         return {
             href: location.href,
