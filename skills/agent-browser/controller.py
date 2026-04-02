@@ -171,8 +171,6 @@ class BrowserController:
             title: document.title,
             pageText: pageText,
             scrollPercent: Math.round(scrollY / scrollMax * 100),
-            viewportHeight: window.innerHeight,
-            pageHeight: document.documentElement.scrollHeight,
         };
     }
     """
@@ -198,8 +196,6 @@ class BrowserController:
             "title": page_info["title"],
             "page_text": page_info["pageText"],
             "scroll_percent": page_info["scrollPercent"],
-            "viewport_height": page_info["viewportHeight"],
-            "page_height": page_info["pageHeight"],
             "elements": elements,
         }
 
