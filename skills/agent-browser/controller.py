@@ -177,14 +177,11 @@ class BrowserController:
         session = self.sessions[session_id]
         page = session.page
 
-        # 并行获取元素列表 + 页面信息（screenshot removed for speed）
-        results = await asyncio.gather(
+        # 并行获取元素列表 + 页面信息
+        (elements, handles), page_info = await asyncio.gather(
             generate_refs(page, interactive_only),
             page.evaluate(self._PAGE_INFO_JS),
-            return_exceptions=True,
         )
-        elements_info, page_info = results[0], results[1]
-        elements, handles = elements_info
 
         session.elements = handles
 
