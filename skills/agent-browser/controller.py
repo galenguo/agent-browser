@@ -1,6 +1,5 @@
 """浏览器控制器 - 核心类"""
 import asyncio
-import base64
 from typing import Dict, Optional, List
 from dataclasses import dataclass
 from playwright.async_api import async_playwright, Browser, Page, Playwright, ElementHandle
