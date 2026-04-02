@@ -85,18 +85,18 @@ class BrowserController:
         session = self.sessions[session_id]
         idx = int(ref.replace("@e", ""))
 
-        if idx < len(session.elements):
+        if idx >= len(session.elements):
+            raise ValueError(f"Element {ref} not found (have {len(session.elements)} elements). Call snapshot() first.")
+
+        try:
+            await session.elements[idx].click()
+            # 智能等待：如果触发导航则等待 domcontentloaded，否则快速返回
             try:
-                await session.elements[idx].click()
-                # 智能等待：如果触发导航则等待 domcontentloaded，否则快速返回
-                try:
-                    await session.page.wait_for_load_state("domcontentloaded", timeout=500)
-                except Exception:
-                    pass
+                await session.page.wait_for_load_state("domcontentloaded", timeout=500)
             except Exception:
-                pass  # 元素不可点击时继续
-        else:
-            raise ValueError(f"Element {ref} not found. Call snapshot() first.")
+                pass
+        except Exception:
+            pass  # 元素不可点击时继续
 
     async def fill(self, session_id: str, ref: str, text: str):
         """填充输入框"""
