@@ -170,7 +170,7 @@ class HumanBehaviorSimulator:
         start_y: int,
         end_x: int,
         end_y: int,
-        steps: int = 20,
+        steps: int = 15,
     ) -> None:
         """沿三次贝塞尔曲线移动鼠标（模拟人类手部运动轨迹）"""
         # 生成 2 个随机控制点，偏移直线路径
