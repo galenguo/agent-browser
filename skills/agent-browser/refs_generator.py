@@ -24,7 +24,6 @@ _BATCH_EXTRACT_JS = """
         return {
             role: role,
             text: (el.innerText || '').trim().substring(0, 20),
-            placeholder: el.getAttribute('placeholder') || '',
             hidden: hidden,
         };
     });
@@ -57,14 +56,12 @@ async def generate_refs(
 
             role = attrs["role"]
             text = attrs["text"]
-            placeholder = attrs["placeholder"]
 
             if interactive_only:
                 continue
 
             ref = f"@e{len(handles)}"
-            display_text = text or placeholder
-            info = {"ref": ref, "text": display_text, "role": role}
+            info = {"ref": ref, "text": text, "role": role}
 
             elements.append(info)
             handles.append(el)
