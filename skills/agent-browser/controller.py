@@ -3,7 +3,7 @@ import asyncio
 from typing import Dict, Optional, List
 from dataclasses import dataclass
 from playwright.async_api import async_playwright, Browser, Page, Playwright, ElementHandle
-from .refs_generator import generate_refs
+from .refs_generator import generate_refs, COMBINED_SELECTOR
 
 
 @dataclass
@@ -12,7 +12,7 @@ class BrowserSession:
     session_id: str
     browser: Browser
     page: Page
-    elements: List[ElementHandle]  # 存储元素句柄
+    dom_indices: List[int]  # 存储可见元素在 DOM 中的索引（延迟获取句柄）
 
 
 class BrowserController:
@@ -42,6 +42,25 @@ class BrowserController:
                     await asyncio.sleep(0.3 * (attempt + 1))
         raise last_err
 
+    async def _get_element(self, session_id: str, ref: str) -> ElementHandle:
+        """通过 ref 延迟获取元素句柄（按 DOM 索引）"""
+        session = self.sessions[session_id]
+        idx = int(ref.replace("@e", ""))
+
+        if idx >= len(session.dom_indices):
+            raise ValueError(f"Element {ref} not found (have {len(session.dom_indices)} elements). Call snapshot() first.")
+
+        dom_idx = session.dom_indices[idx]
+
+        # 通过 evaluate_handle 获取指定 DOM 索引的元素
+        element = await session.page.evaluate_handle(
+            f"document.querySelectorAll('{COMBINED_SELECTOR}')[{dom_idx}]"
+        )
+        if not element:
+            raise ValueError(f"Element {ref} not found in DOM")
+
+        return element.as_element()
+
     async def create_session(self, session_id: str, cdp_url: str = "http://127.0.0.1:19222") -> BrowserSession:
         """创建会话"""
         browser = await self.connect(cdp_url)
@@ -52,7 +71,7 @@ class BrowserController:
             session_id=session_id,
             browser=browser,
             page=page,
-            elements=[],
+            dom_indices=[],
         )
 
         self.sessions[session_id] = session
@@ -79,45 +98,35 @@ class BrowserController:
 
     async def click(self, session_id: str, ref: str):
         """点击元素"""
-        session = self.sessions[session_id]
-        idx = int(ref.replace("@e", ""))
-
-        if idx >= len(session.elements):
-            raise ValueError(f"Element {ref} not found (have {len(session.elements)} elements). Call snapshot() first.")
-
+        el = await self._get_element(session_id, ref)
         try:
-            await session.elements[idx].click()
+            await el.click()
             # 智能等待：如果触发导航则等待 domcontentloaded，否则快速返回
             try:
-                await session.page.wait_for_load_state("domcontentloaded", timeout=50)
+                await self.sessions[session_id].page.wait_for_load_state("domcontentloaded", timeout=50)
             except Exception:
                 pass
         except Exception:
             # Fallback: use JS click() for elements that Playwright can't click
             try:
-                await session.elements[idx].evaluate("el => el.click()")
+                await el.evaluate("el => el.click()")
             except Exception:
                 pass
 
     async def fill(self, session_id: str, ref: str, text: str):
         """填充输入框"""
-        session = self.sessions[session_id]
-        idx = int(ref.replace("@e", ""))
-
-        if idx >= len(session.elements):
-            raise ValueError(f"Element {ref} not found. Call snapshot() first.")
-
+        el = await self._get_element(session_id, ref)
         try:
-            await session.elements[idx].fill(text)
+            await el.fill(text)
         except Exception:
             # 回退: click + type（支持 contenteditable 等非标准输入元素）
             try:
-                await session.elements[idx].click()
-                await session.page.keyboard.type(text, delay=30)
+                await el.click()
+                await self.sessions[session_id].page.keyboard.type(text, delay=30)
             except Exception:
                 # Fallback: JS value set
                 try:
-                    await session.elements[idx].evaluate(f"el => {{ el.value = '{text}'; }}")
+                    await el.evaluate(f"el => {{ el.value = '{text}'; }}")
                 except Exception:
                     pass
 
@@ -129,19 +138,13 @@ class BrowserController:
 
     async def select_option(self, session_id: str, ref: str, value: str):
         """选择下拉选项"""
-        session = self.sessions[session_id]
-        idx = int(ref.replace("@e", ""))
-        if idx >= len(session.elements):
-            raise ValueError(f"Element {ref} not found. Call snapshot() first.")
-        await session.elements[idx].select_option(value)
+        el = await self._get_element(session_id, ref)
+        await el.select_option(value)
 
     async def hover(self, session_id: str, ref: str):
         """悬停元素"""
-        session = self.sessions[session_id]
-        idx = int(ref.replace("@e", ""))
-        if idx >= len(session.elements):
-            raise ValueError(f"Element {ref} not found. Call snapshot() first.")
-        await session.elements[idx].hover()
+        el = await self._get_element(session_id, ref)
+        await el.hover()
 
     async def press_key(self, session_id: str, key: str):
         """按键（Enter, Tab, Escape 等）"""
@@ -163,10 +166,10 @@ class BrowserController:
         session = self.sessions[session_id]
         page = session.page
 
-        # 单次 JS 评估获取元素列表 + 页面信息 + 句柄
-        elements, handles, page_info = await generate_refs(page, interactive_only)
+        # 单次 JS 评估获取元素列表 + 页面信息（无句柄获取）
+        elements, dom_indices, page_info = await generate_refs(page, interactive_only)
 
-        session.elements = handles
+        session.dom_indices = dom_indices
 
         result = {
             "url": page_info["href"],

@@ -1,5 +1,4 @@
 """元素引用生成器 — 使用批量 JS 评估 + 可见性检测"""
-import asyncio
 from typing import List, Dict, Tuple
 from playwright.async_api import Page, ElementHandle
 
@@ -42,35 +41,28 @@ _COMBINED_JS = """
 async def generate_refs(
     page: Page,
     interactive_only: bool = False,
-) -> Tuple[List[Dict], List[ElementHandle], Dict]:
-    """生成元素引用 + 元素句柄 + 页面信息（单次 JS 评估）"""
-    handles: List[ElementHandle] = []
+) -> Tuple[List[Dict], List[int], Dict]:
+    """生成元素引用 + DOM 索引列表 + 页面信息（单次 JS 评估，无句柄获取）"""
+    dom_indices: List[int] = []
     elements: List[Dict] = []
 
     try:
         result = await page.evaluate(_COMBINED_JS % COMBINED_SELECTOR)
     except Exception:
-        return elements, handles, {"href": "", "title": ""}
+        return elements, dom_indices, {"href": "", "title": ""}
 
     page_info = {"href": result["href"], "title": result["title"]}
 
-    # 批量获取句柄
-    all_handles = await page.query_selector_all(COMBINED_SELECTOR)
-
     for item in result["elements"]:
         try:
-            idx = item["idx"]
-            if idx >= len(all_handles):
-                continue
-
             if interactive_only:
                 continue
 
-            ref = f"@e{len(handles)}"
+            ref = f"@e{len(dom_indices)}"
             info = {"ref": ref, "text": item["text"], "role": item["role"]}
             elements.append(info)
-            handles.append(all_handles[idx])
+            dom_indices.append(item["idx"])
         except Exception:
             continue
 
-    return elements, handles, page_info
+    return elements, dom_indices, page_info
