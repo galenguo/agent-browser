@@ -119,7 +119,7 @@ class BrowserController:
             except Exception:
                 # Fallback: JS value set
                 try:
-                    await session.elements[idx].evaluate(f"el => {{ el.value = '{text}'; el.dispatchEvent(new Event('input', {{bubbles: true}})); }}")
+                    await session.elements[idx].evaluate(f"el => {{ el.value = '{text}'; }}")
                 except Exception:
                     pass
 
