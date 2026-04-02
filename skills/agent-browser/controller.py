@@ -156,7 +156,7 @@ class BrowserController:
     async def go_back(self, session_id: str):
         """后退到上一页"""
         session = self.sessions[session_id]
-        await session.page.go_back(wait_until="domcontentloaded", timeout=15000)
+        await session.page.go_back(wait_until="domcontentloaded", timeout=10000)
 
     # JS 提取页面标题和 URL
     _PAGE_INFO_JS = """
