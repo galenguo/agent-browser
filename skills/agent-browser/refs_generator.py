@@ -1,4 +1,4 @@
-"""元素引用生成器 — 使用批量 JS 评估"""
+"""元素引用生成器 — 使用批量 JS 评估 + 可见性检测"""
 from typing import List, Dict, Tuple
 from playwright.async_api import Page, ElementHandle
 
@@ -11,18 +11,25 @@ INTERACTIVE_ROLES = {
 
 COMBINED_SELECTOR = "button, a, input, textarea, select"
 
-# JS 批量提取脚本：一次调用获取所有元素属性
+# JS 批量提取：一次调用获取所有元素属性 + 视口可见性
 _BATCH_EXTRACT_JS = """
 () => {
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
     const els = document.querySelectorAll('%s');
-    return Array.from(els).map((el, i) => ({
-        tag: el.tagName.toLowerCase(),
-        text: (el.textContent || '').trim().substring(0, 80),
-        role_attr: el.getAttribute('role') || '',
-        input_type: el.getAttribute('type') || '',
-        placeholder: el.getAttribute('placeholder') || '',
-        index: i
-    }));
+    return Array.from(els).map((el, i) => {
+        const rect = el.getBoundingClientRect();
+        const inViewport = rect.top < vh && rect.bottom > 0 && rect.left < vw && rect.right > 0;
+        return {
+            tag: el.tagName.toLowerCase(),
+            text: (el.textContent || '').trim().substring(0, 80),
+            role_attr: el.getAttribute('role') || '',
+            input_type: el.getAttribute('type') || '',
+            placeholder: el.getAttribute('placeholder') || '',
+            in_viewport: inViewport,
+            index: i
+        };
+    });
 }
 """
 
@@ -31,17 +38,17 @@ async def generate_refs(
     page: Page,
     interactive_only: bool = False,
 ) -> Tuple[List[Dict], List[ElementHandle]]:
-    """生成元素引用 + 元素句柄（单次 JS 评估批量获取）"""
+    """生成元素引用 + 元素句柄（单次 JS 评估批量获取 + 可见性标记）"""
     handles: List[ElementHandle] = []
     elements: List[Dict] = []
 
-    # 1. 单次 JS 评估获取所有元素属性（无 DOM roundtrip 开销）
+    # 1. 单次 JS 评估获取所有元素属性（含可见性检测）
     try:
         raw_attrs = await page.evaluate(_BATCH_EXTRACT_JS % COMBINED_SELECTOR)
     except Exception:
         return elements, handles
 
-    # 2. 获取元素句柄（仍需 query_selector_all 用于 click/fill）
+    # 2. 获取元素句柄（用于 click/fill）
     try:
         els = await page.query_selector_all(COMBINED_SELECTOR)
     except Exception:
@@ -54,6 +61,7 @@ async def generate_refs(
             input_type = attrs["input_type"]
             text = attrs["text"]
             placeholder = attrs["placeholder"]
+            in_viewport = attrs["in_viewport"]
 
             if role_attr and role_attr not in INTERACTIVE_ROLES:
                 role = role_attr
@@ -72,7 +80,7 @@ async def generate_refs(
                 continue
 
             ref = f"@e{len(handles)}"
-            info = {"ref": ref, "text": text or placeholder, "role": role, "tag": tag}
+            info = {"ref": ref, "text": text or placeholder, "role": role, "tag": tag, "in_viewport": in_viewport}
             if input_type:
                 info["type"] = input_type
 
