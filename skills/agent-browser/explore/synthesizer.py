@@ -1,12 +1,12 @@
 """适配器生成器 — 从探索产物生成 YAML 适配器"""
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Optional
 from urllib.parse import urlparse
 
 import yaml
 
-from .explorer import ExplorationResult, Endpoint
+from .explorer import ExplorationResult
 
 logger = logging.getLogger(__name__)
 
