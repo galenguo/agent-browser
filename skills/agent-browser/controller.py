@@ -115,13 +115,8 @@ class BrowserController:
     # JS 提取页面可见文本摘要 + 滚动状态
     _PAGE_INFO_JS = """
     () => {
-        const body = document.body;
-        let pageText = '';
-        if (body) {
-            const clone = body.cloneNode(true);
-            clone.querySelectorAll('script,style,noscript,svg').forEach(e => e.remove());
-            pageText = (clone.textContent || '').replace(/\\s+/g, ' ').trim().substring(0, 500);
-        }
+        // innerText 在原始 DOM 上有效（有布局引擎），自动跳过 script/style 内容
+        const pageText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 500);
         const scrollY = window.scrollY || 0;
         const scrollMax = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
         return {
