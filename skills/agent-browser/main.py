@@ -49,3 +49,8 @@ async def select_option(session_id: str, ref: str, value: str):
 async def hover(session_id: str, ref: str):
     """悬停元素"""
     await _manager.controller.hover(session_id, ref)
+
+
+async def press_key(session_id: str, key: str):
+    """按键"""
+    await _manager.controller.press_key(session_id, key)

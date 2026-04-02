@@ -128,6 +128,11 @@ class BrowserController:
             raise ValueError(f"Element {ref} not found. Call snapshot() first.")
         await session.elements[idx].hover()
 
+    async def press_key(self, session_id: str, key: str):
+        """按键（Enter, Tab, Escape 等）"""
+        session = self.sessions[session_id]
+        await session.page.keyboard.press(key)
+
     # JS 提取页面可见文本摘要 + 滚动状态
     _PAGE_INFO_JS = """
     () => {
