@@ -1,6 +1,6 @@
 """适配器运行器 — 查找适配器 → 创建会话 → 执行 pipeline → 返回结果"""
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from .loader import get_adapter
 from ..pipeline.executor import execute_pipeline
