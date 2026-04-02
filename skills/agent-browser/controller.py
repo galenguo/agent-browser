@@ -164,7 +164,6 @@ class BrowserController:
             title: document.title,
             pageText: pageText,
             scrollPercent: Math.round(scrollY / scrollMax * 100),
-            scrollY: scrollY,
             viewportHeight: window.innerHeight,
             pageHeight: document.documentElement.scrollHeight,
         };
