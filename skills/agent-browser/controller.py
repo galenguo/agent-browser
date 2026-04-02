@@ -22,7 +22,7 @@ class BrowserController:
         self.sessions: Dict[str, BrowserSession] = {}
         self._playwright: Optional[Playwright] = None
 
-    async def connect(self, cdp_url: str, retries: int = 2) -> Browser:
+    async def connect(self, cdp_url: str) -> Browser:
         """连接到 CDP 端点（带重试）"""
         if not self._playwright:
             self._playwright = await async_playwright().start()
@@ -32,6 +32,7 @@ class BrowserController:
             cdp_url = "http://" + cdp_url[5:]
 
         last_err = None
+        retries = 2  # hardcoded
         for attempt in range(retries):
             try:
                 browser = await self._playwright.chromium.connect_over_cdp(cdp_url)
