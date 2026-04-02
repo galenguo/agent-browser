@@ -4,12 +4,6 @@ description: B站热门视频排行
 strategy: cookie
 browser: true
 
-stealth:
-  warmup: true
-  human_click: true
-  request_delay: [0.5, 2.0]
-  scroll_before: true
-
 args:
   limit:
     type: int
