@@ -160,7 +160,7 @@ class HumanBehaviorSimulator:
             ty = random.randint(100, viewport["height"] - 100)
             await self._bezier_mouse_move(page, cx, cy, tx, ty)
             cx, cy = tx, ty
-            await asyncio.sleep(random.uniform(0.2, 1.0))
+            await asyncio.sleep(random.uniform(0.1, 0.5))
 
     async def _bezier_mouse_move(
         self,
