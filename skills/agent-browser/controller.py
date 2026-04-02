@@ -157,7 +157,6 @@ class BrowserController:
     _PAGE_INFO_JS = """
     () => {
         const pageText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 300);
-        const scrollY = window.scrollY || 0;
         const scrollMax = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
         return {
             href: location.href,
