@@ -4,12 +4,6 @@ from typing import List, Dict, Tuple
 from playwright.async_api import Page, ElementHandle
 
 
-INTERACTIVE_ROLES = {
-    "button", "link", "textbox", "checkbox", "combobox",
-    "searchbox", "spinbutton", "switch", "radio",
-    "menuitem", "tab", "slider", "treeitem",
-}
-
 COMBINED_SELECTOR = "button, a, input, textarea, select"
 
 # JS 批量提取：一次调用获取所有元素属性 + 视口可见性
@@ -72,7 +66,7 @@ async def generate_refs(
             else:
                 role = tag
 
-            if interactive_only and role not in INTERACTIVE_ROLES:
+            if interactive_only:
                 continue
 
             ref = f"@e{len(handles)}"
