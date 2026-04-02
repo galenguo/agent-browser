@@ -134,17 +134,21 @@ class BrowserController:
         session = self.sessions[session_id]
         page = session.page
 
-        # 并行获取元素列表 + 页面信息（合并为一次 JS 评估）
-        (elements_info, title, page_info) = await asyncio.gather(
+        # 并行获取元素列表 + 页面信息
+        results = await asyncio.gather(
             generate_refs(page, interactive_only),
             page.title(),
             page.evaluate(self._PAGE_INFO_JS),
+            page.screenshot(type="jpeg", quality=50),
+            return_exceptions=True,
         )
+        elements_info, title, page_info = results[0], results[1], results[2]
+        screenshot_bytes = results[3] if not isinstance(results[3], Exception) else b""
         elements, handles = elements_info
 
         session.elements = handles
 
-        return {
+        result = {
             "url": page_info["href"],
             "title": title,
             "page_text": page_info["pageText"],
@@ -153,3 +157,10 @@ class BrowserController:
             "page_height": page_info["pageHeight"],
             "elements": elements,
         }
+
+        # 截图作为 base64 编码（可选，供视觉模型使用）
+        if screenshot_bytes:
+            import base64
+            result["screenshot"] = base64.b64encode(screenshot_bytes).decode("ascii")
+
+        return result
