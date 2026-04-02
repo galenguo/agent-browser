@@ -1,13 +1,10 @@
 """Pipeline Step 处理器 — 所有浏览器操作经过隐匿性封装"""
 import asyncio
 import json
-import logging
 import random
 from typing import Any, Callable, Dict
 
 from .template import resolve
-
-logger = logging.getLogger(__name__)
 
 # Step 处理器注册表
 STEPS: Dict[str, Callable] = {}
