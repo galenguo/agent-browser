@@ -24,7 +24,7 @@ _BATCH_EXTRACT_JS = """
         const hidden = style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0' || (rect.width === 0 && rect.height === 0);
         return {
             tag: el.tagName.toLowerCase(),
-            text: (el.innerText || '').trim().substring(0, 60),
+            text: (el.innerText || '').trim().substring(0, 40),
             role_attr: el.getAttribute('role') || '',
             input_type: el.getAttribute('type') || '',
             placeholder: el.getAttribute('placeholder') || '',
