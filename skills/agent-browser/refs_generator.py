@@ -22,7 +22,7 @@ _BATCH_EXTRACT_JS = """
         const disabled = el.disabled === true;
         return {
             tag: el.tagName.toLowerCase(),
-            text: (el.innerText || '').trim().substring(0, 30),
+            text: (el.innerText || '').trim().substring(0, 20),
             role_attr: el.getAttribute('role') || '',
             input_type: el.getAttribute('type') || '',
             placeholder: el.getAttribute('placeholder') || '',
