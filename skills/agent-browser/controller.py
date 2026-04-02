@@ -42,14 +42,6 @@ class BrowserController:
                     await asyncio.sleep(0.3 * (attempt + 1))
         raise last_err
 
-    def _resolve_dom_idx(self, session_id: str, ref: str) -> int:
-        """将 ref (@eN) 解析为 DOM 索引"""
-        session = self.sessions[session_id]
-        idx = int(ref.replace("@e", ""))
-        if idx >= len(session.dom_indices):
-            raise ValueError(f"Element {ref} not found (have {len(session.dom_indices)} elements). Call snapshot() first.")
-        return session.dom_indices[idx]
-
     async def create_session(self, session_id: str, cdp_url: str = "http://127.0.0.1:19222") -> BrowserSession:
         """创建会话"""
         browser = await self.connect(cdp_url)
@@ -98,14 +90,20 @@ class BrowserController:
 
     async def click(self, session_id: str, ref: str):
         """点击元素（直接 JS，无 ElementHandle）"""
-        dom_idx = self._resolve_dom_idx(session_id, ref)
         session = self.sessions[session_id]
+        idx = int(ref.replace("@e", ""))
+        if idx >= len(session.dom_indices):
+            raise ValueError(f"Element {ref} not found (have {len(session.dom_indices)} elements). Call snapshot() first.")
+        dom_idx = session.dom_indices[idx]
         await session.page.evaluate(f"document.querySelectorAll('{COMBINED_SELECTOR}')[{dom_idx}].click()")
 
     async def fill(self, session_id: str, ref: str, text: str):
         """填充输入框（直接 JS，无 ElementHandle）"""
-        dom_idx = self._resolve_dom_idx(session_id, ref)
         session = self.sessions[session_id]
+        idx = int(ref.replace("@e", ""))
+        if idx >= len(session.dom_indices):
+            raise ValueError(f"Element {ref} not found (have {len(session.dom_indices)} elements). Call snapshot() first.")
+        dom_idx = session.dom_indices[idx]
         escaped = text.replace("\\", "\\\\").replace("'", "\\'")
         await session.page.evaluate(
             f"(el => {{ el.focus(); el.value = '{escaped}'; el.dispatchEvent(new Event('input', {{bubbles: true}})); }})"
@@ -120,8 +118,11 @@ class BrowserController:
 
     async def select_option(self, session_id: str, ref: str, value: str):
         """选择下拉选项（直接 JS，无 ElementHandle）"""
-        dom_idx = self._resolve_dom_idx(session_id, ref)
         session = self.sessions[session_id]
+        idx = int(ref.replace("@e", ""))
+        if idx >= len(session.dom_indices):
+            raise ValueError(f"Element {ref} not found (have {len(session.dom_indices)} elements). Call snapshot() first.")
+        dom_idx = session.dom_indices[idx]
         escaped = value.replace("\\", "\\\\").replace("'", "\\'")
         await session.page.evaluate(
             f"(el => {{ el.value = '{escaped}'; el.dispatchEvent(new Event('change', {{bubbles: true}})); }})"
@@ -130,8 +131,11 @@ class BrowserController:
 
     async def hover(self, session_id: str, ref: str):
         """悬停元素（通过坐标 + JS 混合）"""
-        dom_idx = self._resolve_dom_idx(session_id, ref)
         session = self.sessions[session_id]
+        idx = int(ref.replace("@e", ""))
+        if idx >= len(session.dom_indices):
+            raise ValueError(f"Element {ref} not found (have {len(session.dom_indices)} elements). Call snapshot() first.")
+        dom_idx = session.dom_indices[idx]
         box = await session.page.evaluate(
             f"(el => {{ const r = el.getBoundingClientRect(); return {{x: r.x + r.width/2, y: r.y + r.height/2}}; }})"
             f"(document.querySelectorAll('{COMBINED_SELECTOR}')[{dom_idx}])"
