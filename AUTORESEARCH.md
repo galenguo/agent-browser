@@ -5,13 +5,13 @@
 与用户确认后:
 1. 创建分支: `git checkout -b autoresearch/<tag>` (tag 基于日期，如 `apr2`)
 2. 读取所有 in-scope 文件获取上下文
-3. 运行基准: `python benchmark.py`，记录基线到 `results.tsv`
+3. 运行基准: `python parallel_benchmark.py`，记录基线到 `results.tsv`
 4. 确认 setup 完成后开始实验循环
 
 ## 优化目标
 
 **主指标: success_rate (越高越好)**
-通过 `python benchmark.py | grep success_rate` 读取。
+通过 `python parallel_benchmark.py | grep success_rate` 读取。
 
 **次要指标**: avg_steps (越低越好), avg_time_seconds (越低越好), passed_tests (越高越好)
 
@@ -56,7 +56,9 @@
 
 ## Read-Only 文件（禁止修改）
 
-- `benchmark.py` — 评估脚本（指标来源，公平性保证）
+- `benchmark.py` — 串行评估脚本（指标来源，公平性保证）
+- `parallel_benchmark.py` — 并行评估脚本（3x 更快，输出格式相同）
+- `parallel_benchmark.py` — 并行评估脚本（3x 更快，同等公平性）
 - `AUTORESEARCH.md` — 本文件（实验规则）
 - `results.tsv` — 结果日志（Agent 只追加，不修改已有行）
 - `src/browser/stealth_launcher.py` — 反检测栈核心（5层防护）
@@ -73,7 +75,7 @@
 每个实验:
 1. 修改一个或少量文件（原子变更）
 2. `git add` + `git commit -m "experiment: <描述>"`
-3. 运行: `python benchmark.py > run.log 2>&1`（重定向输出，不要刷屏上下文）
+3. 运行: `python parallel_benchmark.py > run.log 2>&1`（重定向输出，不要刷屏上下文）
 4. 读取结果: `grep "^success_rate:" run.log`
 5. 改进 → 保留 commit; 退步 → `git reset --hard HEAD~1`
 6. 记录到 `results.tsv`（不 commit 此文件）
