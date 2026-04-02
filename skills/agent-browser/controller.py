@@ -13,7 +13,6 @@ class BrowserSession:
     browser: Browser
     page: Page
     elements: List[ElementHandle]  # 存储元素句柄
-    created_at: float
 
 
 class BrowserController:
@@ -54,7 +53,6 @@ class BrowserController:
             browser=browser,
             page=page,
             elements=[],
-            created_at=asyncio.get_event_loop().time()
         )
 
         self.sessions[session_id] = session
