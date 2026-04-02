@@ -25,7 +25,6 @@ _BATCH_EXTRACT_JS = """
             role_attr: el.getAttribute('role') || '',
             input_type: el.getAttribute('type') || '',
             placeholder: el.getAttribute('placeholder') || '',
-            href: (el.tagName === 'A' ? (el.href || '') : ''),
             hidden: hidden,
             index: i
         };
@@ -87,8 +86,6 @@ async def generate_refs(
             info = {"ref": ref, "text": display_text, "role": role}
             if input_type:
                 info["type"] = input_type
-            if attrs.get("href"):
-                info["href"] = attrs["href"]
 
             elements.append(info)
             handles.append(el)
