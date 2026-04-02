@@ -92,7 +92,7 @@ async def generate_refs(
 
             ref = f"@e{len(handles)}"
             display_text = text or placeholder or attrs.get("aria_label", "")
-            info = {"ref": ref, "text": display_text, "role": role, "tag": tag, "in_viewport": in_viewport}
+            info = {"ref": ref, "text": display_text, "role": role, "in_viewport": in_viewport}
             if attrs.get("disabled"):
                 info["disabled"] = True
             if input_type:
