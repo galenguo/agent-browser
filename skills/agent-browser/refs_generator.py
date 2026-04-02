@@ -20,8 +20,8 @@ _BATCH_EXTRACT_JS = """
     return Array.from(els).map((el, i) => {
         const rect = el.getBoundingClientRect();
         const inViewport = rect.top < vh && rect.bottom > 0 && rect.left < vw && rect.right > 0;
-        const style = window.getComputedStyle(el);
-        const hidden = style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0' || (rect.width === 0 && rect.height === 0);
+        const s = el.style;
+        const hidden = s.display === 'none' || s.visibility === 'hidden' || (rect.width === 0 && rect.height === 0);
         const disabled = el.disabled === true;
         return {
             tag: el.tagName.toLowerCase(),
