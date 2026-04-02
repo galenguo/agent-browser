@@ -54,3 +54,8 @@ async def hover(session_id: str, ref: str):
 async def press_key(session_id: str, key: str):
     """按键"""
     await _manager.controller.press_key(session_id, key)
+
+
+async def wait_for_selector(session_id: str, selector: str, timeout: int = 10000):
+    """等待选择器出现"""
+    await _manager.controller.wait_for_selector(session_id, selector, timeout)

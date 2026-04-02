@@ -142,6 +142,11 @@ class BrowserController:
         session = self.sessions[session_id]
         await session.page.keyboard.press(key)
 
+    async def wait_for_selector(self, session_id: str, selector: str, timeout: int = 10000):
+        """等待选择器出现"""
+        session = self.sessions[session_id]
+        await session.page.wait_for_selector(selector, timeout=timeout)
+
     # JS 提取页面可见文本摘要 + 滚动状态
     _PAGE_INFO_JS = """
     () => {
