@@ -1,6 +1,6 @@
 """元素引用生成器 — 使用批量 JS 评估 + 可见性检测"""
 from typing import List, Dict, Tuple
-from playwright.async_api import Page, ElementHandle
+from playwright.async_api import Page
 
 
 COMBINED_SELECTOR = "button, a, input, textarea, select"
