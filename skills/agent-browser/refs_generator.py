@@ -59,7 +59,7 @@ async def generate_refs(
                 continue
 
             tag = attrs["tag"]
-            input_type = attrs["input_type"]
+            input_type = attrs.get("input_type", "")
             text = attrs["text"]
             placeholder = attrs["placeholder"]
 
@@ -80,8 +80,6 @@ async def generate_refs(
             ref = f"@e{len(handles)}"
             display_text = text or placeholder
             info = {"ref": ref, "text": display_text, "role": role}
-            if input_type:
-                info["type"] = input_type
 
             elements.append(info)
             handles.append(el)
