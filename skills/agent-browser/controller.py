@@ -22,7 +22,7 @@ class BrowserController:
         self.sessions: Dict[str, BrowserSession] = {}
         self._playwright: Optional[Playwright] = None
 
-    async def connect(self, cdp_url: str, retries: int = 3) -> Browser:
+    async def connect(self, cdp_url: str, retries: int = 2) -> Browser:
         """连接到 CDP 端点（带重试）"""
         if not self._playwright:
             self._playwright = await async_playwright().start()
@@ -39,7 +39,7 @@ class BrowserController:
             except Exception as e:
                 last_err = e
                 if attempt < retries - 1:
-                    await asyncio.sleep(0.5 * (attempt + 1))
+                    await asyncio.sleep(0.3 * (attempt + 1))
         raise last_err
 
     async def create_session(self, session_id: str, cdp_url: str = "http://127.0.0.1:19222") -> BrowserSession:
