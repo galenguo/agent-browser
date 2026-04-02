@@ -7,6 +7,11 @@ from .main import (
     click,
     fill,
     scroll,
+    select_option,
+    hover,
+    press_key,
+    wait_for_selector,
+    go_back,
 )
 
 # 适配器系统
@@ -27,6 +32,11 @@ __all__ = [
     "click",
     "fill",
     "scroll",
+    "select_option",
+    "hover",
+    "press_key",
+    "wait_for_selector",
+    "go_back",
     # 站点适配器
     "list_adapters",
     "run_adapter",
