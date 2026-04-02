@@ -25,8 +25,6 @@ class ExplorationResult:
     url: str
     title: str = ""
     endpoints: List[Endpoint] = field(default_factory=list)
-    frameworks: List[str] = field(default_factory=list)
-    stores: List[str] = field(default_factory=list)
     capabilities: List[Dict] = field(default_factory=list)
 
 
