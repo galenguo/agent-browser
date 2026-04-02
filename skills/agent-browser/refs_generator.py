@@ -23,7 +23,7 @@ _BATCH_EXTRACT_JS = """
             : t;
         return {
             role: role,
-            text: (el.innerText || '').trim().substring(0, 20),
+            text: (el.innerText || '').trim().substring(0, 15),
             hidden: hidden,
         };
     });
