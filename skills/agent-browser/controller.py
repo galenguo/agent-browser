@@ -161,7 +161,7 @@ class BrowserController:
     # JS 提取页面可见文本摘要 + 标题
     _PAGE_INFO_JS = """
     () => {
-        const pageText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 40);
+        const pageText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 30);
         return {
             href: location.href,
             title: document.title,
