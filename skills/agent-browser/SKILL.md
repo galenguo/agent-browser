@@ -85,15 +85,13 @@ for el in snap["elements"]:
 {
     "url": "当前页面 URL",
     "title": "页面标题",
-    "page_text": "页面可见文本前 500 字符",
+    "page_text": "页面可见文本前 80 字符",
     "scroll_percent": 0,   # 滚动位置百分比 (0-100)
-    "viewport_height": 800, # 视口高度
-    "page_height": 3000,   # 页面总高度
-    "elements": [{"ref": "@e0", "text": "...", "role": "a", "tag": "a", "in_viewport": true}, ...]
+    "elements": [{"ref": "@e0", "text": "...", "role": "a", "tag": "a"}, ...]
 }
 ```
 
-**提示**：`scroll_percent` 接近 100 时说明已到底部。`in_viewport=false` 的元素需要先滚动才能交互。
+**提示**：`scroll_percent` 接近 100 时说明已到底部。
 ```
 
 ### 3. Check（验证结果）
