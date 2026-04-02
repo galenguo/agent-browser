@@ -13,6 +13,7 @@ class BrowserSession:
     browser: Browser
     page: Page
     dom_indices: List[int]  # 存储可见元素在 DOM 中的索引（延迟获取句柄）
+    _snapshot_cache: Optional[Dict] = None  # open_page 后的快照缓存
 
 
 class BrowserController:
@@ -96,6 +97,18 @@ class BrowserController:
         session = self.sessions[session_id]
         await session.page.goto(url, wait_until="domcontentloaded", timeout=10000)
 
+        # 预计算快照缓存（open 后立即 snapshot 的场景可复用）
+        try:
+            elements, dom_indices, page_info = await generate_refs(session.page, False)
+            session.dom_indices = dom_indices
+            session._snapshot_cache = {
+                "url": page_info["href"],
+                "title": page_info["title"],
+                "elements": elements,
+            }
+        except Exception:
+            session._snapshot_cache = None
+
     async def click(self, session_id: str, ref: str):
         """点击元素"""
         el = await self._get_element(session_id, ref)
@@ -164,6 +177,13 @@ class BrowserController:
     async def snapshot(self, session_id: str, interactive_only: bool = False) -> Dict:
         """获取页面快照"""
         session = self.sessions[session_id]
+
+        # 如果有缓存且不是 interactive_only，直接返回缓存
+        if session._snapshot_cache and not interactive_only:
+            result = session._snapshot_cache
+            session._snapshot_cache = None  # 缓存只使用一次
+            return result
+
         page = session.page
 
         # 单次 JS 评估获取元素列表 + 页面信息（无句柄获取）
