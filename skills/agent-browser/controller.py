@@ -75,7 +75,7 @@ class BrowserController:
     async def open(self, session_id: str, url: str):
         """打开 URL"""
         session = self.sessions[session_id]
-        await session.page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        await session.page.goto(url, wait_until="domcontentloaded", timeout=15000)
 
     async def click(self, session_id: str, ref: str):
         """点击元素"""
