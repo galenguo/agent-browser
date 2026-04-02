@@ -9,7 +9,6 @@ from .refs_generator import generate_refs, COMBINED_SELECTOR
 @dataclass
 class BrowserSession:
     """浏览器会话"""
-    session_id: str
     browser: Browser
     page: Page
     dom_indices: List[int]  # 存储可见元素在 DOM 中的索引（用于 JS 直接操作）
@@ -58,7 +57,6 @@ class BrowserController:
         page = await context.new_page()
 
         session = BrowserSession(
-            session_id=session_id,
             browser=browser,
             page=page,
             dom_indices=[],
