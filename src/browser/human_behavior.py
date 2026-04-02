@@ -28,10 +28,9 @@ logger = logging.getLogger(__name__)
 class HumanBehaviorSimulator:
     """模拟真人不完美行为，对抗行为分析反爬"""
 
-    # 预热 URL 列表：先建立正常用户基线
+    # 预热 URL 列表：先建立正常用户基线（精简到2个，减少预热时间）
     WARMUP_URLS = [
         "https://www.baidu.com",
-        "https://www.163.com",
         "https://www.zhipin.com",  # Boss 直聘首页预热（不直接搜索）
     ]
 
