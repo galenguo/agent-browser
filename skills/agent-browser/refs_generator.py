@@ -14,12 +14,9 @@ COMBINED_SELECTOR = "button, a, input, textarea, select"
 # JS 批量提取：一次调用获取所有元素属性 + 视口可见性
 _BATCH_EXTRACT_JS = """
 () => {
-    const vh = window.innerHeight;
-    const vw = window.innerWidth;
     const els = document.querySelectorAll('%s');
     return Array.from(els).map((el, i) => {
         const rect = el.getBoundingClientRect();
-        const inViewport = rect.top < vh && rect.bottom > 0 && rect.left < vw && rect.right > 0;
         const s = el.style;
         const hidden = s.display === 'none' || s.visibility === 'hidden' || (rect.width === 0 && rect.height === 0);
         const disabled = el.disabled === true;
@@ -31,7 +28,6 @@ _BATCH_EXTRACT_JS = """
             placeholder: el.getAttribute('placeholder') || '',
             aria_label: el.getAttribute('aria-label') || '',
             href: (el.tagName === 'A' ? (el.href || '') : ''),
-            in_viewport: inViewport,
             hidden: hidden,
             disabled: disabled,
             index: i
@@ -72,7 +68,6 @@ async def generate_refs(
             input_type = attrs["input_type"]
             text = attrs["text"]
             placeholder = attrs["placeholder"]
-            in_viewport = attrs["in_viewport"]
 
             if role_attr and role_attr not in INTERACTIVE_ROLES:
                 role = role_attr
@@ -93,8 +88,6 @@ async def generate_refs(
             ref = f"@e{len(handles)}"
             display_text = text or placeholder or attrs.get("aria_label", "")
             info = {"ref": ref, "text": display_text, "role": role}
-            if not in_viewport:
-                info["in_viewport"] = False
             if attrs.get("disabled"):
                 info["disabled"] = True
             if input_type:
