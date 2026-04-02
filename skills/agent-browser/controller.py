@@ -170,7 +170,7 @@ class BrowserController:
             generate_refs(page, interactive_only),
             page.title(),
             page.evaluate(self._PAGE_INFO_JS),
-            page.screenshot(type="jpeg", quality=50),
+            page.screenshot(type="jpeg", quality=30),
             return_exceptions=True,
         )
         elements_info, title, page_info = results[0], results[1], results[2]
