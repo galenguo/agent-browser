@@ -127,16 +127,11 @@ class BrowserController:
         try:
             await el.fill(text)
         except Exception:
-            # 回退: click + type（支持 contenteditable 等非标准输入元素）
+            # Fallback: JS value set（支持 contenteditable 等非标准输入元素）
             try:
-                await el.click()
-                await self.sessions[session_id].page.keyboard.type(text, delay=0)
+                await el.evaluate(f"el => {{ el.value = '{text}'; }}")
             except Exception:
-                # Fallback: JS value set
-                try:
-                    await el.evaluate(f"el => {{ el.value = '{text}'; }}")
-                except Exception:
-                    pass
+                pass
 
     async def scroll(self, session_id: str, direction: str = "down", amount: int = 500):
         """滚动页面"""
