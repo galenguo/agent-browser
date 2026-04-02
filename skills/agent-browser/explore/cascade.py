@@ -6,8 +6,6 @@ import random
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 
-from .explorer import Endpoint
-
 logger = logging.getLogger(__name__)
 
 # 策略级别（从低到高）
@@ -28,7 +26,7 @@ class StrategyResult:
 async def cascade(
     session_id: str,
     url: str,
-    endpoints: Optional[List[Endpoint]] = None,
+    endpoints: Optional[List[Any]] = None,
     goal: str = "",
 ) -> List[StrategyResult]:
     """
@@ -92,7 +90,7 @@ async def cascade(
     return results
 
 
-def _get_test_urls(endpoints: Optional[List[Endpoint]], base_url: str) -> List[str]:
+def _get_test_urls(endpoints: Optional[List[Any]], base_url: str) -> List[str]:
     """获取测试 URL 列表"""
     if endpoints:
         return [ep.url for ep in endpoints if ep.is_json][:5]
