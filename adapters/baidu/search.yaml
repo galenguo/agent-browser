@@ -1,0 +1,47 @@
+site: baidu
+name: search
+description: 百度搜索并提取结果
+strategy: cookie
+browser: true
+
+stealth:
+  warmup: true
+  human_click: true
+  human_type: true
+  request_delay: [0.5, 2.0]
+  scroll_before: true
+  jitter: true
+
+args:
+  query:
+    type: str
+    required: true
+    description: 搜索关键词
+  limit:
+    type: int
+    default: 5
+    description: 返回结果数
+
+columns: [rank, title, url, description]
+
+pipeline:
+  - navigate: "https://www.baidu.com/s?wd=${{ args.query | urlencode }}"
+  - wait:
+      selector: ".result"
+      timeout: 8000
+  - evaluate: |
+      (() => {
+        const results = [];
+        document.querySelectorAll('.result.c-container, .c-container').forEach((el, i) => {
+          const h3 = el.querySelector('h3 a, h3');
+          const abstract = el.querySelector('.c-abstract, .c-span-last, .content-right_8Zs40');
+          results.push({
+            rank: i + 1,
+            title: h3 ? h3.textContent.trim() : '',
+            url: h3 && h3.tagName === 'A' ? h3.href : (h3 ? h3.querySelector('a')?.href || '' : ''),
+            description: abstract ? abstract.textContent.trim().substring(0, 200) : ''
+          });
+        });
+        return results;
+      })()
+  - limit: "${{ args.limit }}"

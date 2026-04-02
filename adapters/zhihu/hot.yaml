@@ -1,0 +1,44 @@
+site: zhihu
+name: hot
+description: 知乎热榜
+strategy: cookie
+browser: true
+
+stealth:
+  warmup: true
+  human_click: true
+  request_delay: [0.5, 2.0]
+  scroll_before: true
+
+args:
+  limit:
+    type: int
+    default: 10
+    description: 返回结果数
+
+columns: [rank, title, url, hot_score, excerpt]
+
+pipeline:
+  - navigate: "https://www.zhihu.com/hot"
+  - wait:
+      selector: ".HotItem"
+      timeout: 10000
+  - evaluate: |
+      (() => {
+        const items = [];
+        document.querySelectorAll('.HotItem').forEach((el, i) => {
+          const titleEl = el.querySelector('.HotItem-title');
+          const excerptEl = el.querySelector('.HotItem-excerpt');
+          const linkEl = el.querySelector('.HotItem-content a');
+          const metricsEl = el.querySelector('.HotItem-metrics');
+          items.push({
+            rank: i + 1,
+            title: titleEl ? titleEl.textContent.trim() : '',
+            url: linkEl ? linkEl.href : '',
+            hot_score: metricsEl ? metricsEl.textContent.trim() : '',
+            excerpt: excerptEl ? excerptEl.textContent.trim().substring(0, 100) : ''
+          });
+        });
+        return items;
+      })()
+  - limit: "${{ args.limit }}"

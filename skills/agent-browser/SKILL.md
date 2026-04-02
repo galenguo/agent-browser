@@ -215,3 +215,66 @@ curl -s -X POST http://localhost:8000/sessions/$SID/task \
 # 清理
 curl -s -X DELETE http://localhost:8000/sessions/$SID
 ```
+
+---
+
+## 站点适配器（零 LLM 成本）
+
+### 列出可用适配器
+
+```python
+from agent_browser import list_adapters
+
+adapters = await list_adapters()
+# [{"site": "baidu", "name": "search", "description": "百度搜索并提取结果", ...}, ...]
+```
+
+### 执行适配器
+
+```python
+from agent_browser import run_adapter
+
+# 百度搜索
+results = await run_adapter("baidu", "search", query="AI coding", limit=5)
+
+# B站热门
+results = await run_adapter("bilibili", "hot", limit=10)
+
+# 知乎热榜
+results = await run_adapter("zhihu", "hot", limit=10)
+
+# Boss直聘搜索
+results = await run_adapter("boss", "search", query="Python", city="101010100")
+```
+
+### AI 自动探索未知网站
+
+```python
+from agent_browser import create_session, explore, synthesize, cascade
+
+sid = await create_session()
+
+# 探索站点
+artifacts = await explore(sid, "https://example.com", goal="获取文章列表")
+
+# 验证策略
+strategies = await cascade(sid, "https://example.com", endpoints=artifacts.endpoints)
+
+# 生成适配器
+adapter = synthesize("example", artifacts, command_name="articles")
+```
+
+### 桌面应用控制
+
+```python
+from agent_browser import list_desktop_apps, run_desktop_command
+
+# 列出可用应用
+apps = await list_desktop_apps()
+
+# Cursor 状态检查
+status = await run_desktop_command("cursor", "status")
+
+# ChatGPT 截图
+result = await run_desktop_command("chatgpt", "screenshot", output_path="/tmp/chatgpt.png")
+```

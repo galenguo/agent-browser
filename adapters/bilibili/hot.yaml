@@ -1,0 +1,46 @@
+site: bilibili
+name: hot
+description: B站热门视频排行
+strategy: cookie
+browser: true
+
+stealth:
+  warmup: true
+  human_click: true
+  request_delay: [0.5, 2.0]
+  scroll_before: true
+
+args:
+  limit:
+    type: int
+    default: 10
+    description: 返回结果数
+
+columns: [rank, title, url, play_count, danmaku, author]
+
+pipeline:
+  - navigate: "https://www.bilibili.com/v/popular/rank/all"
+  - wait:
+      selector: ".rank-item"
+      timeout: 10000
+  - evaluate: |
+      (() => {
+        const items = [];
+        document.querySelectorAll('.rank-item').forEach((el, i) => {
+          const titleEl = el.querySelector('.title, a.title');
+          const infoEl = el.querySelector('.data-box, .detail');
+          const authorEl = el.querySelector('.author, .up-name');
+          const playEl = el.querySelectorAll('.data-box')[0];
+          const danmakuEl = el.querySelectorAll('.data-box')[1];
+          items.push({
+            rank: i + 1,
+            title: titleEl ? titleEl.textContent.trim() : '',
+            url: titleEl ? titleEl.href : '',
+            play_count: playEl ? playEl.textContent.trim() : '',
+            danmaku: danmakuEl ? danmakuEl.textContent.trim() : '',
+            author: authorEl ? authorEl.textContent.trim() : ''
+          });
+        });
+        return items;
+      })()
+  - limit: "${{ args.limit }}"
