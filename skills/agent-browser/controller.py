@@ -148,6 +148,11 @@ class BrowserController:
         session = self.sessions[session_id]
         await session.page.wait_for_selector(selector, timeout=timeout)
 
+    async def go_back(self, session_id: str):
+        """后退到上一页"""
+        session = self.sessions[session_id]
+        await session.page.go_back(wait_until="domcontentloaded", timeout=15000)
+
     # JS 提取页面可见文本摘要 + 滚动状态
     _PAGE_INFO_JS = """
     () => {

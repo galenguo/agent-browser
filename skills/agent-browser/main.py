@@ -59,3 +59,8 @@ async def press_key(session_id: str, key: str):
 async def wait_for_selector(session_id: str, selector: str, timeout: int = 10000):
     """等待选择器出现"""
     await _manager.controller.wait_for_selector(session_id, selector, timeout)
+
+
+async def go_back(session_id: str):
+    """后退到上一页"""
+    await _manager.controller.go_back(session_id)
