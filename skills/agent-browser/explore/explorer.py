@@ -14,9 +14,7 @@ class Endpoint:
     """发现的 API 端点"""
     url: str
     method: str = "GET"
-    content_type: str = ""
     status: int = 0
-    size: int = 0
     is_json: bool = False
     sample: Any = None  # 截取的响应样本（前 2KB）
 
