@@ -115,7 +115,7 @@ class BrowserController:
             # 回退: click + type（支持 contenteditable 等非标准输入元素）
             try:
                 await session.elements[idx].click()
-                await session.page.keyboard.type(text, delay=50)
+                await session.page.keyboard.type(text, delay=30)
             except Exception:
                 # Fallback: JS value set
                 try:
