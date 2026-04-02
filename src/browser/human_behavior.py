@@ -138,7 +138,7 @@ class HumanBehaviorSimulator:
         for _ in range(count):
             distance = random.randint(100, 600)
             await page.evaluate(f"window.scrollBy(0, {distance})")
-            await asyncio.sleep(random.uniform(0.5, 3.0))
+            await asyncio.sleep(random.uniform(0.3, 2.0))
 
             # 20% 概率回滚（真人经常这样：看到感兴趣的往上翻）
             if random.random() < 0.2:
