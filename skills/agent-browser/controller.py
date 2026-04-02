@@ -153,13 +153,12 @@ class BrowserController:
         session = self.sessions[session_id]
         await session.page.go_back(wait_until="domcontentloaded", timeout=15000)
 
-    # JS 提取页面可见文本摘要 + 滚动状态 + meta description
+    # JS 提取页面可见文本摘要 + 滚动状态 + 标题
     _PAGE_INFO_JS = """
     () => {
-        const pageText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 1000);
+        const pageText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 500);
         const scrollY = window.scrollY || 0;
         const scrollMax = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
-        const metaDesc = document.querySelector('meta[name="description"]')?.content || '';
         return {
             href: location.href,
             title: document.title,
@@ -168,7 +167,6 @@ class BrowserController:
             scrollY: scrollY,
             viewportHeight: window.innerHeight,
             pageHeight: document.documentElement.scrollHeight,
-            metaDescription: metaDesc,
         };
     }
     """
