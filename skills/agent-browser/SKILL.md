@@ -31,7 +31,7 @@ description: >
 **本地模式（Python）：**
 ```python
 import asyncio
-from agent_browser import create_session, delete_session, open_page, snapshot, click, fill
+from agent_browser import create_session, delete_session, open_page, snapshot, click, fill, scroll
 
 # 创建会话
 session_id = await create_session()  # 默认 http://127.0.0.1:19222
@@ -74,10 +74,24 @@ for el in snap["elements"]:
 | 操作 | 函数 | 说明 |
 |------|------|------|
 | 打开页面 | `open_page(sid, url)` | 导航到 URL |
-| 获取快照 | `snapshot(sid)` | 返回页面元素列表 |
+| 获取快照 | `snapshot(sid)` | 返回页面状态 + 元素列表 |
 | 点击元素 | `click(sid, ref)` | 点击 @eN 元素 |
 | 填充输入 | `fill(sid, ref, text)` | 在 @eN 输入框填入文本 |
+| 滚动页面 | `scroll(sid, dir, amt)` | dir="down"/"up"，默认滚动 500px |
 | 关闭会话 | `delete_session(sid)` | 释放浏览器资源 |
+
+**快照返回字段**:
+```python
+{
+    "url": "当前页面 URL",
+    "title": "页面标题",
+    "page_text": "页面可见文本前 500 字符",
+    "scroll_percent": 0,   # 滚动位置百分比 (0-100)
+    "viewport_height": 800, # 视口高度
+    "page_height": 3000,   # 页面总高度
+    "elements": [{"ref": "@e0", "text": "...", "role": "a", "tag": "a"}, ...]
+}
+```
 
 ### 3. Check（验证结果）
 
