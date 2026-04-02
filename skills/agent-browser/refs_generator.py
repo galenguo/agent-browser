@@ -22,7 +22,6 @@ _BATCH_EXTRACT_JS = """
         return {
             tag: el.tagName.toLowerCase(),
             text: (el.innerText || '').trim().substring(0, 20),
-            role_attr: el.getAttribute('role') || '',
             input_type: el.getAttribute('type') || '',
             placeholder: el.getAttribute('placeholder') || '',
             hidden: hidden,
@@ -60,14 +59,11 @@ async def generate_refs(
                 continue
 
             tag = attrs["tag"]
-            role_attr = attrs["role_attr"]
             input_type = attrs["input_type"]
             text = attrs["text"]
             placeholder = attrs["placeholder"]
 
-            if role_attr and role_attr not in INTERACTIVE_ROLES:
-                role = role_attr
-            elif tag == "button" or (tag == "input" and input_type in ("submit", "button", "reset")):
+            if tag == "button" or (tag == "input" and input_type in ("submit", "button", "reset")):
                 role = "button"
             elif tag == "a":
                 role = "a"
