@@ -1,7 +1,8 @@
 """模板表达式引擎 — 解析 ${{ }} 表达式"""
 import re
 from typing import Any
-from urllib.parse import quote_plus
+def quote_plus_direct(value):
+    return quote_plus(str(value)) if value is not None else ""
 
 
 # 匹配 ${{ expr }} 模板
