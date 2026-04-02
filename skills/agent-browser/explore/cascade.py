@@ -4,7 +4,6 @@ import json
 import logging
 import random
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -12,23 +11,12 @@ logger = logging.getLogger(__name__)
 STRATEGY_LEVELS = ["public", "cookie", "header", "intercept", "ui"]
 
 
-@dataclass
-class StrategyResult:
-    """策略验证结果"""
-    strategy: str
-    success: bool
-    endpoint: str = ""
-    sample_size: int = 0
-    fields: Dict = None
-    notes: str = ""
-
-
 async def cascade(
     session_id: str,
     url: str,
     endpoints: Optional[List[Any]] = None,
     goal: str = "",
-) -> List[StrategyResult]:
+) -> List[Dict[str, Any]]:
     """
     逐级探测认证策略: PUBLIC → COOKIE → HEADER → INTERCEPT
 
@@ -47,7 +35,7 @@ async def cascade(
     await page.goto(url, wait_until="domcontentloaded", timeout=20000)
     await asyncio.sleep(random.uniform(1, 3))
 
-    results: List[StrategyResult] = []
+    results: List[Dict[str, Any]] = []
 
     # 如果没有提供端点，尝试发现
     test_urls = _get_test_urls(endpoints, url)
@@ -55,8 +43,8 @@ async def cascade(
     # Level 1: PUBLIC（无 cookie，纯 API）
     r = await _try_public(test_urls, url)
     results.append(r)
-    if r.success:
-        logger.info(f"Strategy PUBLIC works: {r.endpoint}")
+    if r["success"]:
+        logger.info(f"Strategy PUBLIC works: {r['endpoint']}")
         return results
 
     await asyncio.sleep(random.uniform(1, 2))
@@ -64,8 +52,8 @@ async def cascade(
     # Level 2: COOKIE（浏览器内 fetch with credentials）
     r = await _try_cookie(page, test_urls)
     results.append(r)
-    if r.success:
-        logger.info(f"Strategy COOKIE works: {r.endpoint}")
+    if r["success"]:
+        logger.info(f"Strategy COOKIE works: {r['endpoint']}")
         return results
 
     await asyncio.sleep(random.uniform(1, 2))
@@ -73,19 +61,21 @@ async def cascade(
     # Level 3: HEADER（需要特定 headers）
     r = await _try_header(page, test_urls, url)
     results.append(r)
-    if r.success:
-        logger.info(f"Strategy HEADER works: {r.endpoint}")
+    if r["success"]:
+        logger.info(f"Strategy HEADER works: {r['endpoint']}")
         return results
 
     await asyncio.sleep(random.uniform(1, 2))
 
     # Level 4: INTERCEPT（需要完整浏览器渲染）
-    r = StrategyResult(
-        strategy="intercept",
-        success=True,
-        notes="Requires full browser rendering + network interception",
-    )
-    results.append(r)
+    results.append({
+        "strategy": "intercept",
+        "success": True,
+        "endpoint": "",
+        "sample_size": 0,
+        "fields": None,
+        "notes": "Requires full browser rendering + network interception",
+    })
 
     return results
 
@@ -97,10 +87,10 @@ def _get_test_urls(endpoints: Optional[List[Any]], base_url: str) -> List[str]:
     return []
 
 
-async def _try_public(test_urls: List[str], base_url: str) -> StrategyResult:
+async def _try_public(test_urls: List[str], base_url: str) -> Dict[str, Any]:
     """Level 1: 公共 API（无认证）"""
     if not test_urls:
-        return StrategyResult(strategy="public", success=False, notes="No endpoints to test")
+        return {"strategy": "public", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "No endpoints to test"}
 
     import aiohttp
     for url in test_urls:
@@ -111,20 +101,21 @@ async def _try_public(test_urls: List[str], base_url: str) -> StrategyResult:
                         data = await resp.json()
                         items = _extract_items(data)
                         if items:
-                            return StrategyResult(
-                                strategy="public",
-                                success=True,
-                                endpoint=url,
-                                sample_size=len(items),
-                                fields=_infer_fields(items[0]) if items else {},
-                            )
+                            return {
+                                "strategy": "public",
+                                "success": True,
+                                "endpoint": url,
+                                "sample_size": len(items),
+                                "fields": _infer_fields(items[0]) if items else {},
+                                "notes": "",
+                            }
         except Exception:
             continue
 
-    return StrategyResult(strategy="public", success=False, notes="All endpoints require auth")
+    return {"strategy": "public", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "All endpoints require auth"}
 
 
-async def _try_cookie(page, test_urls: List[str]) -> StrategyResult:
+async def _try_cookie(page, test_urls: List[str]) -> Dict[str, Any]:
     """Level 2: Cookie 认证（浏览器内 fetch）"""
     for url in test_urls:
         try:
@@ -141,20 +132,21 @@ async def _try_cookie(page, test_urls: List[str]) -> StrategyResult:
                 data = json.loads(result)
                 items = _extract_items(data)
                 if items:
-                    return StrategyResult(
-                        strategy="cookie",
-                        success=True,
-                        endpoint=url,
-                        sample_size=len(items),
-                        fields=_infer_fields(items[0]) if items else {},
-                    )
+                    return {
+                        "strategy": "cookie",
+                        "success": True,
+                        "endpoint": url,
+                        "sample_size": len(items),
+                        "fields": _infer_fields(items[0]) if items else {},
+                        "notes": "",
+                    }
         except Exception:
             continue
 
-    return StrategyResult(strategy="cookie", success=False, notes="Cookie auth insufficient")
+    return {"strategy": "cookie", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "Cookie auth insufficient"}
 
 
-async def _try_header(page, test_urls: List[str], base_url: str) -> StrategyResult:
+async def _try_header(page, test_urls: List[str], base_url: str) -> Dict[str, Any]:
     """Level 3: 需要特定 Headers（如 Referer, X-Token 等）"""
     parsed_base = base_url.split("?")[0]
 
@@ -180,17 +172,18 @@ async def _try_header(page, test_urls: List[str], base_url: str) -> StrategyResu
                 data = json.loads(result)
                 items = _extract_items(data)
                 if items:
-                    return StrategyResult(
-                        strategy="header",
-                        success=True,
-                        endpoint=url,
-                        sample_size=len(items),
-                        fields=_infer_fields(items[0]) if items else {},
-                    )
+                    return {
+                        "strategy": "header",
+                        "success": True,
+                        "endpoint": url,
+                        "sample_size": len(items),
+                        "fields": _infer_fields(items[0]) if items else {},
+                        "notes": "",
+                    }
         except Exception:
             continue
 
-    return StrategyResult(strategy="header", success=False, notes="Header auth insufficient")
+    return {"strategy": "header", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "Header auth insufficient"}
 
 
 def _extract_items(data: Any) -> list:
