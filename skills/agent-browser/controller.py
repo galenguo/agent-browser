@@ -158,14 +158,12 @@ class BrowserController:
         session = self.sessions[session_id]
         await session.page.go_back(wait_until="domcontentloaded", timeout=15000)
 
-    # JS 提取页面可见文本摘要 + 标题
+    # JS 提取页面标题和 URL
     _PAGE_INFO_JS = """
     () => {
-        const pageText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 30);
         return {
             href: location.href,
             title: document.title,
-            pageText: pageText,
         };
     }
     """
@@ -186,7 +184,6 @@ class BrowserController:
         result = {
             "url": page_info["href"],
             "title": page_info["title"],
-            "page_text": page_info["pageText"],
             "elements": elements,
         }
 
