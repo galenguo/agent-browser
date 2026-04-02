@@ -6,7 +6,7 @@ from playwright.async_api import Page
 COMBINED_SELECTOR = "button, a, input, textarea, select"
 
 # 合并的 JS：一次 evaluate 同时返回元素属性 + 页面信息（减少一次 CDP 往返）
-_COMBINED_JS = """(()=>{const e=document.querySelectorAll('%s'),r=[];for(let i=0;i<e.length;i++){const l=e[i],c=l.getBoundingClientRect(),d=l.style;if(d.display==='none'||d.visibility==='hidden'||(c.width===0&&c.height===0))continue;r.push(i,(t=>(t==='button'||(t==='input'&&/^(submit|button|reset)$/.test(l.getAttribute('type')||'')))?'button':t==='a'?'a':t==='input'||t==='textarea'?'input':t==='select'?'select':t)(l.tagName.toLowerCase()),(l.innerText||'').trim().substring(0,3))}return{href:location.href,title:document.title,elements:r}})()"""
+_COMBINED_JS = """(()=>{const e=document.querySelectorAll('%s'),r=[];for(let i=0;i<e.length;i++){const l=e[i];if(!l.offsetParent)continue;r.push(i,(t=>(t==='button'||(t==='input'&&/^(submit|button|reset)$/.test(l.getAttribute('type')||'')))?'button':t==='a'?'a':t==='input'||t==='textarea'?'input':t==='select'?'select':t)(l.tagName.toLowerCase()),(l.innerText||'').trim().slice(0,3))}return{href:location.href,title:document.title,elements:r}})()"""
 
 
 async def generate_refs(
