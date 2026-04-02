@@ -1,10 +1,9 @@
 """桌面应用命令执行器 — 路由到 CDP 或 AppleScript"""
 import asyncio
-import json
 import logging
 import os
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 import yaml
 
