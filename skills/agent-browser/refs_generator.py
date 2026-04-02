@@ -6,7 +6,7 @@ from playwright.async_api import Page, ElementHandle
 
 COMBINED_SELECTOR = "button, a, input, textarea, select"
 
-# JS 批量提取：一次调用获取所有元素属性 + 视口可见性
+# JS 批量提取：一次调用获取所有元素属性 + 视口可见性 + role 推导
 _BATCH_EXTRACT_JS = """
 () => {
     const els = document.querySelectorAll('%s');
@@ -14,13 +14,18 @@ _BATCH_EXTRACT_JS = """
         const rect = el.getBoundingClientRect();
         const s = el.style;
         const hidden = s.display === 'none' || s.visibility === 'hidden' || (rect.width === 0 && rect.height === 0);
+        const t = el.tagName.toLowerCase();
+        const it = el.getAttribute('type') || '';
+        const role = (t === 'button' || (t === 'input' && ['submit','button','reset'].includes(it))) ? 'button'
+            : t === 'a' ? 'a'
+            : (t === 'input' || t === 'textarea') ? 'input'
+            : t === 'select' ? 'select'
+            : t;
         return {
-            tag: el.tagName.toLowerCase(),
+            role: role,
             text: (el.innerText || '').trim().substring(0, 20),
-            input_type: el.getAttribute('type') || '',
             placeholder: el.getAttribute('placeholder') || '',
             hidden: hidden,
-            index: i
         };
     });
 }
@@ -50,21 +55,9 @@ async def generate_refs(
             if attrs.get("hidden"):
                 continue
 
-            tag = attrs["tag"]
-            input_type = attrs.get("input_type", "")
+            role = attrs["role"]
             text = attrs["text"]
             placeholder = attrs["placeholder"]
-
-            if tag == "button" or (tag == "input" and input_type in ("submit", "button", "reset")):
-                role = "button"
-            elif tag == "a":
-                role = "a"
-            elif tag in ("input", "textarea"):
-                role = "input"
-            elif tag == "select":
-                role = "select"
-            else:
-                role = tag
 
             if interactive_only:
                 continue
