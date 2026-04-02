@@ -27,6 +27,7 @@ _BATCH_EXTRACT_JS = """
             input_type: el.getAttribute('type') || '',
             placeholder: el.getAttribute('placeholder') || '',
             aria_label: el.getAttribute('aria-label') || '',
+            href: (el.tagName === 'A' ? (el.href || '') : ''),
             in_viewport: inViewport,
             index: i
         };
@@ -85,6 +86,8 @@ async def generate_refs(
             info = {"ref": ref, "text": display_text, "role": role, "tag": tag, "in_viewport": in_viewport}
             if input_type:
                 info["type"] = input_type
+            if attrs.get("href"):
+                info["href"] = attrs["href"]
 
             elements.append(info)
             handles.append(el)
