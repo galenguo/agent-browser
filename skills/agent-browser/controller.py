@@ -130,7 +130,7 @@ class BrowserController:
             # 回退: click + type（支持 contenteditable 等非标准输入元素）
             try:
                 await el.click()
-                await self.sessions[session_id].page.keyboard.type(text, delay=30)
+                await self.sessions[session_id].page.keyboard.type(text, delay=0)
             except Exception:
                 # Fallback: JS value set
                 try:
