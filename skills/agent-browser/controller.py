@@ -100,14 +100,26 @@ class BrowserController:
             except Exception:
                 pass
 
-    # JS 提取页面可见文本摘要（body 前 500 字符，跳过 script/style）
-    _PAGE_TEXT_JS = """
+    # JS 提取页面可见文本摘要 + 滚动状态
+    _PAGE_INFO_JS = """
     () => {
         const body = document.body;
-        if (!body) return '';
-        const clone = body.cloneNode(true);
-        clone.querySelectorAll('script,style,noscript,svg').forEach(e => e.remove());
-        return (clone.textContent || '').replace(/\\s+/g, ' ').trim().substring(0, 500);
+        let pageText = '';
+        if (body) {
+            const clone = body.cloneNode(true);
+            clone.querySelectorAll('script,style,noscript,svg').forEach(e => e.remove());
+            pageText = (clone.textContent || '').replace(/\\s+/g, ' ').trim().substring(0, 500);
+        }
+        const scrollY = window.scrollY || 0;
+        const scrollMax = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+        return {
+            href: location.href,
+            pageText: pageText,
+            scrollPercent: Math.round(scrollY / scrollMax * 100),
+            scrollY: scrollY,
+            viewportHeight: window.innerHeight,
+            pageHeight: document.documentElement.scrollHeight,
+        };
     }
     """
 
@@ -116,15 +128,22 @@ class BrowserController:
         session = self.sessions[session_id]
         page = session.page
 
-        # 并行获取元素列表、页面信息、页面文本摘要
-        (elements_info, url, title, page_text) = await asyncio.gather(
+        # 并行获取元素列表 + 页面信息（合并为一次 JS 评估）
+        (elements_info, title, page_info) = await asyncio.gather(
             generate_refs(page, interactive_only),
-            page.evaluate("() => location.href"),
             page.title(),
-            page.evaluate(self._PAGE_TEXT_JS),
+            page.evaluate(self._PAGE_INFO_JS),
         )
         elements, handles = elements_info
 
         session.elements = handles
 
-        return {"url": url, "title": title, "page_text": page_text, "elements": elements}
+        return {
+            "url": page_info["href"],
+            "title": title,
+            "page_text": page_info["pageText"],
+            "scroll_percent": page_info["scrollPercent"],
+            "viewport_height": page_info["viewportHeight"],
+            "page_height": page_info["pageHeight"],
+            "elements": elements,
+        }
