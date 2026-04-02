@@ -1,5 +1,6 @@
 """浏览器控制器 - 核心类"""
 import asyncio
+import base64
 from typing import Dict, Optional, List
 from dataclasses import dataclass
 from playwright.async_api import async_playwright, Browser, Page, Playwright, ElementHandle
@@ -196,7 +197,6 @@ class BrowserController:
 
         # 截图作为 base64 编码（可选，供视觉模型使用）
         if screenshot_bytes:
-            import base64
             result["screenshot"] = base64.b64encode(screenshot_bytes).decode("ascii")
 
         return result
