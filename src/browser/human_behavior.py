@@ -191,8 +191,8 @@ class HumanBehaviorSimulator:
                  + t ** 3 * end_y)
             await page.mouse.move(int(x), int(y))
             # ease-in-out 变速：起点和终点慢，中间快
-            base_delay = 0.005 + 0.02 * math.sin(math.pi * t)
-            await asyncio.sleep(base_delay + random.uniform(0, 0.008))
+            base_delay = 0.003 + 0.015 * math.sin(math.pi * t)
+            await asyncio.sleep(base_delay + random.uniform(0, 0.005))
 
     async def reading_pause(self, min_sec: float = 2.0, max_sec: float = 8.0) -> None:
         """模拟阅读停顿"""
