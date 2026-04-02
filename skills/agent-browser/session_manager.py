@@ -1,6 +1,6 @@
 """会话管理器"""
 import uuid
-from typing import Dict, Optional
+from typing import Optional
 from .controller import BrowserController, BrowserSession
 
 
@@ -12,7 +12,7 @@ class SessionManager:
 
     async def create_session(self, cdp_url: str = "http://127.0.0.1:19222") -> str:
         """创建会话"""
-        session_id = str(uuid.uuid4())
+        session_id = uuid.uuid4().hex
         await self.controller.create_session(session_id, cdp_url)
         return session_id
 
@@ -23,7 +23,3 @@ class SessionManager:
     def get_session(self, session_id: str) -> Optional[BrowserSession]:
         """获取会话"""
         return self.controller.sessions.get(session_id)
-
-    def list_sessions(self) -> Dict[str, BrowserSession]:
-        """列出所有会话"""
-        return self.controller.sessions
