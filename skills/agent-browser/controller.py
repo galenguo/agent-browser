@@ -152,7 +152,7 @@ class BrowserController:
     _PAGE_INFO_JS = """
     () => {
         // innerText 在原始 DOM 上有效（有布局引擎），自动跳过 script/style 内容
-        const pageText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 500);
+        const pageText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 1000);
         const scrollY = window.scrollY || 0;
         const scrollMax = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
         return {
