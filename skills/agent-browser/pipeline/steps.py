@@ -345,24 +345,3 @@ async def step_limit(session_id: str, params: Any, data: Any,
         return data[:n]
     return data
 
-
-@register("tap")
-async def step_tap(session_id: str, params: Any, data: Any,
-                   context: dict, stealth: dict) -> Any:
-    """拦截/捕获浏览器网络请求中的数据"""
-    # tap step 用于从 Pinia Store 或全局变量提取数据
-    js_path = resolve(str(params), **context)
-    page = _get_page(session_id)
-
-    js = f"""
-    (() => {{
-        const parts = '{js_path}'.split('.');
-        let obj = window;
-        for (const part of parts) {{
-            if (obj == null) return null;
-            obj = obj[part];
-        }}
-        return JSON.parse(JSON.stringify(obj));
-    }})()
-    """
-    return await page.evaluate(js)
