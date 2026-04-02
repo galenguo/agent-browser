@@ -65,7 +65,6 @@ async def explore(
                 intercepted.append(Endpoint(
                     url=url,
                     method=response.request.method,
-                    content_type=ct,
                     status=response.status,
                     is_json="json" in ct,
                 ))
