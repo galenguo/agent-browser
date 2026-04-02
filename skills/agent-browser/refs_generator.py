@@ -20,6 +20,8 @@ _BATCH_EXTRACT_JS = """
     return Array.from(els).map((el, i) => {
         const rect = el.getBoundingClientRect();
         const inViewport = rect.top < vh && rect.bottom > 0 && rect.left < vw && rect.right > 0;
+        const style = window.getComputedStyle(el);
+        const hidden = style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0' || (rect.width === 0 && rect.height === 0);
         return {
             tag: el.tagName.toLowerCase(),
             text: (el.innerText || '').trim().substring(0, 60),
@@ -29,6 +31,7 @@ _BATCH_EXTRACT_JS = """
             aria_label: el.getAttribute('aria-label') || '',
             href: (el.tagName === 'A' ? (el.href || '') : ''),
             in_viewport: inViewport,
+            hidden: hidden,
             index: i
         };
     });
@@ -58,6 +61,10 @@ async def generate_refs(
 
     for el, attrs in zip(els, raw_attrs):
         try:
+            # Skip hidden/invisible elements
+            if attrs.get("hidden"):
+                continue
+
             tag = attrs["tag"]
             role_attr = attrs["role_attr"]
             input_type = attrs["input_type"]
