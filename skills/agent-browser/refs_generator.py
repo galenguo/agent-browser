@@ -22,6 +22,7 @@ _BATCH_EXTRACT_JS = """
         const inViewport = rect.top < vh && rect.bottom > 0 && rect.left < vw && rect.right > 0;
         const style = window.getComputedStyle(el);
         const hidden = style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0' || (rect.width === 0 && rect.height === 0);
+        const disabled = el.disabled === true;
         return {
             tag: el.tagName.toLowerCase(),
             text: (el.innerText || '').trim().substring(0, 40),
@@ -32,6 +33,7 @@ _BATCH_EXTRACT_JS = """
             href: (el.tagName === 'A' ? (el.href || '') : ''),
             in_viewport: inViewport,
             hidden: hidden,
+            disabled: disabled,
             index: i
         };
     });
@@ -91,6 +93,8 @@ async def generate_refs(
             ref = f"@e{len(handles)}"
             display_text = text or placeholder or attrs.get("aria_label", "")
             info = {"ref": ref, "text": display_text, "role": role, "tag": tag, "in_viewport": in_viewport}
+            if attrs.get("disabled"):
+                info["disabled"] = True
             if input_type:
                 info["type"] = input_type
             if attrs.get("href"):

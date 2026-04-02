@@ -118,7 +118,11 @@ class BrowserController:
                 await session.elements[idx].click()
                 await session.page.keyboard.type(text, delay=50)
             except Exception:
-                pass
+                # Fallback: JS value set
+                try:
+                    await session.elements[idx].evaluate(f"el => {{ el.value = '{text}'; el.dispatchEvent(new Event('input', {{bubbles: true}})); }}")
+                except Exception:
+                    pass
 
     async def scroll(self, session_id: str, direction: str = "down", amount: int = 500):
         """滚动页面"""
