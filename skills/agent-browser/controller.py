@@ -160,16 +160,14 @@ class BrowserController:
         session = self.sessions[session_id]
         await session.page.go_back(wait_until="domcontentloaded", timeout=15000)
 
-    # JS 提取页面可见文本摘要 + 滚动状态 + 标题
+    # JS 提取页面可见文本摘要 + 标题
     _PAGE_INFO_JS = """
     () => {
         const pageText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().substring(0, 80);
-        const scrollMax = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
         return {
             href: location.href,
             title: document.title,
             pageText: pageText,
-            scrollPercent: Math.round(scrollY / scrollMax * 100),
         };
     }
     """
@@ -194,7 +192,6 @@ class BrowserController:
             "url": page_info["href"],
             "title": page_info["title"],
             "page_text": page_info["pageText"],
-            "scroll_percent": page_info["scrollPercent"],
             "elements": elements,
         }
 
