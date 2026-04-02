@@ -114,11 +114,6 @@ class BrowserController:
         el = await self._get_element(session_id, ref)
         try:
             await el.click()
-            # 智能等待：如果触发导航则等待 domcontentloaded，否则快速返回
-            try:
-                await self.sessions[session_id].page.wait_for_load_state("domcontentloaded", timeout=50)
-            except Exception:
-                pass
         except Exception:
             # Fallback: use JS click() for elements that Playwright can't click
             try:
