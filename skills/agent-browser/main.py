@@ -34,3 +34,8 @@ async def click(session_id: str, ref: str):
 async def fill(session_id: str, ref: str, text: str):
     """填充输入"""
     await _manager.controller.fill(session_id, ref, text)
+
+
+async def scroll(session_id: str, direction: str = "down", amount: int = 500):
+    """滚动页面"""
+    await _manager.controller.scroll(session_id, direction, amount)

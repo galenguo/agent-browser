@@ -6,6 +6,7 @@ from .main import (
     snapshot,
     click,
     fill,
+    scroll,
 )
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "snapshot",
     "click",
     "fill",
+    "scroll",
 ]

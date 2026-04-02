@@ -92,13 +92,19 @@ class BrowserController:
 
         try:
             await session.elements[idx].fill(text)
-        except Exception as e:
-            # 尝试 click + type 作为回退（某些元素不支持 fill）
+        except Exception:
+            # 回退: click + type（支持 contenteditable 等非标准输入元素）
             try:
                 await session.elements[idx].click()
                 await session.page.keyboard.type(text, delay=50)
             except Exception:
                 pass
+
+    async def scroll(self, session_id: str, direction: str = "down", amount: int = 500):
+        """滚动页面"""
+        session = self.sessions[session_id]
+        delta = amount if direction == "down" else -amount
+        await session.page.mouse.wheel(0, delta)
 
     # JS 提取页面可见文本摘要 + 滚动状态
     _PAGE_INFO_JS = """
