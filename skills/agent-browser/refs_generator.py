@@ -37,7 +37,7 @@ async def generate_refs(
     page: Page,
     interactive_only: bool = False,
 ) -> Tuple[List[Dict], List[ElementHandle]]:
-    """生成元素引用 + 元素句柄（单次 JS 评估批量获取 + 可见性标记）"""
+    """生成元素引用 + 元素句柄（单次 JS 评估批量获取 + 可见性标记 + 并行获取句柄）"""
     handles: List[ElementHandle] = []
     elements: List[Dict] = []
 

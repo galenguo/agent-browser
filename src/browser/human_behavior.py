@@ -55,7 +55,7 @@ class HumanBehaviorSimulator:
                 logger.info(f"Warmup: visiting {url}")
                 await page.goto(url, wait_until="domcontentloaded", timeout=20_000)
                 await self._random_scroll(page)
-                await asyncio.sleep(random.uniform(3, 8))
+                await asyncio.sleep(random.uniform(2, 5))
 
                 # 随机鼠标游走
                 await self._random_mouse_move(page)
