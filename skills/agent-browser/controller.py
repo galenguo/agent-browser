@@ -100,19 +100,31 @@ class BrowserController:
             except Exception:
                 pass
 
+    # JS 提取页面可见文本摘要（body 前 500 字符，跳过 script/style）
+    _PAGE_TEXT_JS = """
+    () => {
+        const body = document.body;
+        if (!body) return '';
+        const clone = body.cloneNode(true);
+        clone.querySelectorAll('script,style,noscript,svg').forEach(e => e.remove());
+        return (clone.textContent || '').replace(/\\s+/g, ' ').trim().substring(0, 500);
+    }
+    """
+
     async def snapshot(self, session_id: str, interactive_only: bool = False) -> Dict:
         """获取页面快照"""
         session = self.sessions[session_id]
         page = session.page
 
-        # 并行获取元素列表和页面信息
-        (elements_info, url, title) = await asyncio.gather(
+        # 并行获取元素列表、页面信息、页面文本摘要
+        (elements_info, url, title, page_text) = await asyncio.gather(
             generate_refs(page, interactive_only),
             page.evaluate("() => location.href"),
             page.title(),
+            page.evaluate(self._PAGE_TEXT_JS),
         )
         elements, handles = elements_info
 
         session.elements = handles
 
-        return {"url": url, "title": title, "elements": elements}
+        return {"url": url, "title": title, "page_text": page_text, "elements": elements}
