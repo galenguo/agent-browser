@@ -7,49 +7,49 @@ description: >
   Proactively use when user mentions browser automation, web scraping, or wants Claude to interact with websites.
 ---
 
-# Agent Browser — ReAct 模式
+# Agent Browser — 多模式浏览器自动化
 
 ## 工作模式
 
-```
-本地模式（默认）: Agent → Python API → BrowserController → Chrome CDP
-远程模式:         Agent → curl → FastAPI → BrowserController → Docker Chrome
-```
+| 模式 | 组合 | 数据流 |
+|------|------|--------|
+| CLI + LLM（默认） | LocalCDPBackend → Playwright CDP | Agent → Python API → CDP |
+| CLI + Agent | LocalCDPBackend → browser-use Agent → CDP | Agent → run_task → CDP |
+| API + LLM | RemoteAPIBackend → HTTP → FastAPI → CDP | Agent → HTTP → FastAPI → CDP |
+| API + Agent | RemoteAPIBackend → HTTP → FastAPI → browser-use | Agent → HTTP → FastAPI → Agent → CDP |
 
-检测：`curl -s http://localhost:8000/health` 成功 → 远程模式，否则本地模式。
+**自动检测**: `curl -s http://localhost:8000/health` 成功 → API 模式，否则 CLI 模式。
+
+**手动配置**:
+```python
+from agent_browser import configure
+configure(mode="api", api_url="http://localhost:8000")
+# 或通过环境变量
+# AGENT_BROWSER_CALLING_MODE=api
+# AGENT_BROWSER_API_URL=http://localhost:8000
+```
 
 ---
 
-## ReAct 循环
+## 模式 1：LLM ReAct（原子操作）
 
-每个任务按 **Observe → Reason & Act → Check** 循环执行：
+外部 LLM（Claude/GPT）通过 ReAct 循环控制每一步。
 
-### 1. Observe（观察）
+### Observe → Reason & Act → Check 循环
 
-获取当前页面状态：
-
-**本地模式（Python）：**
+**1. Observe（观察）**
 ```python
 import asyncio
 from agent_browser import create_session, delete_session, open_page, snapshot, click, fill, scroll
 
-# 创建会话
-session_id = await create_session()  # 默认 http://127.0.0.1:19222
-# 或指定 CDP: await create_session("http://host:port")
-
-# 打开页面
+session_id = await create_session()
 await open_page(session_id, "https://example.com")
-
-# 获取快照 — 返回 {url, title, elements: [{ref, text, role}...]}
 snap = await snapshot(session_id)
+# 返回 {url, title, elements: [{ref, text, role}...]}
 ```
 
-### 2. Reason & Act（推理并行动）
-
-分析快照中的元素，选择操作：
-
+**2. Reason & Act（推理并行动）**
 ```python
-# 分析 snap["elements"] 找到目标元素
 for el in snap["elements"]:
     if "搜索" in el.get("text", ""):
         await fill(session_id, el["ref"], "关键词")
@@ -57,17 +57,30 @@ for el in snap["elements"]:
         await click(session_id, el["ref"])
 ```
 
-**元素引用格式**: `@e0`, `@e1`, `@e2`...（通过 snapshot 获取）
+**3. Check（验证）**
+```python
+snap2 = await snapshot(session_id)
+# 检查 URL 变化、目标元素、数据是否提取到
+```
 
-**可用操作**:
+### 可用操作
+
 | 操作 | 函数 | 说明 |
 |------|------|------|
+| 创建会话 | `create_session(mode?, api_url?, cdp_url?)` | 默认 http://127.0.0.1:19222 |
 | 打开页面 | `open_page(sid, url)` | 导航到 URL |
 | 获取快照 | `snapshot(sid)` | 返回页面状态 + 元素列表 |
 | 点击元素 | `click(sid, ref)` | 点击 @eN 元素 |
 | 填充输入 | `fill(sid, ref, text)` | 在 @eN 输入框填入文本 |
-| 滚动页面 | `scroll(sid, dir, amt)` | dir="down"/"up"，默认滚动 500px |
+| 滚动页面 | `scroll(sid, dir, amt)` | dir="down"/"up"，默认 500px |
+| 悬停元素 | `hover(sid, ref)` | 悬停在 @eN 元素上 |
+| 选择下拉 | `select_option(sid, ref, value)` | 选择下拉选项 |
+| 按键 | `press_key(sid, key)` | Enter, Tab, Escape 等 |
+| 等待元素 | `wait_for_selector(sid, selector)` | 等待选择器出现 |
+| 后退 | `go_back(sid)` | 后退到上一页 |
 | 关闭会话 | `delete_session(sid)` | 释放浏览器资源 |
+
+**元素引用格式**: `@e0`, `@e1`, `@e2`...（通过 snapshot 获取）
 
 **快照返回字段**:
 ```python
@@ -77,54 +90,115 @@ for el in snap["elements"]:
     "elements": [{"ref": "@e0", "text": "...", "role": "a"}, ...]
 }
 ```
-```
 
-### 3. Check（验证结果）
+---
+
+## 模式 2：Agent 自主执行（browser-use）
+
+内置 LLM Agent 自主完成整个任务，无需外部 ReAct 循环。
 
 ```python
-# 操作后重新获取快照验证
-snap2 = await snapshot(session_id)
-# 检查 URL 是否变化、是否出现目标元素、数据是否提取到
+from agent_browser import create_session, delete_session, run_task
+
+sid = await create_session()
+result = await run_task(
+    sid,
+    task="访问百度搜索 AI coding，提取前5条结果标题和链接",
+    intelligence="agent",
+    max_steps=10,
+)
+await delete_session(sid)
+
+# result = {"status": "completed", "result": "...", "steps": 8, "chunks": 2}
+```
+
+**Agent 模式参数**:
+- `task`: 任务描述（中文或英文）
+- `intelligence`: "agent"（默认）或 "llm"
+- `llm_config`: LLM 配置（可选，默认从环境变量读取）
+  ```python
+  llm_config = {
+      "provider": "openai",  # "openai" | "anthropic"
+      "model": "gpt-4o",
+      "api_key": "sk-...",
+      "base_url": "https://api.openai.com/v1",
+  }
+  ```
+- `max_steps`: 每块最大步数（默认 6）
+
+**Agent 返回值**:
+```python
+{
+    "status": "completed" | "failed" | "stuck",
+    "result": "任务结果文本",
+    "steps": 12,
+    "chunks": 2,
+    "error": "..."  # 仅失败时
+}
+```
+
+**环境变量配置**:
+```bash
+AGENT_BROWSER_LLM_PROVIDER=openai    # 或 anthropic
+OPENAI_API_KEY=sk-xxx
+OPENAI_BASE_URL=https://api.openai.com/v1
 ```
 
 ---
 
 ## 标准流程
 
-### 简单导航/提取
-
+### 简单导航/提取（LLM 模式）
 ```
 1. create_session → open_page → snapshot → [分析元素] → delete_session
 ```
 
-### 搜索任务
-
+### 搜索任务（LLM 模式）
 ```
 1. create_session → open_page(搜索页) → snapshot
-2. 找到搜索框 → fill(搜索词)
-3. snapshot → 找到搜索按钮 → click
+2. 找搜索框 → fill(搜索词)
+3. snapshot → 找搜索按钮 → click
 4. 等待加载 → snapshot → 提取结果
 5. delete_session
 ```
 
-### 多步复合任务
-
+### 自主任务（Agent 模式）
 ```
-1. create_session → open_page → snapshot
-2. 循环 { 观察 → 分析 → 操作 → 验证 } 直到目标达成
-3. 汇总结果 → delete_session
+1. create_session → run_task(sid, "任务描述", max_steps=10) → delete_session
+```
+
+### 适配器优先（零 LLM 成本）
+```
+1. 检查 run_adapter(site, command) 是否存在
+2. 存在 → 直接执行 pipeline（零 token）
+3. 不存在 → explore → synthesize → 生成适配器 → 下次零 token
 ```
 
 ---
 
-## 远程模式分块执行
+## 远程模式
 
-远程 API 使用 agent task，需要轮询：
+### LLM 模式（原子操作）
+```bash
+# 创建会话
+SID=$(curl -s -X POST http://localhost:8000/sessions/create \
+  -d '{"user_id":"test","browser_mode":"local"}' | jq -r '.session_id')
 
+# 快照
+curl -s http://localhost:8000/sessions/$SID/snapshot
+
+# 点击
+curl -s -X POST http://localhost:8000/sessions/$SID/click -d '{"ref":"@e3"}'
+
+# 清理
+curl -s -X DELETE http://localhost:8000/sessions/$SID
+```
+
+### Agent 模式（任务提交）
 ```bash
 # 提交任务
 TASK=$(curl -s -X POST http://localhost:8000/sessions/$SID/task \
-  -d '{"task":"任务描述","model":"glm-5-turbo","max_steps":6}')
+  -d '{"task":"任务描述","max_steps":6}')
 TID=$(echo $TASK | jq -r '.task_id')
 
 # 轮询状态
@@ -136,22 +210,43 @@ while true; do
 done
 ```
 
-### 分块循环
+---
 
-```
-chunk=1, stuck=0
-LOOP:
-  task_result = run_task(session, prompt, max_steps=6)
-  if result contains TASK_COMPLETE → done
-  if result empty or same as last → stuck++
-  if stuck >= 2 → ask user for intervention
-  else → report progress, continue
+## 站点适配器（零 LLM 成本）
+
+### 列出可用适配器
+```python
+from agent_browser import list_adapters
+adapters = await list_adapters()
 ```
 
-### 续接提示词
+### 执行适配器
+```python
+from agent_browser import run_adapter
 
-**首轮**: `{任务描述}\n完成后输出 TASK_COMPLETE: {结果摘要}`
-**续轮**: `任务：{原始}\n已完成：{上次结果摘要}\n请继续。完成后输出 TASK_COMPLETE: {结果摘要}`
+# 百度搜索
+results = await run_adapter("baidu", "search", query="AI coding", limit=5)
+
+# Boss直聘搜索
+results = await run_adapter("boss", "search", query="Python", city="101010100")
+```
+
+### AI 自动探索未知网站
+```python
+from agent_browser import create_session, explore, synthesize, cascade
+
+sid = await create_session()
+artifacts = await explore(sid, "https://example.com", goal="获取文章列表")
+strategies = await cascade(sid, "https://example.com", endpoints=artifacts.endpoints)
+adapter = synthesize("example", artifacts, command_name="articles")
+```
+
+### 桌面应用控制
+```python
+from agent_browser import list_desktop_apps, run_desktop_command
+apps = await list_desktop_apps()
+status = await run_desktop_command("cursor", "status")
+```
 
 ---
 
@@ -161,8 +256,10 @@ LOOP:
 |------|------|------|
 | `Element @eN not found` | 元素引用过期（页面变化） | 重新 snapshot 获取新 refs |
 | `CDP not initialized` | 浏览器未就绪 | 等待 5-10 秒重试 |
+| `Backend not initialized` | 未调用 create_session | 先创建会话 |
 | 任务空结果 | 反爬检测 | 引导用户 VNC 干预 |
-| 连续失败 | 会话异常 | 删除重建 |
+| `explore() requires LocalCDPBackend` | API 模式不支持 explore | 使用 CLI 模式 |
+| Agent stuck | 连续空/重复结果 | 手动干预或换策略 |
 
 **重试策略**: 同一操作失败 3 次 → 换选择器策略 → 仍失败 → 报告用户
 
@@ -175,106 +272,4 @@ LOOP:
 2. 等待 15s → 导航到登录页
 3. 点击"扫码登录" → 告知用户扫码
 4. 用户确认后继续
-```
-
----
-
-## 使用示例
-
-### 百度搜索并提取结果
-```python
-sid = await create_session()
-await open_page(sid, "https://www.baidu.com")
-snap = await snapshot(sid)
-
-# 找搜索框
-search_ref = next(e["ref"] for e in snap["elements"] if e["role"] == "input")
-await fill(sid, search_ref, "AI coding")
-
-# 找搜索按钮并点击
-snap2 = await snapshot(sid)
-btn_ref = next(e["ref"] for e in snap2["elements"] if "百度一下" in e.get("text",""))
-await click(sid, btn_ref)
-
-# 提取结果
-import asyncio; await asyncio.sleep(3)
-snap3 = await snapshot(sid)
-results = [e["text"] for e in snap3["elements"] if e["role"] == "a" and e["text"]]
-await delete_session(sid)
-```
-
-### 远程模式 Boss 直聘搜索
-```bash
-# 创建会话
-SID=$(curl -s -X POST http://localhost:8000/sessions/create -d '{"user_id":"zhipin"}' | jq -r '.session_id')
-
-# 提交搜索任务
-curl -s -X POST http://localhost:8000/sessions/$SID/task \
-  -d '{"task":"访问 Boss直聘 搜索 Python 工程师，提取前10条职位信息","model":"glm-5-turbo","max_steps":10}'
-
-# 清理
-curl -s -X DELETE http://localhost:8000/sessions/$SID
-```
-
----
-
-## 站点适配器（零 LLM 成本）
-
-### 列出可用适配器
-
-```python
-from agent_browser import list_adapters
-
-adapters = await list_adapters()
-# [{"site": "baidu", "name": "search", "description": "百度搜索并提取结果", ...}, ...]
-```
-
-### 执行适配器
-
-```python
-from agent_browser import run_adapter
-
-# 百度搜索
-results = await run_adapter("baidu", "search", query="AI coding", limit=5)
-
-# B站热门
-results = await run_adapter("bilibili", "hot", limit=10)
-
-# 知乎热榜
-results = await run_adapter("zhihu", "hot", limit=10)
-
-# Boss直聘搜索
-results = await run_adapter("boss", "search", query="Python", city="101010100")
-```
-
-### AI 自动探索未知网站
-
-```python
-from agent_browser import create_session, explore, synthesize, cascade
-
-sid = await create_session()
-
-# 探索站点
-artifacts = await explore(sid, "https://example.com", goal="获取文章列表")
-
-# 验证策略
-strategies = await cascade(sid, "https://example.com", endpoints=artifacts.endpoints)
-
-# 生成适配器
-adapter = synthesize("example", artifacts, command_name="articles")
-```
-
-### 桌面应用控制
-
-```python
-from agent_browser import list_desktop_apps, run_desktop_command
-
-# 列出可用应用
-apps = await list_desktop_apps()
-
-# Cursor 状态检查
-status = await run_desktop_command("cursor", "status")
-
-# ChatGPT 截图
-result = await run_desktop_command("chatgpt", "screenshot", output_path="/tmp/chatgpt.png")
 ```

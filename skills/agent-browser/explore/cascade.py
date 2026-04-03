@@ -25,11 +25,15 @@ async def cascade(
       - 使用浏览器内 fetch（credentials: include）
       - 不注入任何检测脚本
     """
-    from ..main import _manager
-    session = _manager.get_session(session_id)
-    if not session:
+    from ..main import _backend
+    if _backend is None:
+        raise ValueError("Backend not initialized")
+    handle = _backend.get_page(session_id)
+    if not handle:
         raise ValueError(f"Session {session_id} not found")
-    page = session.page
+    page = handle.raw_page if hasattr(handle, 'raw_page') else None
+    if page is None:
+        raise ValueError("cascade() requires LocalCDPBackend (raw_page)")
 
     # 先导航到目标页面（建立 cookie）
     await page.goto(url, wait_until="domcontentloaded", timeout=20000)

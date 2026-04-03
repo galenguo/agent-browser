@@ -19,12 +19,14 @@ def register(name: str):
 
 
 def _get_page(session_id: str):
-    """从全局 SessionManager 获取 page 对象"""
-    from ..main import _manager
-    session = _manager.get_session(session_id)
-    if not session:
-        raise ValueError(f"Session {session_id} not found")
-    return session.page
+    """从全局 backend 获取 Playwright Page 对象"""
+    from ..main import _backend
+    if _backend is None:
+        raise ValueError("Backend not initialized")
+    handle = _backend.get_page(session_id)
+    if hasattr(handle, 'raw_page'):
+        return handle.raw_page
+    raise ValueError(f"Session {session_id} not found or no raw_page (pipeline requires LocalCDPBackend)")
 
 
 async def _stealth_delay(stealth: dict, key: str = "default"):

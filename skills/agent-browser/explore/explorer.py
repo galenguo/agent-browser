@@ -43,11 +43,15 @@ async def explore(
       - 框架检测使用 querySelector，不暴露全局变量指纹
       - 动作间隔 1-3 秒
     """
-    from ..main import _manager
-    session = _manager.get_session(session_id)
-    if not session:
+    from ..main import _backend
+    if _backend is None:
+        raise ValueError("Backend not initialized")
+    handle = _backend.get_page(session_id)
+    if not handle:
         raise ValueError(f"Session {session_id} not found")
-    page = session.page
+    page = handle.raw_page if hasattr(handle, 'raw_page') else None
+    if page is None:
+        raise ValueError("explore() requires LocalCDPBackend (raw_page)")
 
     result = ExplorationResult(url=url)
 

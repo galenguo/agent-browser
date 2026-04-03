@@ -12,7 +12,12 @@ from .main import (
     press_key,
     wait_for_selector,
     go_back,
+    configure,
+    run_task,
 )
+
+# 配置系统
+from .config import SkillConfig, load_config
 
 # 适配器系统
 from .adapters import list_adapters, run_adapter
@@ -24,7 +29,7 @@ from .explore import explore, synthesize, cascade
 from .desktop import run_desktop_command, list_desktop_apps
 
 __all__ = [
-    # 原有 API
+    # 原有 API（向后兼容）
     "create_session",
     "delete_session",
     "open_page",
@@ -37,6 +42,11 @@ __all__ = [
     "press_key",
     "wait_for_selector",
     "go_back",
+    "run_task",
+    # 配置
+    "configure",
+    "SkillConfig",
+    "load_config",
     # 站点适配器
     "list_adapters",
     "run_adapter",

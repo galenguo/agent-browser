@@ -113,13 +113,16 @@ async def run_desktop_command(
             cdp_url = await get_cdp(app_name)
             if cdp_url:
                 try:
-                    from ..main import _manager, create_session
+                    from ..main import _backend, create_session
                     # 使用 patchright 连接（隐匿性保障）
                     sid = await create_session(cdp_url)
                     try:
-                        session = _manager.get_session(sid)
-                        page = session.page
-                        result["cdp_result"] = await page.evaluate(js_code)
+                        handle = await _backend.get_page(sid)
+                        page = handle.raw_page if hasattr(handle, 'raw_page') else None
+                        if page is None:
+                            result["cdp_error"] = "No raw_page available"
+                        else:
+                            result["cdp_result"] = await page.evaluate(js_code)
                     finally:
                         from ..main import delete_session
                         await delete_session(sid)
