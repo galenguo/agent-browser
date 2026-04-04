@@ -14,7 +14,6 @@ from .applescript import (
 
 logger = logging.getLogger(__name__)
 
-# 桌面适配器目录
 _ADAPTER_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
     "adapters", "desktop",
@@ -48,7 +47,6 @@ def list_desktop_apps() -> List[dict]:
 
 
 def _load_app_adapter(app_name: str) -> Optional[dict]:
-    """加载应用适配器"""
     if not os.path.isdir(_ADAPTER_DIR):
         return None
 
@@ -74,12 +72,7 @@ async def run_desktop_command(
     """
     执行桌面应用命令。
 
-    路由到 CDP 或 AppleScript 执行器。
-
-    隐匿性:
-      - CDP 连接复用 patchright 驱动级补丁
-      - AppleScript 通过 System Events（无障碍 API），不注入代码
-      - 截图使用 screencapture（macOS 原生），不使用 CDP screenshot
+    路由到 CDP 或 AppleScript 执行器。CDP 操作通过 StealthMiddleware 隐匿包装。
     """
     adapter = _load_app_adapter(app_name)
     if not adapter:
@@ -113,18 +106,15 @@ async def run_desktop_command(
             cdp_url = await get_cdp(app_name)
             if cdp_url:
                 try:
-                    from ..main import _backend, create_session
-                    # 使用 patchright 连接（隐匿性保障）
-                    sid = await create_session(cdp_url)
+                    from ..main import create_session, delete_session
+                    # 通过 StealthMiddleware 创建 session + 获取 handle
+                    sid = await create_session(cdp_url=cdp_url)
                     try:
-                        handle = await _backend.get_page(sid)
-                        page = handle.raw_page if hasattr(handle, 'raw_page') else None
-                        if page is None:
-                            result["cdp_error"] = "No raw_page available"
-                        else:
-                            result["cdp_result"] = await page.evaluate(js_code)
+                        from ..main import _ensure_middleware
+                        mw = await _ensure_middleware()
+                        handle = await mw.get_page(sid)
+                        result["cdp_result"] = await handle.evaluate(js_code)
                     finally:
-                        from ..main import delete_session
                         await delete_session(sid)
                 except Exception as e:
                     result["cdp_error"] = str(e)
@@ -143,7 +133,6 @@ async def run_desktop_command(
             result["screenshot"] = await screenshot_window(app_name, output_path)
             result["screenshot_path"] = output_path if result["screenshot"] else None
 
-        # 隐匿性：步骤间随机延迟
         await asyncio.sleep(random.uniform(0.3, 1.0))
 
     return result

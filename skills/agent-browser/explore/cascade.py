@@ -7,8 +7,14 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# 策略级别（从低到高）
 STRATEGY_LEVELS = ["public", "cookie", "header", "intercept", "ui"]
+
+
+async def _get_handle(session_id: str):
+    """通过 StealthMiddleware 获取 BrowserPageHandle"""
+    from ..main import _ensure_middleware
+    mw = await _ensure_middleware()
+    return await mw.get_page(session_id)
 
 
 async def cascade(
@@ -20,28 +26,15 @@ async def cascade(
     """
     逐级探测认证策略: PUBLIC → COOKIE → HEADER → INTERCEPT
 
-    隐匿性:
-      - 每级探测间延迟 1-3 秒
-      - 使用浏览器内 fetch（credentials: include）
-      - 不注入任何检测脚本
+    隐匿性通过 StealthMiddleware 自动处理（导航延迟、evaluate passthrough）。
     """
-    from ..main import _backend
-    if _backend is None:
-        raise ValueError("Backend not initialized")
-    handle = _backend.get_page(session_id)
-    if not handle:
-        raise ValueError(f"Session {session_id} not found")
-    page = handle.raw_page if hasattr(handle, 'raw_page') else None
-    if page is None:
-        raise ValueError("cascade() requires LocalCDPBackend (raw_page)")
+    handle = await _get_handle(session_id)
 
-    # 先导航到目标页面（建立 cookie）
-    await page.goto(url, wait_until="domcontentloaded", timeout=20000)
+    # 导航到目标页面（StealthPageHandle.goto 自动注入隐匿延迟）
+    await handle.goto(url, wait_until="domcontentloaded", timeout=20000)
     await asyncio.sleep(random.uniform(1, 3))
 
     results: List[Dict[str, Any]] = []
-
-    # 如果没有提供端点，尝试发现
     test_urls = _get_test_urls(endpoints, url)
 
     # Level 1: PUBLIC（无 cookie，纯 API）
@@ -54,7 +47,7 @@ async def cascade(
     await asyncio.sleep(random.uniform(1, 2))
 
     # Level 2: COOKIE（浏览器内 fetch with credentials）
-    r = await _try_cookie(page, test_urls)
+    r = await _try_cookie(handle, test_urls)
     results.append(r)
     if r["success"]:
         logger.info(f"Strategy COOKIE works: {r['endpoint']}")
@@ -63,7 +56,7 @@ async def cascade(
     await asyncio.sleep(random.uniform(1, 2))
 
     # Level 3: HEADER（需要特定 headers）
-    r = await _try_header(page, test_urls, url)
+    r = await _try_header(handle, test_urls, url)
     results.append(r)
     if r["success"]:
         logger.info(f"Strategy HEADER works: {r['endpoint']}")
@@ -85,7 +78,6 @@ async def cascade(
 
 
 def _get_test_urls(endpoints: Optional[List[Any]], base_url: str) -> List[str]:
-    """获取测试 URL 列表"""
     if endpoints:
         return [ep.url for ep in endpoints if ep.is_json][:5]
     return []
@@ -119,7 +111,7 @@ async def _try_public(test_urls: List[str], base_url: str) -> Dict[str, Any]:
     return {"strategy": "public", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "All endpoints require auth"}
 
 
-async def _try_cookie(page, test_urls: List[str]) -> Dict[str, Any]:
+async def _try_cookie(handle, test_urls: List[str]) -> Dict[str, Any]:
     """Level 2: Cookie 认证（浏览器内 fetch）"""
     for url in test_urls:
         try:
@@ -131,7 +123,7 @@ async def _try_cookie(page, test_urls: List[str]) -> Dict[str, Any]:
                     .catch(() => null);
             }})()
             """
-            result = await page.evaluate(js)
+            result = await handle.evaluate(js)
             if result:
                 data = json.loads(result)
                 items = _extract_items(data)
@@ -150,7 +142,7 @@ async def _try_cookie(page, test_urls: List[str]) -> Dict[str, Any]:
     return {"strategy": "cookie", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "Cookie auth insufficient"}
 
 
-async def _try_header(page, test_urls: List[str], base_url: str) -> Dict[str, Any]:
+async def _try_header(handle, test_urls: List[str], base_url: str) -> Dict[str, Any]:
     """Level 3: 需要特定 Headers（如 Referer, X-Token 等）"""
     parsed_base = base_url.split("?")[0]
 
@@ -171,7 +163,7 @@ async def _try_header(page, test_urls: List[str], base_url: str) -> Dict[str, An
                 .catch(() => null);
             }})()
             """
-            result = await page.evaluate(js)
+            result = await handle.evaluate(js)
             if result:
                 data = json.loads(result)
                 items = _extract_items(data)
@@ -191,7 +183,6 @@ async def _try_header(page, test_urls: List[str], base_url: str) -> Dict[str, An
 
 
 def _extract_items(data: Any) -> list:
-    """从 JSON 响应中提取数据列表"""
     if isinstance(data, list):
         return data
     if isinstance(data, dict):
@@ -200,7 +191,6 @@ def _extract_items(data: Any) -> list:
             if isinstance(val, list):
                 return val
             if isinstance(val, dict):
-                # 嵌套一层
                 for k2 in ("items", "list", "records"):
                     inner = val.get(k2)
                     if isinstance(inner, list):
@@ -209,7 +199,6 @@ def _extract_items(data: Any) -> list:
 
 
 def _infer_fields(item: dict) -> Dict[str, str]:
-    """从数据项推断字段角色"""
     fields = {}
     if not isinstance(item, dict):
         return fields
