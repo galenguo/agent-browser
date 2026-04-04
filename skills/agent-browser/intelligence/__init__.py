@@ -1,4 +1,4 @@
-"""智能模式路由 — 委托给 backend.run_task()"""
+"""智能模式路由 — 委托给 StealthMiddleware.run_task()"""
 from typing import Optional, Dict
 
 
@@ -11,14 +11,16 @@ async def run_task(
     **kwargs,
 ) -> Dict:
     """
-    统一任务入口。委托给当前 backend 的 run_task 实现。
+    统一任务入口。通过 StealthMiddleware 委托给后端。
 
-    - LocalCDPBackend.run_task(): 本地 browser-use Agent（直连 CDP）
-    - RemoteAPIBackend.run_task(): HTTP 轮询远程 FastAPI
+    自动获得 total_timeout 超时保护和隐匿包装。
     """
-    from ..main import _backend
-    if _backend is None:
-        return {"status": "failed", "error": "Backend not initialized. Call create_session() first."}
-    return await _backend.run_task(
-        session_id, task, intelligence=intelligence, llm_config=llm_config, max_steps=max_steps, **kwargs
+    from ..main import _ensure_middleware
+    mw = await _ensure_middleware()
+    return await mw.run_task(
+        session_id, task,
+        intelligence=intelligence,
+        llm_config=llm_config,
+        max_steps=max_steps,
+        **kwargs,
     )
