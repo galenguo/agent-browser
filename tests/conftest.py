@@ -20,6 +20,8 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).parent.parent))
 # 添加 skill 路径
 sys.path.insert(0, str(Path(__file__).parent.parent / "skills"))
+# 添加 src 路径（用于 src.stealth, src.core 等模块的绝对导入）
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 
 @pytest.fixture(scope="session")

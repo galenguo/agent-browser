@@ -3,7 +3,7 @@ import os
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Literal, Optional
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,9 @@ class SkillConfig:
 
     # 隐匿
     stealth_enabled: bool = True
+    stealth_mode: Literal["full", "vanilla"] = "full"
+    #   full:    CloakBrowser + 全部 6 层反检测栈 + StealthEnhancer 行为模拟
+    #   vanilla: 标准 Playwright + 仅 StealthEnhancer 延迟行为（无需 CloakBrowser）
     warmup_enabled: bool = False
 
 
@@ -85,6 +88,9 @@ def _apply_env_overrides(cfg: SkillConfig) -> SkillConfig:
         cfg.daemon_idle_timeout = int(v)
     if v := os.getenv("AGENT_BROWSER_STEALTH_ENABLED"):
         cfg.stealth_enabled = v.lower() in ("1", "true", "yes")
+    if v := os.getenv("AGENT_BROWSER_STEALTH_MODE"):
+        if v in ("full", "vanilla"):
+            cfg.stealth_mode = v
     return cfg
 
 
@@ -122,6 +128,10 @@ def _apply_yaml_overrides(cfg: SkillConfig, yaml_data: dict) -> SkillConfig:
     stealth = skill.get("stealth", {})
     if "enabled" in stealth:
         cfg.stealth_enabled = stealth["enabled"]
+    if "mode" in stealth:
+        mode_val = stealth["mode"]
+        if mode_val in ("full", "vanilla"):
+            cfg.stealth_mode = mode_val
     if "warmup" in stealth:
         cfg.warmup_enabled = stealth["warmup"]
 

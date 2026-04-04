@@ -393,6 +393,7 @@ class LocalCDPBackend(BrowserBackend):
         intelligence: str = "agent",
         llm_config: Optional[Dict] = None,
         max_steps: int = 6,
+        total_timeout: float = 300.0,
         **kwargs,
     ) -> Dict:
         """
@@ -400,6 +401,7 @@ class LocalCDPBackend(BrowserBackend):
 
         使用 browser-use Agent 通过现有 CDP URL 自主完成任务。
         每块最多 max_steps 步，最多执行 2 块。
+        total_timeout: 整体超时秒数（默认 300s / 5 分钟），防止无限阻塞。
         """
         if intelligence != "agent":
             return {
@@ -444,59 +446,94 @@ class LocalCDPBackend(BrowserBackend):
 
         try:
             browser_session = BUSession(browser_profile=browser_profile)
-            for chunk_num in range(1, MAX_CHUNKS + 1):
-                if chunk_num == 1:
-                    current_task = f"{task}\n完成后输出 TASK_COMPLETE: <结果摘要>"
-                else:
-                    current_task = (
-                        f"任务：{task}\n"
-                        f"已完成：{last_result_text}\n"
-                        f"请继续。完成后输出 TASK_COMPLETE: <结果摘要>"
+
+            async def _run_chunks():
+                """内部：分块执行 agent 任务（可被 total_timeout 超时控制）"""
+                nonlocal browser_session
+
+                # 注入隐匿动作（覆盖 browser-use 默认 navigate/input/click）
+                controller = None
+                if self._stealth:
+                    try:
+                        from browser_use.tools.service import Tools
+                        from src.core.stealth_actions import register_stealth_actions
+
+                        controller = Tools(browser_session)
+                        register_stealth_actions(controller, self._stealth)
+                        logger.info("Stealth actions registered for agent mode")
+                    except Exception as e:
+                        logger.warning(f"Failed to register stealth actions: {e} (using default actions)")
+
+                for chunk_num in range(1, MAX_CHUNKS + 1):
+                    if chunk_num == 1:
+                        current_task = f"{task}\n完成后输出 TASK_COMPLETE: <结果摘要>"
+                    else:
+                        current_task = (
+                            f"任务：{task}\n"
+                            f"已完成：{last_result_text}\n"
+                            f"请继续。完成后输出 TASK_COMPLETE: <结果摘要>"
+                        )
+
+                    agent_kwargs = dict(
+                        task=current_task,
+                        llm=llm,
+                        browser_session=browser_session,
+                        max_actions_per_step=5,
+                        use_vision=False,
                     )
+                    if controller:
+                        agent_kwargs["controller"] = controller
 
-                agent = Agent(
-                    task=current_task,
-                    llm=llm,
-                    browser_session=browser_session,
-                    max_actions_per_step=5,
-                    use_vision=False,
-                )
+                    agent = Agent(**agent_kwargs)
 
+                    try:
+                        result = await agent.run(max_steps=max_steps)
+                        total_steps += max_steps
+                    except Exception as e:
+                        logger.error(f"Agent chunk {chunk_num} failed: {e}")
+                        return {"status": "failed", "error": str(e), "steps": total_steps}
+
+                    result_text = str(result) if result else ""
+                    all_results.append(result_text)
+
+                    if "TASK_COMPLETE" in result_text:
+                        final = result_text.split("TASK_COMPLETE:")[-1].strip()
+                        return {"status": "completed", "result": final, "steps": total_steps, "chunks": chunk_num}
+
+                    if not result_text or result_text == last_result_text:
+                        stuck_count += 1
+                    else:
+                        stuck_count = 0
+
+                    if stuck_count >= 2:
+                        return {
+                            "status": "stuck",
+                            "result": result_text or last_result_text,
+                            "steps": total_steps,
+                            "chunks": chunk_num,
+                        }
+
+                    last_result_text = result_text
+
+                return {
+                    "status": "completed" if all_results else "failed",
+                    "result": last_result_text,
+                    "steps": total_steps,
+                    "chunks": MAX_CHUNKS,
+                }
+
+            # 超时控制
+            if total_timeout > 0:
                 try:
-                    result = await agent.run(max_steps=max_steps)
-                    total_steps += max_steps
-                except Exception as e:
-                    logger.error(f"Agent chunk {chunk_num} failed: {e}")
-                    return {"status": "failed", "error": str(e), "steps": total_steps}
-
-                result_text = str(result) if result else ""
-                all_results.append(result_text)
-
-                if "TASK_COMPLETE" in result_text:
-                    final = result_text.split("TASK_COMPLETE:")[-1].strip()
-                    return {"status": "completed", "result": final, "steps": total_steps, "chunks": chunk_num}
-
-                if not result_text or result_text == last_result_text:
-                    stuck_count += 1
-                else:
-                    stuck_count = 0
-
-                if stuck_count >= 2:
+                    return await asyncio.wait_for(_run_chunks(), timeout=total_timeout)
+                except asyncio.TimeoutError:
                     return {
-                        "status": "stuck",
-                        "result": result_text or last_result_text,
+                        "status": "timeout",
+                        "error": f"Task exceeded {total_timeout}s limit",
                         "steps": total_steps,
-                        "chunks": chunk_num,
                     }
-
-                last_result_text = result_text
-
-            return {
-                "status": "completed" if all_results else "failed",
-                "result": last_result_text,
-                "steps": total_steps,
-                "chunks": MAX_CHUNKS,
-            }
+            else:
+                return await _run_chunks()
         finally:
             try:
                 await browser_session.close()
