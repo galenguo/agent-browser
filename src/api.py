@@ -115,10 +115,15 @@ async def verify_api_key(x_api_key: Optional[str] = Header(None, alias="X-API-Ke
     return x_api_key
 
 
-async def verify_session_ownership(session_id: str, api_key: Optional[str] = None):
-    """验证会话所有权（多租户安全）"""
+async def get_session_manager():
+    """FastAPI 依赖：返回 SessionPoolManager 或 503"""
     if not _session_manager:
         raise HTTPException(status_code=503, detail="Service not ready")
+    return _session_manager
+
+
+async def verify_session_ownership(session_id: str, api_key: Optional[str] = None):
+    """验证会话所有权（多租户安全）"""
 
     # 如果未配置 API Key，跳过所有权检查（单租户模式）
     if not _api_key:

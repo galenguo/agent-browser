@@ -1,4 +1,5 @@
 """Agent Browser Skill 主入口 — 轻量级 facade（通过 StealthMiddleware 路由所有操作）"""
+import asyncio
 import json
 import re
 import uuid
@@ -56,7 +57,6 @@ def reset():
     global _config, _middleware
     if _middleware:
         try:
-            import asyncio
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 asyncio.create_task(_middleware.disconnect())
