@@ -94,7 +94,7 @@ cp .env.example .env
 # 编辑 .env 设置 OPENAI_API_KEY 等
 
 # 启动 API 服务
-cd src && python -m uvicorn api:app --host 0.0.0.1 --port 8000 --reload
+cd src && python -m uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### Docker 部署
@@ -288,5 +288,5 @@ python tests/performance_test.py
 
 - [CLAUDE.md](./CLAUDE.md) - Claude Code 开发指南
 - [SKILL.md](./skills/agent-browser/SKILL.md) - Skill 使用文档
-- [架构方案V4](./docs/Agent-Browser%20架构方案V4.md) - 详细架构设计
+- [ARCHITECTURE.md](./docs/ARCHITECTURE.md) - 架构设计
 - [部署文档](./docs/DEPLOYMENT.md) - 部署指南

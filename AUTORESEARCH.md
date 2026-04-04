@@ -40,9 +40,6 @@
 - `src/core/stealth_actions.py` — 隐身动作覆写
 - 新增 `src/agent/prompts.py` — 提示模板（browser-use 有 9 种变体）
 
-### 浏览器控制
-- `src/core/browser_controller.py` — 原子操作实现
-
 ### 行为模拟
 - `src/browser/human_behavior.py` — 类人行为模拟参数
 
@@ -57,11 +54,10 @@
 ## Read-Only 文件（禁止修改）
 
 - `benchmark.py` — 串行评估脚本（指标来源，公平性保证）
-- `parallel_benchmark.py` — 并行评估脚本（3x 更快，输出格式相同）
 - `parallel_benchmark.py` — 并行评估脚本（3x 更快，同等公平性）
 - `AUTORESEARCH.md` — 本文件（实验规则）
 - `results.tsv` — 结果日志（Agent 只追加，不修改已有行）
-- `src/browser/stealth_launcher.py` — 反检测栈核心（5层防护）
+- `src/browser/stealth_launcher.py` — 反检测栈核心（6层防护）
 - `src/browser/instance_pool.py` — 浏览器实例池
 - `src/session/session_manager.py` — 指纹-IP-Cookie 一致性
 - `src/session/profile_manager.py` — 配置文件管理
