@@ -3,11 +3,19 @@
 DEPRECATED: 新代码应直接从 src.browser.daemon 导入。
 """
 import sys
+import warnings
 from pathlib import Path
 
 _src = str(Path(__file__).resolve().parent.parent.parent / "src")
 if _src not in sys.path:
     sys.path.insert(0, _src)
+
+warnings.warn(
+    "Importing from skills.agent_browser.daemon is DEPRECATED. "
+    "Use 'from src.browser.daemon import BrowserDaemon' instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from src.browser.daemon import BrowserDaemon  # noqa: F401
 
