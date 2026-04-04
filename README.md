@@ -20,30 +20,27 @@ Agent Browser 是一个基于 FastAPI + browser-use 的浏览器自动化系统�
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
-│                      main.py (API)                               │
-│       _ensure_backend() 路由 + run_task() 智能模式               │
-└───────────────┬─────────────────────────────────┬───────────────┘
-                │                                 │
-┌───────────────▼───────────────┐  ┌──────────────▼───────────────┐
-│      LocalCDPBackend          │  │      RemoteAPIBackend        │
-│      (本地 CDP 直连)           │  │      (HTTP 传输适配器)        │
-│  ├─ BrowserDaemon 持久化      │  │  ├─ aiohttp REST 调用        │
-│  ├─ StealthEnhancer 隐匿增强  │  │  ├─ X-API-Key 认证           │
-│  └─ browser-use Agent         │  │  └─ session_id 映射          │
-└───────────────────────────────┘  └──────────────┬───────────────┘
-                                                  │ HTTP
-                                   ┌──────────────▼───────────────┐
-                                   │      FastAPI 服务端           │
-                                   │  (内部运行 LocalCDPBackend)   │
-                                   │         ↓                    │
-                                   │  ┌───────────────────────┐   │
-                                   │  │ Gateway + Docker      │   │
-                                   │  │ (remote browser mode) │   │
-                                   │  └───────────────────────┘   │
-                                   └──────────────────────────────┘
+│                      main.py (Facade API, ~194 lines)            │
+│       _ensure_middleware() → StealthMiddleware 路由              │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────────┐
+│                  StealthMiddleware (src/stealth/)               │
+│   ┌─────────────────┐  ┌──────────────────┐  ┌───────────────┐ │
+│   │ Pre-action 延迟  │  │ StealthPageHandle │  │ Circuit Breaker│ │
+│   │ (按操作类型分类)  │  │ (自动隐匿包装)     │  │ (per-session)  │ │
+│   └─────────────────┘  └──────────────────┘  └───────────────┘ │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+┌───────▼────────┐  ┌────────▼────────┐  ┌────────▼────────┐
+│LocalCDPBackend │  │RemoteAPIBackend │  │ YAML Pipeline   │
+│(唯一核心实现)   │  │(HTTP 传输层)    │  │(steps.py)       │
+└────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
-### 6 层反检测栈
+### 7 层反检测栈
 
 | 层 | 组件 | 功能 |
 |---|------|------|
@@ -52,7 +49,8 @@ Agent Browser 是一个基于 FastAPI + browser-use 的浏览器自动化系统�
 | 3 | rebrowser-patches | Runtime.Enable 泄漏修复（addBinding 模式） |
 | 4 | 非标准端口 19222 | 绑定 127.0.0.1，连接隐匿 |
 | 5 | BrowserDaemon | 持久单 CDP 会话，禁止频繁 attach/detach |
-| 6 | StealthEnhancer | 人类延迟 + 贝塞尔鼠标 + 逐字输入 + 定时器噪声 |
+| 6 | StealthEnhancer | 贝塞尔鼠标 + 逐字输入 + 定时器噪声 |
+| 7 | **StealthMiddleware** | **集中隐匿层：自动 pre/post 延迟 + 熔断器** |
 
 ### 模式矩阵
 
@@ -202,6 +200,7 @@ results = await run_adapter("baidu", "search", query="AI coding", limit=5)
 | `AGENT_BROWSER_DAEMON_ENABLED` | `true` | 启用 Daemon 持久化 |
 | `AGENT_BROWSER_DAEMON_IDLE_TIMEOUT` | `1800` | Daemon 空闲超时（秒） |
 | `AGENT_BROWSER_STEALTH_ENABLED` | `true` | 启用隐匿增强 |
+| `AGENT_BROWSER_STEALTH_MODE` | `full` | 隐匿模式: `full`(CloakBrowser+全栈) / `vanilla`(Playwright+延迟) |
 
 ### 服务端配置（src/）
 
@@ -218,33 +217,39 @@ results = await run_adapter("baidu", "search", query="AI coding", limit=5)
 
 ```
 agent-browser/
-├── src/                              # 服务端源代码（FastAPI）
+├── src/                              # 核心实现（唯一真实代码位置）
 │   ├── api.py                        # FastAPI 入口
 │   ├── browser/                      # 浏览器引擎层
+│   │   ├── backends/                 # LocalCDPBackend + RemoteAPIBackend
+│   │   │   ├── __init__.py           # BrowserBackend ABC
+│   │   │   ├── local.py              # 唯一浏览器操作核心
+│   │   │   └── remote.py             # HTTP 传输适配器
+│   │   └── daemon.py                # BrowserDaemon 单例
+│   ├── stealth/                      # ★ StealthMiddleware 集中隐匿层
+│   │   ├── __init__.py               # 导出: StealthMiddleware, StealthPageHandle
+│   │   └── middleware.py             # 核心: 隐匿包装 + 熔断器
+│   ├── core/                         # 底层组件
+│   │   └── stealth_enhancer.py       # StealthEnhancer (贝塞尔鼠标等)
 │   ├── session/                      # 会话管理层
 │   └── agent/                        # Agent 层
 │
-├── skills/agent-browser/             # Skill 包（Claude Code / OpenClaw）
-│   ├── __init__.py                   # 顶层导出
-│   ├── main.py                       # Facade API
-│   ├── config.py                     # 配置系统
-│   ├── daemon.py                     # BrowserDaemon
-│   ├── stealth.py                    # StealthEnhancer
-│   ├── backends/                     # 后端抽象
-│   │   ├── __init__.py               # BrowserBackend ABC
-│   │   ├── local.py                  # LocalCDPBackend
-│   │   └── remote.py                 # RemoteAPIBackend
-│   ├── intelligence/                 # 智能模式
-│   │   ├── __init__.py               # run_task()
-│   │   └── agent_runner.py           # browser-use 执行器
+├── skills/agent-browser/             # Skill 包（轻量级 facade + 向后兼容 shim）
+│   ├── main.py                       # Facade API (~194 lines)
+│   ├── config.py                     # 配置系统 (含 stealth_mode)
+│   ├── backends/                     # → 重导出到 src/browser/backends/ (DEPRECATED)
+│   ├── daemon.py                     # → 重导出到 src/browser/daemon.py (DEPRECATED)
+│   ├── stealth.py                    # → 重导出到 core.stealth_enhancer (DEPRECATED)
+│   ├── intelligence/                 # 智能模式路由
+│   ├── pipeline/                     # YAML pipeline (已集成 StealthMiddleware)
+│   │   └── steps.py                  # 所有步骤通过 StealthPageHandle 执行
 │   ├── adapters/                     # 站点适配器
-│   ├── pipeline/                     # YAML pipeline
 │   ├── explore/                      # 站点探索
-│   ├── desktop/                      # 桌面控制
 │   └── SKILL.md                      # Skill 文档
 │
 ├── tests/                            # 测试套件
+│   └── test_stealth_middleware.py    # 19 个测试 (熔断器/中间件/回归)
 ├── scripts/                          # 实用脚本
+│   └── baseline_measurements.py      # 反检测性能基准测试
 ├── docker/                           # Docker 配置
 └── docs/                             # 文档
 ```

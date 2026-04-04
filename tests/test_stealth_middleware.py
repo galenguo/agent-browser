@@ -383,7 +383,7 @@ class TestRegressionFixes:
             "<script>alert(1)</script>",
         ]
         for ref in bad_refs:
-            with pytest.raises(ValueError, match="Invalid ref format"):
+            with pytest.raises(ValueError, match="Invalid ref"):
                 _validate_ref(ref)
 
     @pytest.mark.asyncio
