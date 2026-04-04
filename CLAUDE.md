@@ -372,7 +372,15 @@ async def new_behavior(self, page):
 - `langchain-openai` / `langchain-anthropic` - LLM 集成
 - `fastapi` + `uvicorn` - REST API
 - `aiohttp` - HTTP 客户端（RemoteAPIBackend）
-- `cloakbrowser` - 反检测 Chromium
+- `cloakbrowser==0.3.18` - 反检测 Chromium（安装在 `.venv`，C++ 编译级指纹伪装 33 处补丁）
+
+**CloakBrowser 安装信息：**
+- 包名：`cloakbrowser`
+- 版本：`0.3.18`
+- 安装位置：`.venv/lib/python3.13/site-packages`
+- 依赖：`httpx`, `playwright`
+- 启动方式：需通过 CloakBrowser 启动浏览器（非普通 Chrome），才能激活第 1 层反检测
+- CDP 端口：`127.0.0.1:19222`
 
 ## 相关文档
 
@@ -383,4 +391,4 @@ async def new_behavior(self, page):
 
 ---
 
-**最后更新：** 2026-04-03
+**最后更新：** 2026-04-04

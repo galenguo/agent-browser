@@ -99,6 +99,7 @@ class LocalCDPBackend(BrowserBackend):
         self._sessions: Dict[str, LocalSession] = {}
         self._stealth = None
         self._daemon = None
+        self._browser_process = None  # 自动启动的浏览器子进程
 
         # Daemon 持久化（可选）
         if config.daemon_enabled:
@@ -117,8 +118,59 @@ class LocalCDPBackend(BrowserBackend):
             except ImportError:
                 logger.debug("StealthEnhancer not available")
 
+    async def _is_cdp_reachable(self) -> bool:
+        """检查 CDP 端点是否可达"""
+        import aiohttp
+        cdp_url = self._config.cdp_url
+        # 转换为 HTTP URL 用于健康检查
+        if cdp_url.startswith("ws://"):
+            health_url = "http://" + cdp_url[5:] + "/json/version"
+        else:
+            health_url = cdp_url.replace("http://", "http://") + "/json/version"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(health_url, timeout=aiohttp.ClientTimeout(total=2)) as resp:
+                    return resp.status == 200
+        except Exception:
+            return False
+
+    async def _launch_browser(self) -> None:
+        """自动启动 CloakBrowser 子进程"""
+        import sys
+        import subprocess
+
+        logger.info("🚀 Auto-starting CloakBrowser...")
+
+        # 启动 CloakBrowser 子进程
+        try:
+            self._browser_process = await asyncio.create_subprocess_exec(
+                sys.executable, "-m", "cloakbrowser.launch",
+                "--port", "19222",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            logger.info(f"CloakBrowser process started (PID: {self._browser_process.pid})")
+        except Exception as e:
+            logger.error(f"Failed to launch CloakBrowser: {e}")
+            raise
+
+        # 等待 CDP 端点可用（最多 30 秒）
+        for attempt in range(30):
+            await asyncio.sleep(1)
+            if await self._is_cdp_reachable():
+                logger.info("✅ CloakBrowser CDP endpoint ready")
+                return
+
+        # 超时，清理子进程
+        if self._browser_process:
+            self._browser_process.kill()
+            await self._browser_process.wait()
+            self._browser_process = None
+        raise TimeoutError("CloakBrowser failed to start within 30 seconds")
+
     async def connect(self) -> None:
-        """连接到 CDP 端点（带重试）"""
+        """连接到 CDP 端点（带重试 + 自动启动浏览器）"""
         # Daemon 路径：使用 BrowserDaemon 持久连接
         if self._daemon:
             await self._daemon.ensure_connected()
@@ -132,6 +184,10 @@ class LocalCDPBackend(BrowserBackend):
                 return
             except Exception:
                 self._browser = None
+
+        # 自动启动浏览器（如果 CDP 不可达）
+        if not await self._is_cdp_reachable():
+            await self._launch_browser()
 
         if not self._playwright:
             self._playwright = await async_playwright().start()
@@ -154,7 +210,7 @@ class LocalCDPBackend(BrowserBackend):
                     raise
 
     async def disconnect(self) -> None:
-        """断开浏览器连接"""
+        """断开浏览器连接（清理子进程）"""
         # 先关闭所有 session
         for sid in list(self._sessions.keys()):
             await self.delete_session(sid)
@@ -163,6 +219,21 @@ class LocalCDPBackend(BrowserBackend):
             await self._daemon.disconnect()
             self._browser = None
             return
+
+        # 清理浏览器子进程（如果是自动启动的）
+        if self._browser_process:
+            try:
+                logger.info(f"Terminating auto-started browser process (PID: {self._browser_process.pid})")
+                self._browser_process.terminate()
+                await asyncio.wait_for(self._browser_process.wait(), timeout=5)
+            except asyncio.TimeoutError:
+                logger.warning("Browser process did not terminate gracefully, killing...")
+                self._browser_process.kill()
+                await self._browser_process.wait()
+            except Exception as e:
+                logger.debug(f"Error terminating browser process: {e}")
+            finally:
+                self._browser_process = None
 
         if self._browser:
             try:
@@ -314,3 +385,147 @@ class LocalCDPBackend(BrowserBackend):
             session = self._sessions.get(session_id)
             if session:
                 await self._stealth.random_mouse_move(session.page_handle.raw_page)
+
+    async def run_task(
+        self,
+        session_id: str,
+        task: str,
+        intelligence: str = "agent",
+        llm_config: Optional[Dict] = None,
+        max_steps: int = 6,
+        **kwargs,
+    ) -> Dict:
+        """
+        Agent 模式任务执行（本地 CDP）。
+
+        使用 browser-use Agent 通过现有 CDP URL 自主完成任务。
+        每块最多 max_steps 步，最多执行 2 块。
+        """
+        if intelligence != "agent":
+            return {
+                "status": "ready",
+                "mode": "llm",
+                "session_id": session_id,
+                "tools": ["snapshot", "click", "fill", "scroll", "go_back", "hover", "press_key"],
+            }
+
+        try:
+            from browser_use import Agent
+            from browser_use.browser.profile import BrowserProfile
+            from browser_use.browser.session import BrowserSession as BUSession
+        except ImportError:
+            return {
+                "status": "failed",
+                "error": "browser-use not installed. Run: pip install browser-use==0.12.2",
+            }
+
+        if session_id not in self._sessions:
+            return {"status": "failed", "error": f"Session {session_id} not found"}
+
+        # LLM 实例
+        llm = self._create_llm(llm_config)
+
+        # browser-use 通过 CDP URL 创建自己的连接（需要独立 BrowserSession）
+        cdp_url = self._config.cdp_url
+        browser_profile = BrowserProfile(
+            cdp_url=cdp_url,
+            is_local=True,
+            headless=False,
+            highlight_elements=True,
+            minimum_wait_page_load_time=0.5,
+            wait_for_network_idle_page_load_time=1.0,
+        )
+
+        all_results = []
+        last_result_text = ""
+        stuck_count = 0
+        total_steps = 0
+        MAX_CHUNKS = 2
+
+        try:
+            browser_session = BUSession(browser_profile=browser_profile)
+            for chunk_num in range(1, MAX_CHUNKS + 1):
+                if chunk_num == 1:
+                    current_task = f"{task}\n完成后输出 TASK_COMPLETE: <结果摘要>"
+                else:
+                    current_task = (
+                        f"任务：{task}\n"
+                        f"已完成：{last_result_text}\n"
+                        f"请继续。完成后输出 TASK_COMPLETE: <结果摘要>"
+                    )
+
+                agent = Agent(
+                    task=current_task,
+                    llm=llm,
+                    browser_session=browser_session,
+                    max_actions_per_step=5,
+                    use_vision=False,
+                )
+
+                try:
+                    result = await agent.run(max_steps=max_steps)
+                    total_steps += max_steps
+                except Exception as e:
+                    logger.error(f"Agent chunk {chunk_num} failed: {e}")
+                    return {"status": "failed", "error": str(e), "steps": total_steps}
+
+                result_text = str(result) if result else ""
+                all_results.append(result_text)
+
+                if "TASK_COMPLETE" in result_text:
+                    final = result_text.split("TASK_COMPLETE:")[-1].strip()
+                    return {"status": "completed", "result": final, "steps": total_steps, "chunks": chunk_num}
+
+                if not result_text or result_text == last_result_text:
+                    stuck_count += 1
+                else:
+                    stuck_count = 0
+
+                if stuck_count >= 2:
+                    return {
+                        "status": "stuck",
+                        "result": result_text or last_result_text,
+                        "steps": total_steps,
+                        "chunks": chunk_num,
+                    }
+
+                last_result_text = result_text
+
+            return {
+                "status": "completed" if all_results else "failed",
+                "result": last_result_text,
+                "steps": total_steps,
+                "chunks": MAX_CHUNKS,
+            }
+        finally:
+            try:
+                await browser_session.close()
+            except Exception:
+                pass
+
+    def _create_llm(self, llm_config: Optional[Dict] = None):
+        """创建 browser-use 兼容的 LLM 实例"""
+        import os
+        if not llm_config:
+            provider = os.getenv("AGENT_BROWSER_LLM_PROVIDER", "openai")
+            llm_config = {"provider": provider}
+
+        provider = llm_config.get("provider", "openai")
+        model_name = llm_config.get("model", "gpt-4o" if provider == "openai" else "claude-3-5-sonnet-20241022")
+        api_key = llm_config.get("api_key")
+        base_url = llm_config.get("base_url")
+        temperature = llm_config.get("temperature", 0.1)
+        max_tokens = llm_config.get("max_tokens", 4096)
+
+        if provider == "anthropic":
+            from browser_use.llm.anthropic.chat import ChatAnthropic
+            return ChatAnthropic(
+                model=model_name, api_key=api_key, base_url=base_url,
+                temperature=temperature, max_tokens=max_tokens,
+            )
+        else:
+            from browser_use.llm.openai.chat import ChatOpenAI
+            return ChatOpenAI(
+                model=model_name, api_key=api_key, base_url=base_url,
+                temperature=temperature, max_completion_tokens=max_tokens,
+            )

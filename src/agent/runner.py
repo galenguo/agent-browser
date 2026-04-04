@@ -40,8 +40,12 @@ async def _ensure_browser_running(proxy: str | None = None) -> str:
 
     if _browser is not None:
         try:
-            # 检查浏览器是否还活着
-            _ = _browser.contexts
+            # 检查浏览器是否还活着（兼容 Browser 和 BrowserContext）
+            # 注意: patchright 和 playwright 类型不同，用属性检测而非 isinstance
+            if hasattr(_browser, 'pages') and not hasattr(_browser, 'contexts'):
+                _ = _browser.pages  # BrowserContext 用 .pages 检查
+            else:
+                _ = _browser.contexts  # Browser 用 .contexts 检查
             cdp_url = f"http://127.0.0.1:{int(os.getenv('CDP_PORT', '19222'))}"
             return cdp_url
         except Exception:
@@ -104,10 +108,18 @@ async def run_agent_task(
         try:
             sim = HumanBehaviorSimulator()
             # 通过临时 page 预热（不通过 browser-use）
-            if _browser and _browser.contexts:
-                ctx = _browser.contexts[0]
-                pages = ctx.pages
-                if pages:
+            # 注意: patchright 和 playwright 类型不同，用属性检测
+            if _browser:
+                if hasattr(_browser, 'pages') and not hasattr(_browser, 'contexts'):
+                    # BrowserContext: 直接使用 pages
+                    pages = _browser.pages
+                    if pages:
+                        await sim.warmup_browsing(pages[0])
+                elif hasattr(_browser, 'contexts') and _browser.contexts:
+                    # Browser: 通过 contexts 获取
+                    ctx = _browser.contexts[0]
+                    pages = ctx.pages
+                    if pages:
                     await sim.warmup_browsing(pages[0])
         except Exception as e:
             logger.warning(f"Warmup failed (non-fatal): {e}")

@@ -29,21 +29,18 @@ class RemotePageHandle(BrowserPageHandle):
         self._remote_id = remote_id
 
     async def goto(self, url: str, wait_until: str = "domcontentloaded", timeout: int = 8000) -> None:
-        # TODO: FastAPI 需添加 POST /sessions/{id}/navigate
         await self._backend._request(
             "POST", f"/sessions/{self._remote_id}/navigate",
             {"url": url, "wait_until": wait_until, "timeout": timeout},
         )
 
     async def go_back(self, wait_until: str = "domcontentloaded", timeout: int = 10000) -> None:
-        # TODO: FastAPI 需添加 POST /sessions/{id}/back
         await self._backend._request(
             "POST", f"/sessions/{self._remote_id}/back",
             {"wait_until": wait_until, "timeout": timeout},
         )
 
     async def evaluate(self, expression: str) -> Any:
-        # TODO: FastAPI 需添加 POST /sessions/{id}/evaluate
         result = await self._backend._request(
             "POST", f"/sessions/{self._remote_id}/evaluate",
             {"expression": expression},
@@ -51,40 +48,36 @@ class RemotePageHandle(BrowserPageHandle):
         return result.get("result")
 
     async def wait_for_selector(self, selector: str, timeout: int = 10000) -> None:
-        # TODO: FastAPI 需添加 POST /sessions/{id}/wait
         await self._backend._request(
             "POST", f"/sessions/{self._remote_id}/wait",
             {"selector": selector, "timeout": timeout},
         )
 
     async def mouse_wheel(self, delta_x: int, delta_y: int) -> None:
-        # TODO: FastAPI 需添加 POST /sessions/{id}/scroll
+        direction = "down" if delta_y >= 0 else "up"
+        amount = abs(delta_y) if delta_y != 0 else abs(delta_x)
         await self._backend._request(
             "POST", f"/sessions/{self._remote_id}/scroll",
-            {"delta_x": delta_x, "delta_y": delta_y},
+            {"direction": direction, "amount": amount},
         )
 
     async def mouse_move(self, x: float, y: float) -> None:
-        # TODO: FastAPI 需添加 POST /sessions/{id}/mouse/move
         await self._backend._request(
             "POST", f"/sessions/{self._remote_id}/mouse/move",
             {"x": x, "y": y},
         )
 
     async def keyboard_press(self, key: str) -> None:
-        # TODO: FastAPI 需添加 POST /sessions/{id}/keyboard/press
         await self._backend._request(
             "POST", f"/sessions/{self._remote_id}/keyboard/press",
             {"key": key},
         )
 
     async def title(self) -> str:
-        # TODO: FastAPI 需添加 GET /sessions/{id}/title
         result = await self._backend._request("GET", f"/sessions/{self._remote_id}/title")
         return result.get("title", "")
 
     async def url(self) -> str:
-        # TODO: FastAPI 需添加 GET /sessions/{id}/url
         result = await self._backend._request("GET", f"/sessions/{self._remote_id}/url")
         return result.get("url", "")
 
@@ -124,7 +117,7 @@ class RemoteAPIBackend(BrowserBackend):
         if self._http_session is None:
             import aiohttp
             self._http_session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=30),
+                timeout=aiohttp.ClientTimeout(total=120),
             )
 
     async def _request(self, method: str, path: str, json_data: dict = None) -> dict:
@@ -219,6 +212,8 @@ class RemoteAPIBackend(BrowserBackend):
         self,
         session_id: str,
         task: str,
+        intelligence: str = "agent",
+        llm_config: Optional[Dict] = None,
         max_steps: int = 6,
         poll_interval: float = 5.0,
         poll_timeout: float = 120.0,
@@ -263,7 +258,6 @@ class RemoteAPIBackend(BrowserBackend):
         remote_id = self._id_map.get(session_id)
         if not remote_id:
             raise ValueError(f"Session {session_id} not found")
-        # TODO: FastAPI 需添加 GET /sessions/{id}/snapshot
         return await self._request(
             "POST", f"/sessions/{remote_id}/snapshot",
             {"interactive_only": interactive_only},

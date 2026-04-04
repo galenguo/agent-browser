@@ -179,7 +179,7 @@ class BrowserInstancePool:
             cdp_url = f"http://{container_ip}:19222"
 
             # 读取公网访问配置（用于告知用户浏览器节点地址）
-            public_host = os.getenv('BROWSER_PUBLIC_HOST')
+            public_host = os.getenv('BROWSER_PUBLIC_HOST', 'www.aiecho.site')
             port_offset = int(os.getenv('BROWSER_PORT_OFFSET', '0'))
 
             public_cdp_port = None  # Mode D: CDP 不对外暴露（内部网络）
@@ -192,7 +192,7 @@ class BrowserInstancePool:
                 if novnc_mapping:
                     host_port = int(novnc_mapping[0]['HostPort'])
                     public_novnc_port = host_port + port_offset
-                    novnc_url = f"http://{public_host}:{public_novnc_port}"
+                    novnc_url = f"http://{public_host}:{public_novnc_port}/vnc.html"
 
         else:
             # 模式 B：本地 API → Docker 浏览器（通过端口映射）
@@ -225,11 +225,11 @@ class BrowserInstancePool:
             cdp_url = f"http://localhost:{cdp_port}"
 
             # 读取公网访问配置（用于告知用户浏览器节点地址）
-            public_host = os.getenv('BROWSER_PUBLIC_HOST')
+            public_host = os.getenv('BROWSER_PUBLIC_HOST', 'www.aiecho.site')
             port_offset = int(os.getenv('BROWSER_PORT_OFFSET', '0'))
 
             public_novnc_port = novnc_port + port_offset
-            novnc_url = f"http://{public_host}:{public_novnc_port}" if public_host else None
+            novnc_url = f"http://{public_host}:{public_novnc_port}/vnc.html" if public_host else None
             public_cdp_port = cdp_port + port_offset if public_host else None
 
         # 等待容器内浏览器启动

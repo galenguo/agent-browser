@@ -1,4 +1,6 @@
 """Agent Browser Skill 主入口 — 模式感知 facade"""
+import json
+import re
 import uuid
 import logging
 from typing import Optional, Dict
@@ -8,6 +10,9 @@ from .backends import BrowserBackend, BrowserPageHandle
 from .backends.local import LocalCDPBackend
 
 logger = logging.getLogger(__name__)
+
+# ref 格式: @e 后跟数字（如 @e0, @e12），防止 CSS 选择器注入
+_REF_PATTERN = re.compile(r'^@e\d+$')
 
 # ── 全局状态 ──
 
@@ -21,8 +26,12 @@ async def _ensure_backend(config: SkillConfig = None) -> BrowserBackend:
     if _backend is not None:
         return _backend
 
+    # 优先级：传入的 config > 已有的 _config > 自动探测
     if config:
         _config = config
+    elif _config is not None:
+        # 已经通过 configure() 设置过，直接使用
+        pass
     else:
         _config = await detect_mode()
 
@@ -47,6 +56,14 @@ def configure(**kwargs) -> SkillConfig:
     global _config
     _config = load_config(**kwargs)
     return _config
+
+
+def reset():
+    """重置全局状态（用于测试）"""
+    global _config, _backend
+    _config = None
+    _backend = None
+    logger.debug("Global state reset")
 
 
 async def create_session(
@@ -121,19 +138,26 @@ async def click(session_id: str, ref: str):
     backend = await _ensure_backend()
     if isinstance(backend, LocalCDPBackend):
         await backend.stealth_delay("click")
-        dom_indices = backend.get_dom_indices(session_id)
-        idx = int(ref.replace("@e", ""))
-        if idx >= len(dom_indices):
-            raise ValueError(f"Element {ref} not found (have {len(dom_indices)} elements). Call snapshot() first.")
-        dom_idx = dom_indices[idx]
+        # 验证 ref 格式（防止 CSS 选择器注入）
+        if not _REF_PATTERN.match(ref):
+            raise ValueError(f"Invalid ref format: {ref}")
+
         page = await backend.get_page(session_id)
-        await page.evaluate(
-            f"document.querySelectorAll('button, a, input, textarea, select')[{dom_idx}].click()"
+        # 通过 data-ab-ref 属性查找元素（稳定，不受 DOM 位置变化影响）
+        result = await page.evaluate(
+            f"""(() => {{
+                const el = document.querySelector('[data-ab-ref="{ref}"]');
+                if (!el) return {{error: 'Element not found'}};
+                el.click();
+                return {{status: 'ok'}};
+            }})()"""
         )
+        if result.get("error"):
+            raise ValueError(f"Element {ref} not found. DOM may have changed since snapshot.")
     else:
         # Remote: 通过 evaluate
         page = await backend.get_page(session_id)
-        await page.evaluate(f"document.querySelector('[data-ref=\"{ref}\"]')?.click()")
+        await page.evaluate(f"document.querySelector('[data-ab-ref=\"{ref}\"]')?.click()")
 
 
 async def fill(session_id: str, ref: str, text: str):
@@ -141,22 +165,30 @@ async def fill(session_id: str, ref: str, text: str):
     backend = await _ensure_backend()
     if isinstance(backend, LocalCDPBackend):
         await backend.stealth_delay("input")
-        dom_indices = backend.get_dom_indices(session_id)
-        idx = int(ref.replace("@e", ""))
-        if idx >= len(dom_indices):
-            raise ValueError(f"Element {ref} not found (have {len(dom_indices)} elements). Call snapshot() first.")
-        dom_idx = dom_indices[idx]
-        escaped = text.replace("\\", "\\\\").replace("'", "\\'")
+        # 验证 ref 格式（防止 CSS 选择器注入）
+        if not _REF_PATTERN.match(ref):
+            raise ValueError(f"Invalid ref format: {ref}")
+
+        escaped = json.dumps(text)
         page = await backend.get_page(session_id)
-        await page.evaluate(
-            f"(el => {{ el.focus(); el.value = '{escaped}'; el.dispatchEvent(new Event('input', {{bubbles: true}})); }})"
-            f"(document.querySelectorAll('button, a, input, textarea, select')[{dom_idx}])"
+        # 通过 data-ab-ref 属性查找元素（稳定，不受 DOM 位置变化影响）
+        result = await page.evaluate(
+            f"""(() => {{
+                const el = document.querySelector('[data-ab-ref="{ref}"]');
+                if (!el) return {{error: 'Element not found'}};
+                el.focus();
+                el.value = '{escaped}';
+                el.dispatchEvent(new Event('input', {{bubbles: true}}));
+                return {{status: 'ok'}};
+            }})()"""
         )
+        if result.get("error"):
+            raise ValueError(f"Element {ref} not found. DOM may have changed since snapshot.")
     else:
         page = await backend.get_page(session_id)
         escaped = text.replace("\\", "\\\\").replace("'", "\\'")
         await page.evaluate(
-            f"document.querySelector('[data-ref=\"{ref}\"]') && (() => {{ const el = document.querySelector('[data-ref=\"{ref}\"]'); el.focus(); el.value = '{escaped}'; el.dispatchEvent(new Event('input', {{bubbles: true}})); }})()"
+            f"document.querySelector('[data-ab-ref=\"{ref}\"]') && (() => {{ const el = document.querySelector('[data-ab-ref=\"{ref}\"]'); el.focus(); el.value = '{escaped}'; el.dispatchEvent(new Event('input', {{bubbles: true}})); }})()"
         )
 
 
@@ -174,35 +206,47 @@ async def select_option(session_id: str, ref: str, value: str):
     """选择下拉选项"""
     backend = await _ensure_backend()
     if isinstance(backend, LocalCDPBackend):
-        dom_indices = backend.get_dom_indices(session_id)
-        idx = int(ref.replace("@e", ""))
-        if idx >= len(dom_indices):
-            raise ValueError(f"Element {ref} not found")
-        dom_idx = dom_indices[idx]
-        escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+        # 验证 ref 格式（防止 CSS 选择器注入）
+        if not _REF_PATTERN.match(ref):
+            raise ValueError(f"Invalid ref format: {ref}")
+
+        escaped = json.dumps(value)
         page = await backend.get_page(session_id)
-        await page.evaluate(
-            f"(el => {{ el.value = '{escaped}'; el.dispatchEvent(new Event('change', {{bubbles: true}})); }})"
-            f"(document.querySelectorAll('button, a, input, textarea, select')[{dom_idx}])"
+        # 通过 data-ab-ref 属性查找元素（稳定，不受 DOM 位置变化影响）
+        result = await page.evaluate(
+            f"""(() => {{
+                const el = document.querySelector('[data-ab-ref="{ref}"]');
+                if (!el) return {{error: 'Element not found'}};
+                el.value = '{escaped}';
+                el.dispatchEvent(new Event('change', {{bubbles: true}}));
+                return {{status: 'ok'}};
+            }})()"""
         )
+        if result.get("error"):
+            raise ValueError(f"Element {ref} not found. DOM may have changed since snapshot.")
 
 
 async def hover(session_id: str, ref: str):
     """悬停元素"""
     backend = await _ensure_backend()
     if isinstance(backend, LocalCDPBackend):
-        dom_indices = backend.get_dom_indices(session_id)
-        idx = int(ref.replace("@e", ""))
-        if idx >= len(dom_indices):
-            raise ValueError(f"Element {ref} not found")
-        dom_idx = dom_indices[idx]
+        # 验证 ref 格式（防止 CSS 选择器注入）
+        if not _REF_PATTERN.match(ref):
+            raise ValueError(f"Invalid ref format: {ref}")
+
         page = await backend.get_page(session_id)
+        # 通过 data-ab-ref 属性查找元素并获取中心坐标
         box = await page.evaluate(
-            f"(el => {{ const r = el.getBoundingClientRect(); return {{x: r.x + r.width/2, y: r.y + r.height/2}}; }})"
-            f"(document.querySelectorAll('button, a, input, textarea, select')[{dom_idx}])"
+            f"""(() => {{
+                const el = document.querySelector('[data-ab-ref="{ref}"]');
+                if (!el) return null;
+                const r = el.getBoundingClientRect();
+                return {{x: r.x + r.width/2, y: r.y + r.height/2}};
+            }})()"""
         )
-        if box:
-            await page.mouse_move(box["x"], box["y"])
+        if not box:
+            raise ValueError(f"Element {ref} not found. DOM may have changed since snapshot.")
+        await page.mouse_move(box["x"], box["y"])
 
 
 async def press_key(session_id: str, key: str):
@@ -238,11 +282,11 @@ async def run_task(
 
     intelligence="agent": 内置 browser-use Agent 自主执行
     intelligence="llm": 返回可用工具描述，由外部 LLM 驱动 ReAct
+
+    LocalCDPBackend: 本地 browser-use Agent（直连 CDP）
+    RemoteAPIBackend: HTTP 轮询远程 FastAPI run_task 端点
     """
     backend = await _ensure_backend()
-    if isinstance(backend, LocalCDPBackend):
-        from .intelligence import run_task as _run_task
-        return await _run_task(session_id, task, intelligence, llm_config, max_steps)
-    else:
-        # RemoteAPIBackend: 通过 HTTP 提交任务
-        return await backend.run_task(session_id, task, max_steps=max_steps)
+    return await backend.run_task(
+        session_id, task, intelligence=intelligence, llm_config=llm_config, max_steps=max_steps
+    )

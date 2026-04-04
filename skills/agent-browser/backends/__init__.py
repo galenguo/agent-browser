@@ -109,3 +109,15 @@ class BrowserBackend(ABC):
     @abstractmethod
     async def get_page(self, session_id: str) -> BrowserPageHandle:
         """获取会话的页面句柄"""
+
+    @abstractmethod
+    async def run_task(
+        self,
+        session_id: str,
+        task: str,
+        intelligence: str = "agent",
+        llm_config: Optional[Dict] = None,
+        max_steps: int = 6,
+        **kwargs,
+    ) -> Dict:
+        """执行智能任务（agent 模式: 内置 browser-use；llm 模式: 返回工具描述）"""
