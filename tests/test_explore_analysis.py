@@ -1,7 +1,7 @@
 """Analysis 模块测试 — 端点分析、策略推断、URL 处理"""
 import pytest
 from types import SimpleNamespace
-from skills.agent_browser.explore.analysis import (
+from agent_browser.explore.analysis import (
     url_to_pattern,
     classify_param,
     has_pagination,

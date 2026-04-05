@@ -1,6 +1,6 @@
 """模式2测试：远程CDP连接"""
 import pytest
-from src.controller import create_session, open_page, snapshot, click, fill
+from agent_browser.main import create_session, open_page, snapshot, click, fill
 
 
 @pytest.mark.asyncio

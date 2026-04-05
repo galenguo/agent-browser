@@ -1,6 +1,6 @@
 """测试 BrowserController"""
 import pytest
-from skills.agent_browser.controller import BrowserController
+from agent_browser.stealth.browser_controller import BrowserController
 
 
 @pytest.mark.asyncio

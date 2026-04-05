@@ -1,2 +1,0 @@
-commit	success_rate	avg_steps	avg_time	status	description
-4e71349	discard	E47: remove unused time import from browser_controller.py (transient failure)

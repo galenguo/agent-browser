@@ -303,7 +303,7 @@ class TestCLIRemoteFallback:
     @pytest.mark.asyncio
     async def test_cli_remote_becomes_local(self, scorecard_writer):
         """CLI 模式下 browser_mode='remote' 应自动变为 'local'"""
-        from skills.agent_browser.config import load_config
+        from agent_browser.config import load_config
 
         cfg = load_config(
             calling_mode="cli",

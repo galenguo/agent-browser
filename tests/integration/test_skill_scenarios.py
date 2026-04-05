@@ -26,10 +26,6 @@ import time
 import traceback
 from pathlib import Path
 
-# 添加 helpers 路径
-HELPERS_DIR = Path(__file__).parent.parent / "helpers"
-sys.path.insert(0, str(HELPERS_DIR.parent))
-
 from helpers.skill_loader import load_skill_module
 
 # 动态加载 skill 模块

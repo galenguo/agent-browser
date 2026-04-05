@@ -95,7 +95,7 @@ class TestCircuitBreaker:
 
     @pytest.mark.asyncio
     async def test_circuit_starts_closed(self):
-        from src.stealth.middleware import _PerSessionCircuit
+        from agent_browser.stealth.middleware import _PerSessionCircuit
 
         circuit = _PerSessionCircuit(threshold=5)
         assert circuit.state.name == "CLOSED"
@@ -104,7 +104,7 @@ class TestCircuitBreaker:
 
     @pytest.mark.asyncio
     async def test_circuit_opens_after_threshold(self):
-        from src.stealth.middleware import _PerSessionCircuit
+        from agent_browser.stealth.middleware import _PerSessionCircuit
 
         circuit = _PerSessionCircuit(threshold=5)
         for i in range(5):
@@ -121,7 +121,7 @@ class TestCircuitBreaker:
     @pytest.mark.asyncio
     async def test_circuit_per_session_isolation(self):
         """不同 session 的熔断状态互不影响"""
-        from src.stealth.middleware import _PerSessionCircuit
+        from agent_browser.stealth.middleware import _PerSessionCircuit
 
         c1 = _PerSessionCircuit(threshold=3)
         c2 = _PerSessionCircuit(threshold=3)
@@ -144,7 +144,7 @@ class TestStealthMiddleware:
 
     @pytest.mark.asyncio
     async def test_create_session_wraps_with_stealth(self, mock_config, mock_backend):
-        from src.stealth.middleware import StealthMiddleware
+        from agent_browser.stealth.middleware import StealthMiddleware
 
         backend, page_handle, raw_page = mock_backend
         mw = StealthMiddleware(backend, mock_config)
@@ -152,7 +152,7 @@ class TestStealthMiddleware:
         result = await mw.create_session("test_session")
 
         # 应返回 StealthPageHandle（不是原始 handle）
-        from src.stealth.middleware import StealthPageHandle
+        from agent_browser.stealth.middleware import StealthPageHandle
         assert isinstance(result, StealthPageHandle)
         assert result._wrapped is page_handle
         assert result._raw_page is raw_page
@@ -162,7 +162,7 @@ class TestStealthMiddleware:
 
     @pytest.mark.asyncio
     async def test_create_session_fallback_on_stealth_failure(self, mock_config, mock_backend):
-        from src.stealth.middleware import StealthMiddleware
+        from agent_browser.stealth.middleware import StealthMiddleware
 
         backend, page_handle, raw_page = mock_backend
         # 注入噪声时抛异常
@@ -179,7 +179,7 @@ class TestStealthMiddleware:
     @pytest.mark.asyncio
     async def test_stealth_off_returns_raw_handle(self, mock_backend):
         """stealth_enabled=False 时返回原始 handle（零开销）"""
-        from src.stealth.middleware import StealthMiddleware
+        from agent_browser.stealth.middleware import StealthMiddleware
 
         cfg = mock.MagicMock()
         cfg.stealth_enabled = False
@@ -192,7 +192,7 @@ class TestStealthMiddleware:
 
     @pytest.mark.asyncio
     async def test_delete_session_cleans_circuit(self, mock_config, mock_backend):
-        from src.stealth.middleware import StealthMiddleware
+        from agent_browser.stealth.middleware import StealthMiddleware
 
         backend, _, _ = mock_backend
         mw = StealthMiddleware(backend, mock_config)
@@ -204,7 +204,7 @@ class TestStealthMiddleware:
 
     @pytest.mark.asyncio
     async def test_connect_disconnect_delegate(self, mock_config, mock_backend):
-        from src.stealth.middleware import StealthMiddleware
+        from agent_browser.stealth.middleware import StealthMiddleware
 
         backend, _, _ = mock_backend
         mw = StealthMiddleware(backend, mock_config)
@@ -225,7 +225,7 @@ class TestStealthPageHandle:
     @pytest.mark.asyncio
     async def test_goto_has_stealth_delays(self, mock_config):
         """goto 操作应有 pre_action(navigate) + post_action(navigate)"""
-        from src.stealth.middleware import StealthPageHandle, _PerSessionCircuit
+        from agent_browser.stealth.middleware import StealthPageHandle, _PerSessionCircuit
 
         wrapped = MagicMock()
         wrapped.goto = AsyncMock()
@@ -249,7 +249,7 @@ class TestStealthPageHandle:
     @pytest.mark.asyncio
     async def test_evaluate_is_passthrough(self, mock_config):
         """evaluate 是透传操作（无隐匿延迟）"""
-        from src.stealth.middleware import StealthPageHandle, _PerSessionCircuit
+        from agent_browser.stealth.middleware import StealthPageHandle, _PerSessionCircuit
 
         wrapped = MagicMock()
         wrapped.evaluate = AsyncMock(return_value=42)
@@ -266,7 +266,7 @@ class TestStealthPageHandle:
     @pytest.mark.asyncio
     async def test_keyboard_press_has_stealth(self, mock_config):
         """keyboard_press 有 pre_action(input) + post_action(input)"""
-        from src.stealth.middleware import StealthPageHandle, _PerSessionCircuit
+        from agent_browser.stealth.middleware import StealthPageHandle, _PerSessionCircuit
 
         wrapped = MagicMock()
         wrapped.keyboard_press = AsyncMock()
@@ -285,7 +285,7 @@ class TestStealthPageHandle:
     @pytest.mark.asyncio
     async def test_mouse_move_calls_random_mouse_move(self, mock_config):
         """mouse_move 应调用 stealth.random_mouse_move（贝塞尔曲线）"""
-        from src.stealth.middleware import StealthPageHandle, _PerSessionCircuit
+        from agent_browser.stealth.middleware import StealthPageHandle, _PerSessionCircuit
 
         wrapped = MagicMock()
         wrapped.mouse_move = AsyncMock()
@@ -305,7 +305,7 @@ class TestStealthPageHandle:
     @pytest.mark.asyncio
     async def test_circuit_open_disables_stealth(self, mock_config):
         """熔断 OPEN 后，操作不再有隐匿延迟"""
-        from src.stealth.middleware import StealthPageHandle, _PerSessionCircuit
+        from agent_browser.stealth.middleware import StealthPageHandle, _PerSessionCircuit
 
         wrapped = MagicMock()
         wrapped.goto = AsyncMock()
@@ -328,7 +328,7 @@ class TestStealthPageHandle:
     @pytest.mark.asyncio
     async def test_remote_handle_no_raw_page_safe(self, mock_config):
         """RemotePageHandle 无 raw_page 时不应崩溃"""
-        from src.stealth.middleware import StealthPageHandle, _PerSessionCircuit
+        from agent_browser.stealth.middleware import StealthPageHandle, _PerSessionCircuit
 
         wrapped = MagicMock()
         wrapped.goto = AsyncMock()
@@ -364,7 +364,7 @@ class TestRegressionFixes:
     @pytest.mark.asyncio
     async def test_ref_validation_rejects_injection(self):
         """ref 格式验证：拒绝 CSS 选择器注入"""
-        from skills.agent_browser.main import _validate_ref
+        from agent_browser.main import _validate_ref
 
         # 合法格式
         _validate_ref("@e0")
@@ -408,7 +408,7 @@ class TestRegressionFixes:
     async def test_total_timeout_parameter_exists(self):
         """run_task 签名包含 total_timeout 参数"""
         from inspect import signature
-        from skills.agent_browser.backends.local import LocalCDPBackend
+        from agent_browser.backends.local import LocalCDPBackend
 
         sig = signature(LocalCDPBackend.run_task)
         params = list(sig.parameters.keys())
@@ -418,7 +418,7 @@ class TestRegressionFixes:
     @pytest.mark.asyncio
     async def test_stealth_mode_config_option(self):
         """SkillConfig 包含 stealth_mode 字段"""
-        from skills.agent_browser.config import SkillConfig
+        from agent_browser.config import SkillConfig
 
         cfg = SkillConfig()
         assert hasattr(cfg, "stealth_mode")
@@ -427,8 +427,8 @@ class TestRegressionFixes:
 
     @pytest.mark.asyncio
     async def test_middleware_exports(self):
-        """src.stealth 模块正确导出核心类"""
-        from src.stealth import StealthMiddleware, StealthPageHandle, CircuitState
+        """agent_browser.stealth 模块正确导出核心类"""
+        from agent_browser.stealth import StealthMiddleware, StealthPageHandle, CircuitState
 
         assert StealthMiddleware is not None
         assert StealthPageHandle is not None

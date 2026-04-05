@@ -2,17 +2,17 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from skills.agent_browser.pipeline.fallback import (
+from agent_browser.pipeline.fallback import (
     attempt_fallback,
     _FALLBACK_HANDLER_NAMES,
     _MAX_RETRIES,
 )
-from skills.agent_browser.pipeline.errors import (
+from agent_browser.pipeline.errors import (
     PipelineStepError,
     StepTimeoutError,
     SelectorNotFoundError,
 )
-from skills.agent_browser.pipeline.classifier import ErrorCategory, classify
+from agent_browser.pipeline.classifier import ErrorCategory, classify
 
 
 class TestFallbackHandlersExist:
@@ -42,7 +42,7 @@ class TestFallbackSelectorDrift:
         )
 
         mock_handler = AsyncMock(return_value=True)
-        with patch("skills.agent_browser.pipeline.fallback._get_fallback_handler",
+        with patch("agent_browser.pipeline.fallback._get_fallback_handler",
                    return_value=mock_handler):
 
             recovered = await attempt_fallback("s1", pe, {"data": []})
@@ -56,7 +56,7 @@ class TestFallbackSelectorDrift:
             step_index=2, step_name="click",
         )
 
-        with patch("skills.agent_browser.pipeline.fallback._retry_with_fresh_selector",
+        with patch("agent_browser.pipeline.fallback._retry_with_fresh_selector",
                    new_callable=AsyncMock(return_value=False)) as mock_retry:
 
             recovered = await attempt_fallback("s1", pe, {"data": []})
@@ -82,7 +82,7 @@ class TestFallbackTimeout:
         )
 
         mock_handler = AsyncMock(return_value=True)
-        with patch("skills.agent_browser.pipeline.fallback._get_fallback_handler",
+        with patch("agent_browser.pipeline.fallback._get_fallback_handler",
                    return_value=mock_handler):
 
             recovered = await attempt_fallback("s1", te, {"data": None})
@@ -93,7 +93,7 @@ class TestFallbackTimeout:
         """超时恢复失败时返回原始错误"""
         te = StepTimeoutError(message="timed out", step_index=1)
 
-        with patch("skills.agent_browser.pipeline.fallback._retry_with_longer_timeout",
+        with patch("agent_browser.pipeline.fallback._retry_with_longer_timeout",
                    new_callable=AsyncMock(return_value=False)) as mock_retry:
 
             recovered = await attempt_fallback("s1", te, {})
@@ -122,7 +122,7 @@ class TestFallbackMaxRetries:
         pe = PipelineStepError(message="fail", step_index=0)
 
         mock_handler = AsyncMock(return_value=False)
-        with patch("skills.agent_browser.pipeline.fallback._get_fallback_handler",
+        with patch("agent_browser.pipeline.fallback._get_fallback_handler",
                    return_value=mock_handler):
 
             result = await attempt_fallback("s1", pe, {}, max_retries=3)

@@ -21,7 +21,7 @@ import pytest
 from helpers.skill_loader import load_skill_module
 
 config = load_skill_module("config")
-daemon_module = load_skill_module("daemon")
+daemon_module = load_skill_module("browser.daemon")
 
 SkillConfig = config.SkillConfig
 BrowserDaemon = daemon_module.BrowserDaemon

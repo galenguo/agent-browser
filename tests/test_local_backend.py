@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 
+@pytest.mark.requires_browser
 class TestCloakBrowserConnection:
     """B1.1 CDP 连接测试"""
 

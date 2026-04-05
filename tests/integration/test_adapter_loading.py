@@ -18,14 +18,14 @@ class TestAdapterDiscovery:
 
     def test_list_adapters_returns_non_empty(self):
         """list_adapters() finds at least one adapter (baidu/search)."""
-        from skills.agent_browser.adapters.loader import list_adapters
+        from agent_browser.adapters.loader import list_adapters
 
         adapters = list_adapters()
         assert len(adapters) > 0
 
     def test_baidu_search_in_registry(self):
         """baidu/search adapter is discoverable and has correct metadata."""
-        from skills.agent_browser.adapters.loader import get_adapter
+        from agent_browser.adapters.loader import get_adapter
 
         adapter = get_adapter("baidu", "search")
         assert adapter is not None
@@ -35,10 +35,10 @@ class TestAdapterDiscovery:
 
     def test_adapter_has_pipeline(self):
         """Each registered adapter has a pipeline list."""
-        from skills.agent_browser.adapters.loader import list_adapters
+        from agent_browser.adapters.loader import list_adapters
 
         for meta in list_adapters():
-            from skills.agent_browser.adapters.loader import get_adapter
+            from agent_browser.adapters.loader import get_adapter
             adapter = get_adapter(meta["site"], meta["name"])
             assert "pipeline" in adapter
             assert isinstance(adapter["pipeline"], list)
@@ -50,7 +50,7 @@ class TestAdapterParsing:
 
     def test_baidu_search_has_query_arg(self):
         """baidu/search defines 'query' as required string arg."""
-        from skills.agent_browser.adapters.loader import get_adapter
+        from agent_browser.adapters.loader import get_adapter
 
         adapter = get_adapter("baidu", "search")
         args = adapter.get("args", {})
@@ -59,7 +59,7 @@ class TestAdapterParsing:
 
     def test_baidu_search_has_limit_default(self):
         """baidu/search 'limit' arg has default value."""
-        from skills.agent_browser.adapters.loader import get_adapter
+        from agent_browser.adapters.loader import get_adapter
 
         adapter = get_adapter("baidu", "search")
         args = adapter.get("args", {})
@@ -76,7 +76,7 @@ class TestAdapterAuthSteps:
 
     def test_boss_search_has_cookie_strategy(self):
         """boss/search uses cookie strategy (requires auth)."""
-        from skills.agent_browser.adapters.loader import get_adapter
+        from agent_browser.adapters.loader import get_adapter
 
         adapter = get_adapter("boss", "search")
         assert adapter is not None
@@ -94,7 +94,7 @@ class TestUnknownAdapter:
 
     def test_get_nonexistent_adapter(self):
         """get_adapter('nonexistent', 'missing') returns None."""
-        from skills.agent_browser.adapters.loader import get_adapter
+        from agent_browser.adapters.loader import get_adapter
 
         result = get_adapter("nonexistent", "missing")
         assert result is None
@@ -109,7 +109,7 @@ class TestOpenCLINormalization:
 
     def test_domain_normalized_to_site(self):
         """OpenCLI 'domain' field becomes 'site'."""
-        from skills.agent_browser.adapters.loader import _normalize_adapter
+        from agent_browser.adapters.loader import _normalize_adapter
 
         adapter = _normalize_adapter({"domain": "example.com", "name": "test"})
         assert adapter["site"] == "example.com"
@@ -117,7 +117,7 @@ class TestOpenCLINormalization:
 
     def test_site_preserved_when_present(self):
         """When both domain and site present, site takes priority."""
-        from skills.agent_browser.adapters.loader import _normalize_adapter
+        from agent_browser.adapters.loader import _normalize_adapter
 
         adapter = _normalize_adapter({
             "domain": "wrong.com",
@@ -128,7 +128,7 @@ class TestOpenCLINormalization:
 
     def test_intercept_strategy_mapped_to_cookie(self):
         """OpenCLI 'intercept' strategy mapped to 'cookie' internally."""
-        from skills.agent_browser.adapters.loader import _normalize_adapter
+        from agent_browser.adapters.loader import _normalize_adapter
 
         adapter = _normalize_adapter({
             "site": "test", "name": "x", "strategy": "intercept"
@@ -137,7 +137,7 @@ class TestOpenCLINormalization:
 
     def test_other_strategies_pass_through(self):
         """Non-intercept strategies are unchanged."""
-        from skills.agent_browser.adapters.loader import _normalize_adapter
+        from agent_browser.adapters.loader import _normalize_adapter
 
         for s in ["public", "ui", "store-action", "header"]:
             adapter = _normalize_adapter({
@@ -151,7 +151,7 @@ class TestNavigateBeforeNormalization:
 
     def test_navigate_before_prepended(self):
         """navigateBefore becomes navigate step at index 0."""
-        from skills.agent_browser.adapters.loader import _normalize_adapter
+        from agent_browser.adapters.loader import _normalize_adapter
 
         adapter = _normalize_adapter({
             "site": "test",
@@ -169,7 +169,7 @@ class TestNavigateBeforeNormalization:
 
     def test_no_navigate_before_leaves_pipeline_unchanged(self):
         """Without navigateBefore, pipeline is untouched."""
-        from skills.agent_browser.adapters.loader import _normalize_adapter
+        from agent_browser.adapters.loader import _normalize_adapter
 
         original = [{"click": ".btn"}, {"snapshot": "*"}]
         adapter = _normalize_adapter({
@@ -187,7 +187,7 @@ class TestValidationErrors:
 
     def test_missing_site_and_name_skipped(self):
         """Adapter without site/name is invalid but doesn't crash loader."""
-        from skills.agent_browser.adapters.loader import _normalize_adapter
+        from agent_browser.adapters.loader import _normalize_adapter
 
         adapter = _normalize_adapter({"description": "no site or name"})
         # Should return dict without site/name — loader will skip it
@@ -195,7 +195,7 @@ class TestValidationErrors:
 
     def test_validation_errors_detected(self):
         """validate_adapter() finds errors in malformed adapter."""
-        from skills.agent_browser.adapters.validator import validate_adapter
+        from agent_browser.adapters.validator import validate_adapter
 
         errors = validate_adapter({})
         assert len(errors) > 0
@@ -204,7 +204,7 @@ class TestValidationErrors:
 
     def test_validation_passes_for_valid_adapter(self):
         """validate_adapter() returns empty list for well-formed adapter."""
-        from skills.agent_browser.adapters.validator import validate_adapter
+        from agent_browser.adapters.validator import validate_adapter
 
         valid = {
             "site": "test",
@@ -217,7 +217,7 @@ class TestValidationErrors:
 
     def test_validation_rejects_unknown_step(self):
         """Pipeline with unregistered step name produces error."""
-        from skills.agent_browser.adapters.validator import validate_adapter
+        from agent_browser.adapters.validator import validate_adapter
 
         bad = {
             "site": "test",
@@ -229,7 +229,7 @@ class TestValidationErrors:
 
     def test_validation_rejects_invalid_strategy(self):
         """Unknown strategy value produces error."""
-        from skills.agent_browser.adapters.validator import validate_adapter
+        from agent_browser.adapters.validator import validate_adapter
 
         bad = {
             "site": "test",
@@ -242,7 +242,7 @@ class TestValidationErrors:
 
     def test_validation_rejects_empty_pipeline(self):
         """Empty pipeline list produces error."""
-        from skills.agent_browser.adapters.validator import validate_adapter
+        from agent_browser.adapters.validator import validate_adapter
 
         bad = {
             "site": "test",
@@ -262,7 +262,7 @@ class TestNormalizeIdempotency:
 
     def test_double_normalize_stable(self):
         """Normalizing an already-normalized adapter is idempotent."""
-        from skills.agent_browser.adapters.loader import _normalize_adapter
+        from agent_browser.adapters.loader import _normalize_adapter
 
         raw = {"site": "test", "name": "x", "strategy": "public"}
         once = _normalize_adapter(raw)

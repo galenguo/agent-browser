@@ -1,6 +1,6 @@
 """小红书场景测试"""
 import pytest
-from src.controller import create_session, open_page, snapshot, click
+from agent_browser.main import create_session, open_page, snapshot, click
 
 
 @pytest.mark.asyncio

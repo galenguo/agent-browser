@@ -56,3 +56,19 @@ references/
 *_REPORT.md
 *_TEST_REPORT.md
 *_VERIFICATION_REPORT.md
+
+# Local development docs (not committed, use GitHub Pages/Wiki for public docs)
+docs/
+
+# Old architecture (pre-restructure — to be deleted after migration)
+src/
+skills/
+references/
+desktop/
+
+# Test artifacts
+tests/screenshots/
+tests/results/
+
+# Benchmark scripts (dev only)
+scripts/benchmark/

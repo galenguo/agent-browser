@@ -6,10 +6,7 @@ import os
 import tempfile
 import shutil
 
-# 添加 src 到路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-from src.session.profile_manager import ProfileManager
+from agent_browser.session.profile_manager import ProfileManager
 
 
 def test_profile_manager():

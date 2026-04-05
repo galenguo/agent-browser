@@ -5,13 +5,8 @@ import pytest
 from pathlib import Path
 from unittest import mock
 
-# Ensure paths
-sys.path.insert(0, str(Path(__file__).parent.parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "skills"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from skills.agent_browser.config import SkillConfig, load_config, from_deploy_config
-from skills.agent_browser.deploy_config import DeployConfig, load_deploy_config
+from agent_browser.config import SkillConfig, load_config, from_deploy_config
+from agent_browser.deploy_config import DeployConfig, load_deploy_config
 
 
 class TestFromDeployConfig:
@@ -73,7 +68,7 @@ skill:
   calling_mode: api
   cdp_url: "http://localhost:9222"
 """)
-        with mock.patch("skills.agent_browser.config.Path.home", return_value=tmp_path):
+        with mock.patch("agent_browser.config.Path.home", return_value=tmp_path):
             cfg = load_config(calling_mode="cli", cdp_url="http://127.0.0.1:19222")
             assert cfg.calling_mode == "cli"
             assert cfg.cdp_url == "http://127.0.0.1:19222"
@@ -89,7 +84,7 @@ skill:
 
         with mock.patch.dict(os.environ, {"AGENT_BROWSER_CALLING_MODE": "api"}):
             # Need to also patch Path.home to point to tmp_path
-            with mock.patch("skills.agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
+            with mock.patch("agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
                 cfg = load_config()
                 assert cfg.calling_mode == "api"
 
@@ -103,7 +98,7 @@ skill:
   browser_mode: remote
   intelligence: agent
 """)
-        with mock.patch("skills.agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
+        with mock.patch("agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
             cfg = load_config()
             assert cfg.calling_mode == "api"
             assert cfg.intelligence == "agent"
@@ -154,7 +149,7 @@ proxy:
   enabled: false
   list: []
 """)
-        with mock.patch("skills.agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
+        with mock.patch("agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
             # Should not raise
             cfg = load_config()
             assert cfg.calling_mode == "cli"
@@ -173,7 +168,7 @@ k8s:
   namespace: production
   replicas: 3
 """)
-        with mock.patch("skills.agent_browser.deploy_config.CONFIG_PATH", cfg_file):
+        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", cfg_file):
             dep = load_deploy_config()
             assert dep.mode == "docker-aio"
             assert dep.docker_registry == "ghcr.io/myorg"
@@ -185,7 +180,7 @@ k8s:
         """If new sections are missing, use DeployConfig defaults."""
         cfg_file = tmp_path / "config.yaml"
         cfg_file.write_text("deployment:\n  mode: local\n")
-        with mock.patch("skills.agent_browser.deploy_config.CONFIG_PATH", cfg_file):
+        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", cfg_file):
             dep = load_deploy_config()
             assert dep.docker_registry is None  # default
             assert dep.k8s_replicas == 1  # default
@@ -205,6 +200,6 @@ skill:
   browser_mode: local
   intelligence: llm
 """)
-        with mock.patch("skills.agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
+        with mock.patch("agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
             cfg = load_config()
             assert cfg.calling_mode == "cli"

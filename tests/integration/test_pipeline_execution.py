@@ -18,7 +18,7 @@ class TestPipelineLoading:
 
     def test_load_baidu_search_adapter(self):
         """baidu/search.yaml loads with correct fields."""
-        from skills.agent_browser.adapters.loader import get_adapter
+        from agent_browser.adapters.loader import get_adapter
 
         adapter = get_adapter("baidu", "search")
         assert adapter is not None
@@ -29,8 +29,8 @@ class TestPipelineLoading:
 
     def test_pipeline_has_known_step_names(self):
         """All step names in baidu adapter are registered in STEPS registry."""
-        from skills.agent_browser.adapters.loader import get_adapter
-        from skills.agent_browser.pipeline.steps import STEPS
+        from agent_browser.adapters.loader import get_adapter
+        from agent_browser.pipeline.steps import STEPS
 
         adapter = get_adapter("baidu", "search")
         for step in adapter.get("pipeline", []):
@@ -44,7 +44,7 @@ class TestPipelineExecution:
     @pytest.mark.asyncio
     async def test_navigate_step_calls_goto(self, patched_get_handle, mock_page_for_steps):
         """step_navigate() validates URL and calls page.goto()."""
-        from skills.agent_browser.pipeline.steps import step_navigate
+        from agent_browser.pipeline.steps import step_navigate
 
         result = await step_navigate(
             session_id="test-001",
@@ -58,7 +58,7 @@ class TestPipelineExecution:
     @pytest.mark.asyncio
     async def test_wait_step_seconds(self, patched_get_handle, mock_page_for_steps):
         """step_wait(3) sleeps for 3 seconds (use small value in test)."""
-        from skills.agent_browser.pipeline.steps import step_wait
+        from agent_browser.pipeline.steps import step_wait
 
         result = await step_wait(
             session_id="test-001",
@@ -72,7 +72,7 @@ class TestPipelineExecution:
     @pytest.mark.asyncio
     async def test_snapshot_step_returns_elements(self, patched_get_handle):
         """step_snapshot() returns list of element dicts."""
-        from skills.agent_browser.pipeline.steps import step_snapshot
+        from agent_browser.pipeline.steps import step_snapshot
 
         patched_get_handle.evaluate = mock.AsyncMock(return_value=[
             {"_index": 0, "tag": "div", "text": "hello", "attrs": {}},
@@ -101,7 +101,7 @@ class TestPipelineErrorHandling:
     @pytest.mark.asyncio
     async def test_navigate_rejects_javascript_url(self):
         """step_navigate rejects javascript: URLs."""
-        from skills.agent_browser.pipeline.steps import step_navigate
+        from agent_browser.pipeline.steps import step_navigate
 
         with pytest.raises(ValueError, match="http\\(s\\) scheme"):
             await step_navigate(
@@ -115,7 +115,7 @@ class TestPipelineErrorHandling:
     @pytest.mark.asyncio
     async def test_navigate_rejects_empty_url(self):
         """step_navigate rejects empty URL."""
-        from skills.agent_browser.pipeline.steps import step_navigate
+        from agent_browser.pipeline.steps import step_navigate
 
         with pytest.raises(ValueError, match="Empty URL|http\\(s\\) scheme"):
             await step_navigate(
@@ -129,7 +129,7 @@ class TestPipelineErrorHandling:
     @pytest.mark.asyncio
     async def test_click_rejects_empty_selector(self):
         """step_click rejects empty selector."""
-        from skills.agent_browser.pipeline.steps import step_click
+        from agent_browser.pipeline.steps import step_click
 
         with pytest.raises(ValueError, match="Empty selector"):
             await step_click(
@@ -151,7 +151,7 @@ class TestOutputSchema:
     @pytest.mark.asyncio
     async def test_snapshot_output_has_expected_keys(self, patched_get_handle):
         """snapshot output contains tag, text, attrs keys per element."""
-        from skills.agent_browser.pipeline.steps import step_snapshot
+        from agent_browser.pipeline.steps import step_snapshot
 
         patched_get_handle.evaluate = mock.AsyncMock(return_value=[
             {"_index": 0, "tag": "h1", "text": "Title", "attrs": {"class": "header"}},
@@ -172,12 +172,12 @@ class TestOutputSchema:
     @pytest.mark.asyncio
     async def test_navigate_returns_data_unchanged(self):
         """step_navigate returns input data unchanged (pass-through)."""
-        from skills.agent_browser.pipeline.steps import step_navigate
+        from agent_browser.pipeline.steps import step_navigate
 
         page = mock.MagicMock()
         page.goto = mock.AsyncMock()
 
-        import skills.agent_browser.pipeline.steps as steps_mod
+        import agent_browser.pipeline.steps as steps_mod
         original_get_handle = steps_mod._get_handle
 
         async def fake_handle(sid):
@@ -208,7 +208,7 @@ class TestTemplateSubstitution:
     @pytest.mark.asyncio
     async def test_template_in_navigate_url(self, patched_get_handle, mock_page_for_steps):
         """Navigate URL template ${{ args.query }} resolves to actual value."""
-        from skills.agent_browser.pipeline.steps import step_navigate
+        from agent_browser.pipeline.steps import step_navigate
 
         await step_navigate(
             session_id="test",
@@ -224,7 +224,7 @@ class TestTemplateSubstitution:
     @pytest.mark.asyncio
     async def test_template_in_limit_param(self):
         """step_limit resolves template string to integer."""
-        from skills.agent_browser.pipeline.steps import step_limit
+        from agent_browser.pipeline.steps import step_limit
 
         data = list(range(100))
         result = await step_limit(
@@ -247,7 +247,7 @@ class TestDataTransformMap:
     @pytest.mark.asyncio
     async def test_map_transforms_items(self):
         """map step applies template to each array item."""
-        from skills.agent_browser.pipeline.steps import step_map
+        from agent_browser.pipeline.steps import step_map
 
         data = [
             {"title": "Hello", "count": 10},
@@ -272,7 +272,7 @@ class TestDataTransformMap:
     @pytest.mark.asyncio
     async def test_map_preserves_item_count(self):
         """map never changes number of items."""
-        from skills.agent_browser.pipeline.steps import step_map
+        from agent_browser.pipeline.steps import step_map
 
         data = [{"a": i} for i in range(50)]
         result = await step_map(
@@ -287,7 +287,7 @@ class TestDataTransformMap:
     @pytest.mark.asyncio
     async def test_map_with_index(self):
         """map exposes index variable for numbering."""
-        from skills.agent_browser.pipeline.steps import step_map
+        from agent_browser.pipeline.steps import step_map
 
         data = ["a", "b", "c"]
         result = await step_map(
@@ -308,7 +308,7 @@ class TestDataTransformFilter:
     @pytest.mark.asyncio
     async def test_filter_by_dict_criteria(self):
         """filter with dict keeps matching items only."""
-        from skills.agent_browser.pipeline.steps import step_filter
+        from agent_browser.pipeline.steps import step_filter
 
         data = [
             {"status": "active", "name": "A"},
@@ -328,7 +328,7 @@ class TestDataTransformFilter:
     @pytest.mark.asyncio
     async def test_filter_no_match_returns_empty(self):
         """filter with no matches returns empty list."""
-        from skills.agent_browser.pipeline.steps import step_filter
+        from agent_browser.pipeline.steps import step_filter
 
         data = [{"x": 1}, {"x": 2}]
         result = await step_filter(
@@ -343,7 +343,7 @@ class TestDataTransformFilter:
     @pytest.mark.asyncio
     async def test_filter_non_list_passes_through(self):
         """filter on non-list data returns it unchanged."""
-        from skills.agent_browser.pipeline.steps import step_filter
+        from agent_browser.pipeline.steps import step_filter
 
         result = await step_filter(
             session_id="test",
@@ -361,7 +361,7 @@ class TestDataTransformSort:
     @pytest.mark.asyncio
     async def test_sort_numeric_asc(self, patched_get_handle, mock_page_for_steps):
         """sort by numeric field ascending."""
-        from skills.agent_browser.pipeline.steps import step_sort
+        from agent_browser.pipeline.steps import step_sort
 
         mock_page_for_steps.evaluate.return_value = [
             {"v": 1}, {"v": 2}, {"v": 3}
@@ -380,7 +380,7 @@ class TestDataTransformSort:
     @pytest.mark.asyncio
     async def test_sort_string_desc(self, patched_get_handle, mock_page_for_steps):
         """sort by string field descending."""
-        from skills.agent_browser.pipeline.steps import step_sort
+        from agent_browser.pipeline.steps import step_sort
 
         mock_page_for_steps.evaluate.return_value = [
             {"name": "Charlie"}, {"name": "Bob"}, {"name": "Alice"}
@@ -404,7 +404,7 @@ class TestDataTransformLimit:
     @pytest.mark.asyncio
     async def test_limit_truncates_array(self):
         """limit(N) returns first N items."""
-        from skills.agent_browser.pipeline.steps import step_limit
+        from agent_browser.pipeline.steps import step_limit
 
         data = list(range(100))
         result = await step_limit(
@@ -420,7 +420,7 @@ class TestDataTransformLimit:
     @pytest.mark.asyncio
     async def test_limit_exceeds_length(self):
         """limit larger than array length returns full array."""
-        from skills.agent_browser.pipeline.steps import step_limit
+        from agent_browser.pipeline.steps import step_limit
 
         data = [1, 2, 3]
         result = await step_limit(
@@ -435,7 +435,7 @@ class TestDataTransformLimit:
     @pytest.mark.asyncio
     async def test_limit_zero_returns_empty(self):
         """limit(0) returns empty list."""
-        from skills.agent_browser.pipeline.steps import step_limit
+        from agent_browser.pipeline.steps import step_limit
 
         data = [1, 2, 3]
         result = await step_limit(
@@ -450,7 +450,7 @@ class TestDataTransformLimit:
     @pytest.mark.asyncio
     async def test_limit_template_resolves(self):
         """limit with template string resolves to int."""
-        from skills.agent_browser.pipeline.steps import step_limit
+        from agent_browser.pipeline.steps import step_limit
 
         data = list(range(50))
         result = await step_limit(
@@ -473,7 +473,7 @@ class TestFetchSSRFProtection:
     @pytest.mark.asyncio
     async def test_fetch_blocks_localhost(self):
         """fetch to localhost is blocked."""
-        from skills.agent_browser.pipeline.steps import step_fetch
+        from agent_browser.pipeline.steps import step_fetch
 
         with pytest.raises(ValueError, match="Blocked"):
             await step_fetch(
@@ -487,7 +487,7 @@ class TestFetchSSRFProtection:
     @pytest.mark.asyncio
     async def test_fetch_blocks_127_0_0_1(self):
         """fetch to 127.0.0.1 is blocked."""
-        from skills.agent_browser.pipeline.steps import step_fetch
+        from agent_browser.pipeline.steps import step_fetch
 
         with pytest.raises(ValueError, match="Blocked"):
             await step_fetch(
@@ -501,7 +501,7 @@ class TestFetchSSRFProtection:
     @pytest.mark.asyncio
     async def test_fetch_blocks_10_x_private(self):
         """fetch to 10.x.x.x private network is blocked."""
-        from skills.agent_browser.pipeline.steps import step_fetch
+        from agent_browser.pipeline.steps import step_fetch
 
         with pytest.raises(ValueError, match="Blocked"):
             await step_fetch(
@@ -515,7 +515,7 @@ class TestFetchSSRFProtection:
     @pytest.mark.asyncio
     async def test_fetch_blocks_192_168(self):
         """fetch to 192.168.x.x is blocked."""
-        from skills.agent_browser.pipeline.steps import step_fetch
+        from agent_browser.pipeline.steps import step_fetch
 
         with pytest.raises(ValueError, match="Blocked"):
             await step_fetch(
@@ -529,7 +529,7 @@ class TestFetchSSRFProtection:
     @pytest.mark.asyncio
     async def test_fetch_blocks_metadata(self):
         """fetch to GCP metadata endpoint is blocked."""
-        from skills.agent_browser.pipeline.steps import step_fetch
+        from agent_browser.pipeline.steps import step_fetch
 
         with pytest.raises(ValueError, match="SSRF blocked|Blocked"):
             await step_fetch(
@@ -543,7 +543,7 @@ class TestFetchSSRFProtection:
     @pytest.mark.asyncio
     async def test_fetch_allows_public_url(self, patched_get_handle, mock_page_for_steps):
         """fetch to public URL is allowed (calls browser evaluate)."""
-        from skills.agent_browser.pipeline.steps import step_fetch
+        from agent_browser.pipeline.steps import step_fetch
 
         mock_page_for_steps.evaluate.return_value = '{"ok": true}'
         result = await step_fetch(

@@ -1,7 +1,7 @@
 """Adapter 回归测试 — 所有 YAML adapter 通过验证器 + 结构检查"""
 import pytest
-from skills.agent_browser.adapters.loader import get_adapter, list_adapters
-from skills.agent_browser.adapters.validator import validate_adapter
+from agent_browser.adapters.loader import get_adapter, list_adapters
+from agent_browser.adapters.validator import validate_adapter
 
 
 class TestAllAdaptersLoad:
@@ -50,7 +50,7 @@ class TestPipelineErrors:
     """PipelineError 层次和序列化"""
 
     def test_pipeline_error_to_dict(self):
-        from skills.agent_browser.pipeline.errors import PipelineError
+        from agent_browser.pipeline.errors import PipelineError
         err = PipelineError(
             message="test error",
             step_index=2,
@@ -65,7 +65,7 @@ class TestPipelineErrors:
         assert d["fix_hint"] == "Check selector"
 
     def test_user_message_format(self):
-        from skills.agent_browser.pipeline.errors import PipelineError
+        from agent_browser.pipeline.errors import PipelineError
         err = PipelineError(
             message="element not found",
             step_index=3,
@@ -80,14 +80,14 @@ class TestPipelineErrors:
         assert "element not found" in msg
 
     def test_subclass_hierarchy(self):
-        from skills.agent_browser.pipeline.errors import (
+        from agent_browser.pipeline.errors import (
             PipelineError, PipelineStepError, SelectorNotFoundError,
         )
         assert issubclass(SelectorNotFoundError, PipelineStepError)
         assert issubclass(PipelineStepError, PipelineError)
 
     def test_fix_hint_generation(self):
-        from skills.agent_browser.pipeline.errors import _generate_fix_hint
+        from agent_browser.pipeline.errors import _generate_fix_hint
         hint = _generate_fix_hint("select", "element not found")
         assert hint  # should always return something
         hint = _generate_fix_hint("unknown_step", "something broke")

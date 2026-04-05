@@ -25,6 +25,7 @@ from typing import Dict, Any, Optional
 API_BASE_URL = "http://localhost:8000"
 
 
+@pytest.mark.requires_browser
 class TestRemoteAPIHealth:
     """Remote API 健康检查"""
 
@@ -50,6 +51,7 @@ class TestRemoteAPIHealth:
                 assert "total" in data
 
 
+@pytest.mark.requires_browser
 class TestRemoteSessionManagement:
     """Remote Session 管理"""
 
@@ -164,6 +166,7 @@ class TestRemoteSessionManagement:
                 assert data["total"] >= 3
 
 
+@pytest.mark.requires_browser
 class TestRemotePageNavigation:
     """Remote 页面导航"""
 
@@ -258,6 +261,7 @@ class TestRemotePageNavigation:
                 assert len(data["title"]) > 0
 
 
+@pytest.mark.requires_browser
 class TestRemoteDOMSnapshot:
     """Remote DOM Snapshot"""
 
@@ -340,6 +344,7 @@ class TestRemoteDOMSnapshot:
                     assert "tag" in elem
 
 
+@pytest.mark.requires_browser
 class TestRemoteClickFill:
     """Remote Click 和 Fill 操作"""
 
@@ -437,6 +442,7 @@ class TestRemoteClickFill:
                         assert data["status"] == "ok"
 
 
+@pytest.mark.requires_browser
 class TestRemoteScroll:
     """Remote Scroll 操作"""
 
@@ -488,6 +494,7 @@ class TestRemoteScroll:
                 assert data["status"] == "ok"
 
 
+@pytest.mark.requires_browser
 class TestRemoteEvaluate:
     """Remote JavaScript 执行"""
 
@@ -566,6 +573,7 @@ class TestRemoteEvaluate:
                 assert isinstance(data["result"], str)
 
 
+@pytest.mark.requires_browser
 class TestRemoteAgentMode:
     """Remote Agent 模式"""
 
@@ -651,6 +659,7 @@ class TestRemoteAgentMode:
                         break
 
 
+@pytest.mark.requires_browser
 class TestRemoteAntiDetection:
     """Remote 反检测验证"""
 

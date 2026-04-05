@@ -26,9 +26,10 @@ from unittest import mock
 import pytest
 
 # 添加 skill 路径
-_SKILL_DIR = Path(__file__).parent.parent.parent / "skills" / "agent-browser"
+_SKILL_DIR = Path(__file__).parent.parent.parent / "agent_browser"
 
 
+@pytest.mark.requires_browser
 class TestE2ELocalLLMMode:
     """
     C1: local llm 模式端到端测试
@@ -213,6 +214,7 @@ class TestE2ELocalLLMMode:
             await browser.close()
 
 
+@pytest.mark.requires_browser
 class TestE2ELocalAgentMode:
     """
     C2: local agent 模式端到端测试
@@ -285,6 +287,7 @@ class TestE2ELocalAgentMode:
             await browser.close()
 
 
+@pytest.mark.requires_browser
 class TestE2EAdapterZeroToken:
     """
     C5: Adapter 零 Token 测试
@@ -338,6 +341,7 @@ class TestE2EAdapterZeroToken:
             await browser.close()
 
 
+@pytest.mark.requires_browser
 class TestE2EExploreAdaptive:
     """
     C6: Explore 自适应探索测试
@@ -439,6 +443,7 @@ class TestE2EExploreAdaptive:
             await browser.close()
 
 
+@pytest.mark.requires_browser
 class TestE2ESessionPersistence:
     """
     Session 持久化和复用测试
@@ -504,6 +509,7 @@ class TestE2ESessionPersistence:
             await browser.close()
 
 
+@pytest.mark.requires_browser
 class TestE2EStealthVerification:
     """
     隐匿性端到端验证
