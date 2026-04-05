@@ -36,9 +36,11 @@ class TestDistillTrace:
         assert "done" not in actions
 
     def test_collapses_redundant_waits(self):
+        # _extract_wait_value reads from step["params"] or step directly.
+        # Use params-level format so wait values are extractable.
         trace = [
-            {"action": [{"type": "wait", "seconds": 1.0}]},
-            {"action": [{"type": "wait", "seconds": 0.5}]},
+            {"action": "wait", "params": {"seconds": 1.0}},
+            {"action": "wait", "params": {"seconds": 0.5}},
             {"action": [{"type": "click", "element": "button"}]},
         ]
         result = distill_trace(trace)

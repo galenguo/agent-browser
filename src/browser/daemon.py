@@ -21,7 +21,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
 
-from .config import SkillConfig
+from skills.agent_browser.config import SkillConfig
 
 logger = logging.getLogger(__name__)
 
