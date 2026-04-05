@@ -24,7 +24,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from core.stealth_enhancer import StealthEnhancer
+try:
+    from core.stealth_enhancer import StealthEnhancer
+except ImportError:
+    # CloakBrowser C extensions not installed (CI environments, dev without cloakbrowser)
+    StealthEnhancer = None  # type: ignore[assignment]
+
 from skills.agent_browser.backends import BrowserBackend, BrowserPageHandle
 
 logger = logging.getLogger(__name__)
@@ -246,8 +251,14 @@ class StealthMiddleware:
         # 仅在启用时初始化 StealthEnhancer
         stealth_enabled = getattr(config, "stealth_enabled", True)
         if stealth_enabled:
-            self._stealth = StealthEnhancer()
-            logger.info("StealthMiddleware initialized (stealth ON)")
+            if StealthEnhancer is not None:
+                self._stealth = StealthEnhancer()
+                logger.info("StealthMiddleware initialized (stealth ON)")
+            else:
+                logger.warning(
+                    "StealthEnhancer not available (CloakBrowser not installed); "
+                    "running in pass-through mode"
+                )
         else:
             logger.info("StealthMiddleware initialized (stealth OFF — pass-through)")
 

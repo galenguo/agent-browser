@@ -145,6 +145,16 @@ async def execute_pipeline(
             logger.error(te.user_message)
             result.errors.append(te.to_dict())
             result.success = False
+
+            # Fallback: attempt recovery when not fail_fast
+            if not fail_fast:
+                from .fallback import attempt_fallback
+                recovered = await attempt_fallback(session_id, te, context)
+                if recovered:
+                    logger.info(f"Step '{step.op}' recovered after timeout")
+                    result.steps_executed = i + 1
+                    continue  # recovered, go to next step
+
             if fail_fast:
                 break
 
@@ -162,6 +172,16 @@ async def execute_pipeline(
             logger.error(pe.user_message)
             result.errors.append(pe.to_dict())
             result.success = False
+
+            # Fallback: attempt recovery when not fail_fast
+            if not fail_fast:
+                from .fallback import attempt_fallback
+                recovered = await attempt_fallback(session_id, pe, context)
+                if recovered:
+                    logger.info(f"Step '{step.op}' recovered after error")
+                    result.steps_executed = i + 1
+                    continue  # recovered, go to next step
+
             if fail_fast:
                 break
 
@@ -172,6 +192,28 @@ async def execute_pipeline(
 
     result.data = data
     result.duration_ms = int((time.time() - start_time) * 1000)
+
+    # Telemetry: record execution (non-blocking, never fails pipeline)
+    try:
+        from .telemetry import Telemetry
+        from .classifier import classify
+        error_cat = None
+        if not result.success and result.errors:
+            # Use first error's category
+            err_dict = result.errors[0]
+            if "step_name" in err_dict:
+                error_cat = err_dict.get("step_name", "")
+        Telemetry.record(
+            adapter=args.get("_adapter_name", "unknown"),
+            success=result.success,
+            duration_ms=result.duration_ms,
+            steps_executed=result.steps_executed,
+            steps_total=result.steps_total,
+            error_category=error_cat,
+            session_id=session_id,
+        )
+    except Exception:
+        pass  # telemetry must never break pipeline
 
     if result.errors:
         logger.warning(

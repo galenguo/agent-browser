@@ -4,7 +4,7 @@ import json
 import re
 import uuid
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from .config import SkillConfig, detect_mode, load_config
 
@@ -252,3 +252,51 @@ async def run_task(
         intelligence=intelligence, llm_config=llm_config,
         max_steps=max_steps, total_timeout=total_timeout,
     )
+
+
+async def debug_pipeline(
+	session_id: str,
+	site: str,
+	command: str,
+	args: dict = None,
+	breakpoints: list = None,
+	cdp_url: str = "http://127.0.0.1:19222",
+	**kwargs,
+) -> Any:
+	"""调试模式：单步执行 adapter pipeline，支持断点。
+
+	Args:
+		session_id: 浏览器会话 ID
+		site: 站点名（如 "boss"）
+		command: 命令名（如 "search"）
+		args: 适配器参数
+		breakpoints: 断点步骤索引列表（如 [2, 5] 表示在第 2、5 步后暂停）
+		cdp_url: CDP 连接地址
+
+	Returns:
+		断点状态字典或最终数据（与 execute_pipeline 兼容）
+
+	Example::
+
+		result = await debug_pipeline(session_id, "boss", "search",
+		                                {"query": "Python"}, breakpoints=[2])
+		# 在 navigate 后暂停，返回当前页面数据
+	"""
+	from .adapters.loader import get_adapter
+	from .pipeline.debugger import debug_pipeline as _debug
+
+	adapter = get_adapter(site, command)
+	if not adapter:
+		raise ValueError(f"Adapter not found: {site}/{command}")
+
+	merged_args = {**(args or {}), "_adapter_name": f"{site}/{command}"}
+	pipeline = adapter.get("pipeline", [])
+	stealth = adapter.get("stealth", {})
+
+	return await _debug(
+		steps=pipeline,
+		session_id=session_id,
+		args=merged_args,
+		breakpoints=breakpoints,
+		stealth_config=stealth,
+	)

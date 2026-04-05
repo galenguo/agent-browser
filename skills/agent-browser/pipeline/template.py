@@ -408,7 +408,7 @@ class TemplateContext:
         value = self._resolve_property(expression)
 
         # If no operators present, return resolved property directly
-        if not any(op in expression for op in ['+', '-', '*', '/', '>', '<', '===', '!==', '==', '!=', '&&', '||']):
+        if not any(op in expression for op in ['+', '-', '*', '/', '>', '<', '(', '===', '!==', '==', '!=', '&&', '||']):
             return value
 
         # For expressions with operators, use safe eval
@@ -544,7 +544,7 @@ class TemplateContext:
                 ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv,
                 ast.Mod, ast.Pow, ast.UAdd, ast.USub, ast.Not,
                 ast.And, ast.Or, ast.Eq, ast.NotEq, ast.Lt, ast.LtE,
-                ast.Gt, ast.GtE, ast.IfExp,
+                ast.Gt, ast.GtE, ast.IfExp, ast.Attribute,
             )
             for node in ast.walk(tree):
                 if not isinstance(node, allowed_nodes):
