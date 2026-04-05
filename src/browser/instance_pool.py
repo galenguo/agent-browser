@@ -10,7 +10,7 @@ import os
 import asyncio
 import logging
 from typing import Literal, Optional
-from models import (
+from src.models import (
     BrowserInstance,
     LocalBrowserInstance,
     DockerBrowserInstance,

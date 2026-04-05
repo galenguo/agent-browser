@@ -13,9 +13,9 @@ from uuid import uuid4
 
 from browser_use.browser import BrowserSession, BrowserProfile
 
-from browser.instance_pool import BrowserInstancePool
-from core.browser_controller import BrowserController
-from models import BrowserInstance, ResourceExhaustedError, SessionNotFoundError
+from src.browser.instance_pool import BrowserInstancePool
+from src.core.browser_controller import BrowserController
+from src.models import BrowserInstance, ResourceExhaustedError, SessionNotFoundError
 
 logger = logging.getLogger(__name__)
 

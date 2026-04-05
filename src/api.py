@@ -36,7 +36,7 @@ from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from session.pool_manager import SessionPoolManager
+from src.session.pool_manager import SessionPoolManager
 from models import (
     ResourceExhaustedError, SessionNotFoundError, PipelineError,
     # 原子操作请求模型

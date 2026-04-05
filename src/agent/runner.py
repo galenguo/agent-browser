@@ -21,9 +21,9 @@ os.environ.setdefault("REBROWSER_PATCHES_RUNTIME_FIX_MODE", "addBinding")
 from browser_use import Agent, Tools
 from browser_use.browser import BrowserProfile, BrowserSession
 
-from browser.stealth_launcher import launch_stealth_browser, close_browser
-from browser.human_behavior import HumanBehaviorSimulator
-from session.session_manager import SessionProfileManager
+from src.browser.stealth_launcher import launch_stealth_browser, close_browser
+from src.browser.human_behavior import HumanBehaviorSimulator
+from src.session.session_manager import SessionProfileManager
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +120,7 @@ async def run_agent_task(
                     ctx = _browser.contexts[0]
                     pages = ctx.pages
                     if pages:
-                    await sim.warmup_browsing(pages[0])
+                        await sim.warmup_browsing(pages[0])
         except Exception as e:
             logger.warning(f"Warmup failed (non-fatal): {e}")
 

@@ -18,11 +18,11 @@ from pathlib import Path
 
 import click
 
-from core.session_manager import UnifiedSessionManager, SessionContext
-from core.browser_controller import ActionResult, BrowserController
-from cli.session_manager import CLISessionManager
+from src.core.session_manager import UnifiedSessionManager, SessionContext
+from src.core.browser_controller import ActionResult, BrowserController
+from src.cli.session_manager import CLISessionManager
 from browser_use.browser import BrowserSession, BrowserProfile
-from models import BrowserInstance
+from src.models import BrowserInstance
 
 logger = logging.getLogger(__name__)
 

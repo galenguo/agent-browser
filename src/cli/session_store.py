@@ -6,6 +6,6 @@ CLI 本地会话存储
 
 实际实现复用 session_manager.CLISessionManager。
 """
-from cli.session_manager import CLISessionManager, CLISession
+from src.cli.session_manager import CLISessionManager, CLISession
 
 __all__ = ['CLISessionManager', 'CLISession']

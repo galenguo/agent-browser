@@ -28,7 +28,7 @@ from browser_use.tools.views import (
     NavigateAction,
 )
 
-from core.stealth_enhancer import StealthEnhancer
+from src.core.stealth_enhancer import StealthEnhancer
 
 logger = logging.getLogger(__name__)
 

@@ -18,13 +18,13 @@ from typing import Dict, Optional, Literal, List, Any
 
 from playwright.async_api import async_playwright, Browser, Page, BrowserContext
 from browser_use import Agent, BrowserSession, BrowserProfile
-from models import (
+from src.models import (
     UserSession, ResourceExhaustedError, SessionNotFoundError, DockerBrowserInstance,
     NavigateRequest, ClickRequest, FillRequest, EvaluateRequest, ScrollRequest, WaitRequest,
     ElementInfo, SnapshotResponse, LocalBrowserInstance
 )
-from browser.instance_pool import BrowserInstancePool
-from core.stealth_enhancer import StealthEnhancer
+from src.browser.instance_pool import BrowserInstancePool
+from src.core.stealth_enhancer import StealthEnhancer
 
 logger = logging.getLogger(__name__)
 
