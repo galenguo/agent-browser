@@ -33,11 +33,12 @@ from contextlib import asynccontextmanager
 from typing import Optional, Literal
 
 from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from session.pool_manager import SessionPoolManager
 from models import (
-    ResourceExhaustedError, SessionNotFoundError,
+    ResourceExhaustedError, SessionNotFoundError, PipelineError,
     # 原子操作请求模型
     NavigateRequest, ClickRequest, FillRequest, EvaluateRequest, ScrollRequest, WaitRequest,
     # 原子操作响应模型
@@ -184,6 +185,15 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(PipelineError)
+async def pipeline_error_handler(request, exc: PipelineError):
+    """Pipeline 执行错误 → HTTP 502 + 结构化 JSON"""
+    return JSONResponse(
+        status_code=502,
+        content=exc.to_dict(),
+    )
 
 
 # ─────────────── 数据模型 ───────────────

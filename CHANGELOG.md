@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added (v2.2 — Quality Release)
+- **PipelineError 异常层次** (`pipeline/errors.py`) -- 类型化错误替代裸字符串
+  - 6 个异常类: PipelineError, AdapterLoadError, AdapterValidationError, PipelineStepError, StepTimeoutError, SelectorNotFoundError, URLError
+  - 每个错误携带 step_index, step_name, adapter_name, fix_hint
+  - `to_dict()` 结构化输出 + `user_message` 友好格式
+  - `_generate_fix_hint()` 按 step 类型自动生成修复建议（12 种 step 覆盖）
+- **Adapter YAML 验证器** (`adapters/validator.py`) -- 零依赖 dict 校验
+  - 5 项检查: 必填字段、pipeline 结构、step 合法性、strategy 值、args 类型
+  - browser:false 与 navigate 步骤矛盾检测
+  - 使用实际 STEPS registry 作为唯一数据源（不会 drift）
+- **FastAPI PipelineError handler** (`src/api.py`) -- HTTP 502 + 结构化 JSON
+- **3 个可运行示例** (`examples/`) -- basic_search, snapshot_explore, agent_task
+- **43 个单元测试** -- adapter 回归测试 (23) + template 边界测试 (20)
+
+### Changed
+- **Executor 错误包装** (`pipeline/executor.py`) -- TimeoutError/Exception 统一包装为 StepTimeoutError/PipelineStepError
+- **Loader 加载时验证** (`adapters/loader.py`) -- _ensure_loaded() 调用 validate_adapter(), 警告但不阻断注册
+
 ### Added
 - **StealthMiddleware** (`src/stealth/middleware.py`) — 集中隐匿层，自动包装所有浏览器操作
   - `StealthPageHandle` 装饰器：按操作类型自动注入 pre/post action 延迟

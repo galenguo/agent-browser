@@ -132,18 +132,35 @@ async def execute_pipeline(
 
             result.steps_executed = i + 1
 
-        except asyncio.TimeoutError:
-            error_msg = f"Step '{step.op}' timed out after {step_timeout}s"
-            logger.error(f"Pipeline step {i} TIMEOUT: {error_msg}")
-            result.errors.append({"step": i, "op": step.op, "error": error_msg})
+        except asyncio.TimeoutError as e:
+            from .errors import StepTimeoutError
+            te = StepTimeoutError(
+                message=f"Step '{step.op}' timed out after {step_timeout}s",
+                step_index=i,
+                step_name=step.op,
+                session_id=session_id,
+                cause=e,
+                fix_hint="Increase timeout or check if page is hanging.",
+            )
+            logger.error(te.user_message)
+            result.errors.append(te.to_dict())
             result.success = False
             if fail_fast:
                 break
 
         except Exception as e:
-            error_msg = f"Step '{step.op}' failed: {e}"
-            logger.error(f"Pipeline step {i} ERROR: {error_msg}")
-            result.errors.append({"step": i, "op": step.op, "error": str(e)})
+            from .errors import PipelineStepError, _generate_fix_hint
+            pe = PipelineStepError(
+                message=str(e),
+                step_index=i,
+                step_name=step.op,
+                step_params=rendered_params,
+                session_id=session_id,
+                cause=e,
+                fix_hint=_generate_fix_hint(step.op, str(e)),
+            )
+            logger.error(pe.user_message)
+            result.errors.append(pe.to_dict())
             result.success = False
             if fail_fast:
                 break

@@ -1,4 +1,8 @@
-"""适配器加载器 — 扫描 adapters/ 目录，解析 YAML，注册到内存"""
+"""适配器加载器 — 扫描 adapters/ 目录，解析 YAML，注册到内存
+
+Supports both AB-native and OpenCLI format YAML adapters.
+OpenCLI top-level fields are accepted and normalized internally.
+"""
 import os
 import logging
 from typing import Dict, List, Optional
@@ -13,6 +17,46 @@ _registry: Dict[tuple, dict] = {}
 
 # 默认适配器目录（项目根目录下的 adapters/）
 _ADAPTER_DIR = str(Path(__file__).resolve().parents[3] / "adapters")
+
+# OpenCLI → AB strategy value mapping
+_STRATEGY_MAP = {
+    "intercept": "cookie",   # OpenCLI 'intercept' = cookie-based fetch interception
+    # Other values pass through: public, ui, store-action, header, cookie
+}
+
+
+def _normalize_adapter(adapter: dict) -> dict:
+    """
+    Normalize an adapter dict to AB-internal format.
+
+    OpenCLI-compatible transformations:
+      - domain → site (alias)
+      - intercept strategy → cookie (internal mapping)
+      - navigateBefore → prepended as first pipeline step
+    """
+    if not adapter:
+        return adapter
+
+    adapter = dict(adapter)  # shallow copy
+
+    # OpenCLI: 'domain' is alias for 'site'
+    if "domain" in adapter and "site" not in adapter:
+        adapter["site"] = adapter.pop("domain")
+
+    # OpenCLI: normalize strategy values
+    raw_strategy = adapter.get("strategy", "")
+    if raw_strategy in _STRATEGY_MAP:
+        adapter["strategy"] = _STRATEGY_MAP[raw_strategy]
+
+    # OpenCLI: handle navigateBefore (pre-navigation step)
+    nav_before = adapter.pop("navigateBefore", None)
+    if nav_before and isinstance(nav_before, str):
+        pipeline = adapter.get("pipeline", [])
+        # Prepend navigate step
+        pipeline.insert(0, {"navigate": nav_before})
+        adapter["pipeline"] = pipeline
+
+    return adapter
 
 
 def _ensure_loaded():
@@ -34,7 +78,18 @@ def _ensure_loaded():
             try:
                 with open(fpath, "r", encoding="utf-8") as f:
                     adapter = yaml.safe_load(f)
+                # Normalize OpenCLI format to AB-internal
+                adapter = _normalize_adapter(adapter)
                 if not adapter or "site" not in adapter or "name" not in adapter:
+                    logger.debug(f"Skipping invalid adapter: {fpath}")
+                    continue
+
+                # Validate structure (warn but still register for backward compat)
+                from .validator import validate_adapter
+                errs = validate_adapter(adapter)
+                if errs:
+                    logger.warning(f"Adapter validation warnings for {fpath}: {errs}")
+                    adapter["_validation_errors"] = errs
                     logger.debug(f"Skipping invalid adapter: {fpath}")
                     continue
                 key = (adapter["site"], adapter["name"])

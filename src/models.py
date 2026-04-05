@@ -41,6 +41,11 @@ class SessionNotFoundError(Exception):
     pass
 
 
+# Re-export PipelineError from skill layer (for API layer consumption)
+# Avoids src/api.py importing from skills.agent_browser.* directly
+from skills.agent_browser.pipeline.errors import PipelineError as PipelineError
+
+
 # ============ 浏览器实例 ============
 
 @dataclass
