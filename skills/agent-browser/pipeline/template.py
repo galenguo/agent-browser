@@ -2,6 +2,7 @@
 Pipeline Template Engine — ${{ }} expression engine with pipe filters.
 
 Based on OpenCLI's template.ts, adapted for Python.
+Fully OpenCLI-compatible: 19 pipe filters, secure sandbox, proper pipe chaining.
 
 Syntax:
   ${{ args.keyword }}           — Simple variable access
@@ -9,6 +10,7 @@ Syntax:
   ${{ index + 1 }}              — Arithmetic
   ${{ args.limit | default(20) }}  — Pipe filter
   ${{ item.title | upper }}     — Pipe: uppercase
+  ${{ item.a || item.b | upper }} — Pipe with logical OR (chained)
   ${{ Math.min(args.limit, 50) }} — Full JS expression
 
 Variables:
@@ -17,14 +19,16 @@ Variables:
   item    → current array item (inside map/filter)
   index   → current index (inside map/filter)
 
-Security: Sandboxed evaluation via AST-based safe eval.
+Security: Sandboxed evaluation via AST-based safe eval with context sanitization.
 """
 import re
 import ast
 import json
 import logging
+import unicodedata
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus as _urlencode
+from urllib.parse import unquote as _urldecode
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +36,11 @@ logger = logging.getLogger(__name__)
 
 TEMPLATE_PATTERN = re.compile(r'\$\{\{\s*(.*?)\s*\}\}')
 
-# ── Built-in pipe filters (OpenCLI-compatible) ──
+# ── Pipe split regex (OpenCLI-compatible: splits on single |, preserves ||) ──
+
+_PIPE_SPLIT_RE = re.compile(r'(?<!\|)\|(?!\|)')
+
+# ── Built-in pipe filters (OpenCLI-compatible: 19 total) ──
 
 PIPE_FILTERS: Dict[str, callable] = {}
 
@@ -45,9 +53,43 @@ def _register_filter(name: str):
     return decorator
 
 
+# ── Filters WITH arguments ──
+
+
 @_register_filter("default")
-def _filter_default(value: Any, arg=None) -> Any:
-    return value if value is not None else (arg if arg is not None else "")
+def _filter_default(value: Any, **kw) -> Any:
+    # OpenCLI-compatible: triggers on None, undefined, AND empty string ""
+    arg = kw.get("arg")
+    if value is None or value == "":
+        return arg if arg is not None else ""
+    return value
+
+
+@_register_filter("truncate")
+def _filter_truncate(value: Any, **kw) -> str:
+    s = str(value) if value is not None else ""
+    n = int(kw.get("arg", 50))
+    if len(s) > n:
+        return s[:n] + "..."  # OpenCLI: append ellipsis when truncated
+    return s
+
+
+@_register_filter("replace")
+def _filter_replace(value: Any, **kw) -> str:
+    old = kw.get("arg0", "")
+    new = kw.get("arg1", "")
+    return str(value).replace(old, new) if value is not None else ""
+
+
+@_register_filter("join")
+def _filter_join(value: Any, **kw) -> str:
+    sep = kw.get("arg", ", ")
+    if isinstance(value, list):
+        return sep.join(str(v) for v in value)
+    return str(value) if value is not None else ""
+
+
+# ── Filters WITHOUT arguments ──
 
 
 @_register_filter("upper")
@@ -60,26 +102,9 @@ def _filter_lower(value: Any, **kw) -> str:
     return str(value).lower() if value is not None else ""
 
 
-@_register_filter("truncate")
-def _filter_truncate(value: Any, n=100, **kw) -> str:
-    return str(value)[:int(n)] if value is not None else ""
-
-
-@_register_filter("replace")
-def _filter_replace(value: Any, old="", new="", **kw) -> str:
-    return str(value).replace(old, new) if value is not None else ""
-
-
-@_register_filter("join")
-def _filter_join(value: Any, sep=", ", **kw) -> str:
-    if isinstance(value, list):
-        return sep.join(str(v) for v in value)
-    return str(value) if value is not None else ""
-
-
-@_register_filter("urlencode")
-def _filter_urlencode(value: Any, **kw) -> str:
-    return _urlencode(str(value)) if value is not None else ""
+@_register_filter("trim")
+def _filter_trim(value: Any, **kw) -> str:
+    return str(value).strip() if value is not None else ""
 
 
 @_register_filter("strip")
@@ -87,9 +112,89 @@ def _filter_strip(value: Any, **kw) -> str:
     return str(value).strip() if value is not None else ""
 
 
+@_register_filter("keys")
+def _filter_keys(value: Any, **kw) -> list:
+    if isinstance(value, dict):
+        return list(value.keys())
+    return []
+
+
 @_register_filter("length")
 def _filter_length(value: Any, **kw) -> int:
-    return len(value) if value is not None else 0
+    if value is None:
+        return 0
+    try:
+        return len(value)
+    except TypeError:
+        return 0
+
+
+@_register_filter("first")
+def _filter_first(value: Any, **kw) -> Any:
+    if isinstance(value, list) and len(value) > 0:
+        return value[0]
+    return value
+
+
+@_register_filter("last")
+def _filter_last(value: Any, **kw) -> Any:
+    if isinstance(value, list) and len(value) > 0:
+        return value[-1]
+    return value
+
+
+@_register_filter("json")
+def _filter_json(value: Any, **kw) -> str:
+    return json.dumps(value, ensure_ascii=False) if value is not None else "null"
+
+
+@_register_filter("slugify")
+def _filter_slugify(value: Any, **kw) -> str:
+    s = str(value).lower() if value is not None else ""
+    # Unicode-aware: keep only letters and numbers, replace rest with hyphen
+    s = re.sub(r'[^\w\s-]', '', unicodedata.normalize('NFKD', s))
+    s = re.sub(r'[\s_]+', '-', s)
+    s = re.sub(r'^-+|-+$', '', s)
+    return s
+
+
+@_register_filter("sanitize")
+def _filter_sanitize(value: Any, **kw) -> str:
+    """Replace invalid filename characters with underscore."""
+    s = str(value) if value is not None else ""
+    return re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', s)
+
+
+@_register_filter("ext")
+def _filter_ext(value: Any, **kw) -> str:
+    """Extract file extension (everything after last . after last / or \\)."""
+    s = str(value) if value is not None else ""
+    last_dot = s.rfind('.')
+    last_slash = max(s.rfind('/'), s.rfind('\\'))
+    if last_dot > last_slash:
+        return s[last_dot:]
+    return ""
+
+
+@_register_filter("basename")
+def _filter_basename(value: Any, **kw) -> str:
+    """Extract basename from URL or file path."""
+    s = str(value) if value is not None else ""
+    parts = re.split(r'[/\\]', s)
+    return parts[-1] if parts else s
+
+
+@_register_filter("urlencode")
+def _filter_urlencode(value: Any, **kw) -> str:
+    return _urlencode(str(value)) if value is not None else ""
+
+
+@_register_filter("urldecode")
+def _filter_urldecode(value: Any, **kw) -> str:
+    try:
+        return _urldecode(str(value)) if value is not None else ""
+    except Exception:
+        return str(value) if value is not None else ""
 
 
 @_register_filter("int")
@@ -112,16 +217,24 @@ def apply_filter(value: Any, filter_expr: str) -> Any:
     """
     Apply a pipe filter to a value.
 
-    Format: filter_name(arg1, arg2)
-    Examples: default(20), upper, truncate(50), replace("foo", "bar")
+    Format: filter_name(arg1, arg2) or filter_name.property_path
+    Examples: default(20), upper, truncate(50), first.name, items[0].title
     """
     filter_expr = filter_expr.strip()
-    match = re.match(r'(\w+)(?:\((.*)\))?$', filter_expr)
-    if not match:
-        return value
 
-    name = match.group(1)
-    args_str = match.group(2)
+    # Check for filter.property access pattern (OpenCLI compatibility)
+    prop_match = re.match(r'(\w+)(?:\((.*)\))?\.([\w.]+)$', filter_expr)
+    if prop_match:
+        name = prop_match.group(1)
+        args_str = prop_match.group(2)
+        prop_path = prop_match.group(3)
+    else:
+        match = re.match(r'(\w+)(?:\((.*)\))?$', filter_expr)
+        if not match:
+            return value
+        name = match.group(1)
+        args_str = match.group(2)
+        prop_path = None
 
     if name not in PIPE_FILTERS:
         logger.warning(f"Unknown pipe filter: {name}")
@@ -132,15 +245,36 @@ def apply_filter(value: Any, filter_expr: str) -> Any:
     # Parse arguments
     if args_str:
         kwargs = _parse_filter_args(args_str)
-        return fn(value, **kwargs)
+        result = fn(value, **kwargs)
     else:
-        return fn(value)
+        result = fn(value)
+
+    # Access property on result (e.g., first.name → apply first, then .name)
+    if prop_path is not None and result is not None:
+        for part in prop_path.split('.'):
+            if isinstance(result, dict):
+                result = result.get(part)
+            elif hasattr(result, part):
+                result = getattr(result, part)
+            else:
+                return None
+            if result is None:
+                break
+
+    return result
 
 
 def _parse_filter_args(args_str: str) -> Dict[str, Any]:
-    """Parse filter arguments like '20' or '"hello", "world"'"""
+    """Parse filter arguments like '20' or '"hello", "world"'
+
+    Returns dict with 'arg' (first arg, for single-arg filters) plus
+    'arg0', 'arg1', etc. (for multi-arg filters).
+
+    Quoted arguments are kept as strings; unquoted numeric-looking args
+    are auto-converted to int/float.
+    """
     args = {}
-    parts = []
+    raw_parts = []
     current = ""
     in_quote = False
     quote_char = None
@@ -152,27 +286,57 @@ def _parse_filter_args(args_str: str) -> Dict[str, Any]:
             in_quote = False
             quote_char = None
         elif ch == ',' and not in_quote:
-            parts.append(current.strip())
+            raw_parts.append((current.strip(), in_quote))
             current = ""
             continue
         current += ch
     if current.strip():
-        parts.append(current.strip())
+        raw_parts.append((current.strip(), in_quote))
 
-    for i, part in enumerate(parts):
+    for i, (part, was_quoted) in enumerate(raw_parts):
         if (part.startswith('"') and part.endswith('"')) or \
            (part.startswith("'") and part.endswith("'")):
             part = part[1:-1]
-        try:
-            part = int(part)
-        except ValueError:
+            was_quoted = True
+
+        # Only convert to numeric if NOT originally quoted
+        if not was_quoted:
             try:
-                part = float(part)
+                part = int(part)
             except ValueError:
-                pass
+                try:
+                    part = float(part)
+                except ValueError:
+                    pass
+
         args[f"arg{i}"] = part
 
+    # Convenience: also provide 'arg' for single-argument filters
+    if "arg0" in args:
+        args["arg"] = args["arg0"]
+
     return args
+
+
+# ── Context Sanitization (security layer) ──
+
+def _sanitize_context(obj: Any) -> Any:
+    """
+    Deep-copy via JSON round-trip to sever prototype chains.
+
+    This neutralizes constructor-based sandbox escapes like:
+      args['constructor']['constructor']('return process')()
+
+    After sanitization, obj.constructor points to Object, and
+    Object.constructor.constructor will fail because we don't
+    expose Function/eval in the eval namespace.
+    """
+    if obj is None or isinstance(obj, (bool, int, float, str)):
+        return obj
+    try:
+        return json.loads(json.dumps(obj))
+    except (TypeError, ValueError):
+        return {}
 
 
 # ── Public API (backward compatible) ──
@@ -206,6 +370,8 @@ class TemplateContext:
       - data: output from previous step
       - item: current array item (map/filter context)
       - index: current index (map/filter context)
+
+    Security: All context values are sanitized before use in _safe_eval().
     """
 
     def __init__(self, args: Dict[str, Any] | None = None, data: Any = None,
@@ -223,15 +389,20 @@ class TemplateContext:
           - Simple property access: args.keyword, item.title
           - Arithmetic: index + 1, args.limit * 2
           - Pipe filters: args.limit | default(20)
+          - Pipe chaining: item.a || item.b | upper (splits on single | only)
           - Complex expressions: Math.min(args.limit, 50)
         """
         expression = expression.strip()
 
-        # Check for pipe filters
-        if '|' in expression:
-            parts = expression.split('|', 1)
-            value = self.resolve(parts[0].strip())
-            return apply_filter(value, parts[1].strip())
+        # Check for pipe filters (OpenCLI-compatible splitting)
+        pipe_parts = _PIPE_SPLIT_RE.split(expression)
+        if len(pipe_parts) > 1:
+            # First segment: evaluate normally
+            value = self.resolve(pipe_parts[0].strip())
+            # Remaining segments: chain through filters
+            for segment in pipe_parts[1:]:
+                value = apply_filter(value, segment.strip())
+            return value
 
         # Try simple property path first
         value = self._resolve_property(expression)
@@ -258,8 +429,11 @@ class TemplateContext:
         value = root_map.get(root)
 
         if value is None:
+            # Bare variable name: fall back to args (OpenCLI compatibility)
+            if len(parts) == 1 and root in self._args:
+                value = self._args[root]
             # Literal values
-            if root == "true":
+            elif root == "true":
                 return True
             elif root == "false":
                 return False
@@ -267,10 +441,11 @@ class TemplateContext:
                 return None
             elif root.isdigit():
                 return int(root)
-            try:
-                return float(root)
-            except ValueError:
-                return None
+            else:
+                try:
+                    return float(root)
+                except ValueError:
+                    return None
 
         # Navigate nested properties
         for part in parts[1:]:
@@ -289,31 +464,77 @@ class TemplateContext:
     def _safe_eval(self, expression: str, fallback: Any = None) -> Any:
         """
         Safe evaluation of arithmetic/comparison expressions using AST.
-        Only allows basic operations: +, -, *, /, comparisons, boolean logic.
-        """
-        # Replace variables with their resolved values
-        expr = expression
-        var_map = {
-            "args": repr(self._args),
-            "data": repr(self._data),
-            "item": repr(self._item),
-            "index": repr(self._index),
-        }
-        for var, val in sorted(var_map.items(), key=lambda x: -len(x[0])):
-            expr = re.sub(r'\b' + var + r'\b', val, expr)
 
-        # Security check: block dangerous patterns
-        dangerous_patterns = [
-            r'import\s', r'__import__', r'exec\s*\(', r'eval\s*\(',
-            r'__class__', r'__bases__', r'__subclasses__', r'__mro__',
-            r'__globals__', r'__builtins__', r'open\s*\(',
-            r'os\.', r'subprocess', r'sys\.', r'getattr\s*\(',
-            r'setattr\s*\(', r'delattr\s*\(',
-        ]
-        for pattern in dangerous_patterns:
-            if re.search(pattern, expr, re.IGNORECASE):
-                logger.warning(f"Blocked potentially dangerous expression: {expression}")
-                return fallback
+        Security layers (matching OpenCLI's approach):
+          1. Length limit (prevent DoS via huge expressions)
+          2. Forbidden pattern blocklist (constructor, __proto__, etc.)
+          3. Context sanitization (JSON round-trip severs prototype chains)
+          4. AST node whitelist (only allow safe operations)
+          5. Restricted globals (no dangerous builtins exposed)
+        """
+        # Layer 1: Length limit
+        if len(expression) > 2000:
+            logger.warning(f"Expression too long ({len(expression)} chars), blocked")
+            return fallback
+
+        # Layer 2: Forbidden pattern blocklist
+        forbidden = r'\b(constructor|__proto__|prototype|globalThis|process|require|import|eval)\b'
+        if re.search(forbidden, expression):
+            logger.warning(f"Blocked forbidden pattern in expression: {expression}")
+            return fallback
+
+        # Layer 3: Sanitize context (sever prototype chains)
+        sanitized_args = _sanitize_context(self._args)
+        sanitized_data = _sanitize_context(self._data)
+        sanitized_item = _sanitize_context(self._item)
+
+        # Build eval namespace with ONLY safe globals (no Function, eval, __import__, etc.)
+        eval_globals = {
+            "__builtins__": {},  # Block access to Python builtins entirely
+            "args": sanitized_args,
+            "data": sanitized_data,
+            "item": sanitized_item,
+            "index": self._index,
+            # Safe utility globals (matching OpenCLI's whitelist)
+            "json": json,
+            "Math": type("Math", (), {
+                "min": min, "max": max,
+                "floor": lambda x: int(x),
+                "ceil": lambda x: int(x),
+                "round": round,
+                "abs": abs,
+            })(),
+            "Number": type("Number", (), {
+                "parseInt": lambda x, *a: int(float(x)),
+                "parseFloat": float,
+            })(),
+            "String": str,
+            "Boolean": bool,
+            "Array": list,
+            "len": len,
+            "int": int,
+            "float": float,
+            "str": str,
+            "True": True,
+            "False": False,
+            "None": None,
+        }
+
+        # Expose individual arg keys as top-level variables (OpenCLI compatibility)
+        # This allows expressions like '${{ a || b }}' where a,b are args
+        if isinstance(sanitized_args, dict):
+            for k, v in sanitized_args.items():
+                if k not in eval_globals:  # Don't override builtins
+                    eval_globals[k] = v
+
+        # Replace variable references with sanitized namespace access
+        expr = expression
+
+        # Translate JS-style operators to Python (OpenCLI compatibility)
+        expr = re.sub(r'\|\|\s*', ' or ', expr)
+        expr = re.sub(r'&&\s*', ' and ', expr)
+        expr = re.sub(r'===', '==', expr)
+        expr = re.sub(r'!==', '!=', expr)
 
         try:
             tree = ast.parse(expr, mode='eval')
@@ -329,10 +550,12 @@ class TemplateContext:
                 if not isinstance(node, allowed_nodes):
                     # Allow Math.* calls
                     if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-                        if node.func.attr in ('min', 'max', 'floor', 'ceil', 'round', 'abs'):
+                        if node.func.attr in ('min', 'max', 'floor', 'ceil', 'round', 'abs',
+                                               'parseInt', 'parseFloat'):
                             continue
                     return fallback
-            return eval(compile(tree, '<template>', 'eval'))
+            result = eval(compile(tree, '<template>', 'eval'), eval_globals)
+            return result
         except Exception:
             return fallback
 

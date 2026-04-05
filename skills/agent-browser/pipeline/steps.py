@@ -80,6 +80,159 @@ async def _get_handle(session_id: str):
 
 
 # ══════════════════════════════════════════════
+#  POLYMORPHIC INPUT ADAPTERS (OpenCLI-compatible)
+#  Each _adapt_*() normalizes OpenCLI format to AB-internal format.
+#  No translation layer — handlers accept both formats natively.
+# ══════════════════════════════════════════════
+
+
+def _adapt_wait(params: Any) -> Any:
+    """
+    Normalize wait step params (OpenCLI + AB formats).
+
+    OpenCLI formats:
+      3                          → {seconds: 3}
+      {time: 3}                  → {seconds: 3}
+      {text: "...", timeout: N}  → {_wait_text: "...", selector: null, timeout: N}
+
+    AB formats (passthrough):
+      {seconds: N}               → unchanged
+      {selector: S, timeout: N}  → unchanged
+    """
+    if isinstance(params, (int, float)):
+        return {"seconds": float(params)}
+    if isinstance(params, str):
+        # Could be a number-as-string or a CSS selector
+        try:
+            return {"seconds": float(params)}
+        except ValueError:
+            return {"selector": params}
+    if isinstance(params, dict):
+        # OpenCLI: {time: N} → AB: {seconds: N}
+        if "time" in params:
+            params = dict(params)
+            params["seconds"] = params.pop("time")
+        # OpenCLI: {text: "..."} → wait for text via polling
+        if "text" in params and "selector" not in params:
+            params = dict(params)
+            params["_wait_text"] = params.pop("text")
+        return params
+    return params
+
+
+def _adapt_select(params: Any) -> Any:
+    """
+    Normalize select step params (OpenCLI + AB formats).
+
+    OpenCLI format:
+      "data.data.list"            → {path: "data.data.list"}  (dot-path over data)
+
+    AB format (passthrough):
+      {path: "data"}              → unchanged
+
+    Heuristic: string param containing . or [ is a dot-path;
+    string without those is a CSS selector (legacy AB behavior).
+    """
+    if isinstance(params, str):
+        # Heuristic: contains dot-path indicators → data path; else → CSS selector
+        if any(c in params for c in ('.', '[')):
+            return {"path": params}
+        # Legacy AB: string = CSS selector (pass through for JS eval)
+        return params
+    return params
+
+
+def _adapt_fetch(params: Any) -> Any:
+    """
+    Normalize fetch step params (OpenCLI + AB formats).
+
+    OpenCLI format:
+      {url}                       → {url: ..., method: "GET", browser: true}
+      {url, params: {...}}        → {url: ..., method: "GET", browser: true, _query_params: {...}}
+
+    AB format (passthrough):
+      {url, method, headers, browser} → unchanged
+    """
+    if isinstance(params, str):
+        return {"url": params}
+    if isinstance(params, dict):
+        params = dict(params)
+        # OpenCLI: params → query string (extracted by handler)
+        if "params" in params and "_query_params" not in params:
+            params["_query_params"] = params.pop("params")
+        # Ensure defaults
+        params.setdefault("method", "GET")
+        params.setdefault("browser", True)
+        return params
+    return params
+
+
+def _adapt_type(params: Any) -> Any:
+    """
+    Normalize type step params (OpenCLI + AB formats).
+
+    OpenCLI format:
+      {ref: "@e1", text: "..."}   → {selector: "@e1", text: "..."}
+      {ref: "@e1", text: "...", submit: true} → {selector: "@e1", text: "...", _submit: true}
+
+    AB format (passthrough):
+      {selector: S, text: T}       → unchanged
+    """
+    if isinstance(params, dict):
+        params = dict(params)
+        # OpenCLI uses 'ref' instead of 'selector'
+        if "ref" in params and "selector" not in params:
+            params["selector"] = params.pop("ref")
+        # OpenCLI has optional 'submit' flag (presses Enter after typing)
+        if "submit" in params:
+            params["_submit"] = params.pop("submit")
+        return params
+    return params
+
+
+def _adapt_tap(params: Any) -> Any:
+    """
+    Normalize tap step params (OpenCLI full shape + AB simple shape).
+
+    OpenCLI format (full shape — 6+ fields):
+      {store, action, capture, select, timeout, framework, args}
+
+    AB format (simple shape — 2-3 fields):
+      {store, getter} or {store, action, args}
+
+    All fields pass through; handler consumes what it needs.
+    """
+    if isinstance(params, str):
+        return {"getter": params}
+    return params
+
+
+def _adapt_navigate(params: Any) -> Any:
+    """
+    Normalize navigate step params (OpenCLI + AB formats).
+
+    OpenCLI format:
+      "url"                       → string URL (passthrough)
+      {url, waitUntil, settleMs}  → extract extra options
+
+    AB format (passthrough):
+      "url" or {url, ...}         → unchanged
+    """
+    if isinstance(params, str):
+        return params
+    if isinstance(params, dict):
+        params = dict(params)
+        # OpenCLI: waitUntil → _wait_until
+        if "waitUntil" in params:
+            params["_wait_until"] = params.pop("waitUntil")
+        # OpenCLI: settleMs → _settle_ms
+        if "settleMs" in params:
+            params["_settle_ms"] = params.pop("settleMs")
+        return params
+    return params
+
+
+# ══════════════════════════════════════════════
 #  BROWSER STEPS (need page handle)
 # ══════════════════════════════════════════════
 
@@ -87,10 +240,25 @@ async def _get_handle(session_id: str):
 @register("navigate")
 async def step_navigate(session_id: str, params: Any, data: Any,
                         context: dict, stealth: dict) -> Any:
-    """Navigate to URL. Returns data unchanged."""
+    """Navigate to URL. Returns data unchanged.
+
+    Accepts both OpenCLI and AB formats via _adapt_navigate().
+    OpenCLI: "url", {url, waitUntil, settleMs}
+    AB: "url" or {url, ...}
+    """
+    params = _adapt_navigate(params)
     url = _validate_url(resolve(str(params), **context))
     page = await _get_handle(session_id)
-    await page.goto(url, wait_until="domcontentloaded", timeout=20000)
+
+    # OpenCLI: custom waitUntil option
+    wait_until = params.get("_wait_until", "domcontentloaded")
+    await page.goto(url, wait_until=wait_until, timeout=20000)
+
+    # OpenCLI: settleMs — extra delay after navigation
+    settle_ms = params.get("_settle_ms")
+    if settle_ms:
+        await asyncio.sleep(float(settle_ms) / 1000.0)
+
     return data
 
 
@@ -119,12 +287,20 @@ async def step_click(session_id: str, params: Any, data: Any,
 @register("type")
 async def step_type(session_id: str, params: Any, data: Any,
                     context: dict, stealth: dict) -> Any:
-    """Type text into element. Returns data unchanged."""
+    """Type text into element. Returns data unchanged.
+
+    Accepts both OpenCLI and AB formats via _adapt_type().
+    OpenCLI: {ref: "@e1", text: "...", submit: true}
+    AB: {selector: S, text: T}
+    """
+    params = _adapt_type(params)
+
     if isinstance(params, dict):
         selector = _escape_selector(resolve(str(params.get("selector", "")), **context))
         text = resolve(str(params.get("text", "")), **context)
+        submit = params.get("_submit", False)
     else:
-        raise ValueError("type step requires {selector, text} dict")
+        raise ValueError("type step requires {selector, text} dict (or {ref, text} for OpenCLI format)")
 
     page = await _get_handle(session_id)
     escaped = json.dumps(text)
@@ -139,14 +315,23 @@ async def step_type(session_id: str, params: Any, data: Any,
             el.dispatchEvent(new Event('change', {{bubbles: true}}));
         }})()"""
     )
-    return data
+    # OpenCLI: optionally press Enter after typing
+    if submit:
+        await page.keyboard_press("Enter")
 
+    return data
 
 @register("wait")
 async def step_wait(session_id: str, params: Any, data: Any,
                     context: dict, stealth: dict) -> Any:
-    """Wait seconds / for text / for selector. Returns data unchanged."""
+    """Wait seconds / for text / for selector. Returns data unchanged.
+
+    Accepts both OpenCLI and AB formats via _adapt_wait().
+    OpenCLI: 3, {time: 3}, {text: "...", timeout: N}
+    AB: {seconds: N}, {selector: S, timeout: N}
+    """
     page = await _get_handle(session_id)
+    params = _adapt_wait(params)
 
     if isinstance(params, (int, float)):
         await asyncio.sleep(float(params))
@@ -158,7 +343,25 @@ async def step_wait(session_id: str, params: Any, data: Any,
             sel = _escape_selector(resolved)
             await page.wait_for_selector(sel, timeout=10000)
     elif isinstance(params, dict):
-        if "seconds" in params:
+        # OpenCLI text-wait: poll for text appearance
+        if "_wait_text" in params:
+            wait_text = resolve(str(params["_wait_text"]), **context)
+            timeout = int(params.get("timeout", 10000))
+            # Polling wait for text content
+            js = f"""
+            (() => {{
+                const target = {json.dumps(wait_text)};
+                return document.body.innerText.includes(target);
+            }})()
+            """
+            deadline = __import__("asyncio").get_event_loop().time() + timeout / 1000.0
+            while __import__("asyncio").get_event_loop().time() < deadline:
+                found = await page.evaluate(js)
+                if found:
+                    return data
+                await asyncio.sleep(0.3)
+            logger.warning(f"Text wait timed out after {timeout}ms for: {wait_text[:50]}")
+        elif "seconds" in params:
             await asyncio.sleep(float(resolve(str(params["seconds"]), **context)))
         elif "selector" in params:
             sel = _escape_selector(resolve(str(params["selector"]), **context))
@@ -365,64 +568,227 @@ async def step_intercept(session_id: str, params: Any, data: Any,
 async def step_tap(session_id: str, params: Any, data: Any,
                    context: dict, stealth: dict) -> Any:
     """
-    Call Vue/Pinia store action declaratively.
+    Store Action Bridge — call Vue/Pinia/Vuex store action + intercept network response.
 
-    This is the highest-performance strategy: zero network requests,
-    directly reads from the app's in-memory state management.
+    Ported from OpenCLI's stepTap (tap.ts + interceptor.ts).
+    Supports both AB simple shape and OpenCLI full interceptor shape.
 
-    Params:
-      - store: Pinia store name (e.g., 'jobStore')
-      - action: action name (e.g., 'fetchJobs')
-      - args: action arguments (dict)
-      - getter: getter name to read after action (e.g., 'jobs')
+    OpenCLI format (full shape — enables network interception):
+      {store, action, capture, select, timeout, framework, args}
 
-    Returns: Store data (the getter value).
+    AB format (simple shape — direct store read):
+      {store, action, getter, args}
+
+    When `capture` is specified, installs a temporary fetch/XHR interceptor,
+    calls the store action, waits for matching network response, then restores
+    originals. This is the "store-action" strategy that zero-cost captures API
+    data that would normally require cookie-based fetch interception.
     """
+    params = _adapt_tap(params)
+
     if isinstance(params, str):
         params = {"getter": params}
 
     store_name = params.get("store", "")
     action_name = params.get("action", "")
     getter_name = params.get("getter", "")
-    action_args = params.get("args", {})
+    capture_pattern = params.get("capture", "")
+    select_path = params.get("select")
+    tap_timeout = int(params.get("timeout", 5))
+    framework = params.get("framework")
+    raw_args = params.get("args", [])
+
+    # Validate required fields
+    if not store_name or not action_name:
+        raise ValueError(
+            "tap: 'store' and 'action' are required. "
+            f"Got: store={store_name!r}, action={action_name!r}"
+        )
 
     page = await _get_handle(session_id)
+
+    # Render template values in params
+    store_name = resolve(str(store_name), **context)
+    action_name = resolve(str(action_name), **context)
+    if capture_pattern:
+        capture_pattern = resolve(str(capture_pattern), **context)
+    if select_path:
+        select_path = resolve(str(select_path), **context)
+
+    # Build select chain for captured response sub-selection
+    if select_path:
+        select_parts = select_path.split(".")
+        select_chain = "".join(f'?.[{json.dumps(p)}]' for p in select_parts)
+    else:
+        select_chain = ""
+
+    # Serialize action arguments (render templates in each)
+    if isinstance(raw_args, list):
+        rendered_args = [json.dumps(resolve(str(a), **context)) for a in raw_args]
+        args_js = ", ".join(rendered_args) if rendered_args else ""
+    elif isinstance(raw_args, dict):
+        args_js = json.dumps(raw_args)
+    else:
+        args_js = ""
+
+    # Build action call JS
     safe_store = json.dumps(store_name)
     safe_action = json.dumps(action_name)
-    safe_getter = json.dumps(getter_name)
-    safe_args = json.dumps(action_args)
+    if args_js:
+        action_call = f"store[{safe_action}]({args_js})"
+    else:
+        action_call = f"store[{safe_action}]()"
 
-    js = f"""
-    (() => {{
-        // Try to access Vue/Pinia instance
-        const app = document.querySelector('#app')?.__vue_app__;
-        if (!app) {{
-            // Try global Vue instance
-            const vue = window.__VUE__ || window.Vue || window.vue;
-            if (!vue) return {{error: 'No Vue/Pinia instance found'}};
+    # ── Generate tap interceptor (from OpenCLI interceptor.ts) ──
+    if capture_pattern:
+        safe_capture = json.dumps(capture_pattern)
+        js = f"""
+        async () => {{
+            // ── 1. Setup capture proxy (fetch + XHR dual interception) ──
+            let captured = null;
+            let captureResolve;
+            const capturePromise = new Promise(r => {{ captureResolve = r; }});
+            const pattern = {safe_capture};
+
+            function __disguise(fn, name) {{
+                const s = 'function ' + name + '() {{ [native code] }}';
+                Object.defineProperty(fn, 'toString', {{ value: function() {{ return s; }}, writable: true, configurable: true, enumerable: false }});
+                try {{ Object.defineProperty(fn, 'name', {{ value: name, configurable: true }}); }} catch {{}}
+                return fn;
+            }}
+
+            // Patch fetch
+            const origFetch = window.fetch;
+            window.fetch = __disguise(async function(...fetchArgs) {{
+                const resp = await origFetch.apply(this, fetchArgs);
+                try {{
+                    const url = typeof fetchArgs[0] === 'string' ? fetchArgs[0]
+                        : fetchArgs[0] instanceof Request ? fetchArgs[0].url : String(fetchArgs[0]);
+                    if (pattern && url.includes(pattern) && !captured) {{
+                        try {{ captured = await resp.clone().json(); captureResolve(); }} catch {{}}
+                    }}
+                }} catch {{}}
+                return resp;
+            }}, 'fetch');
+
+            // Patch XHR
+            const origXhrOpen = XMLHttpRequest.prototype.open;
+            const origXhrSend = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.open = __disguise(function(method, url) {{
+                Object.defineProperty(this, '__iurl', {{ value: String(url), writable: true, enumerable: false, configurable: true }});
+                return origXhrOpen.apply(this, arguments);
+            }}, 'open');
+            XMLHttpRequest.prototype.send = __disguise(function(body) {{
+                if (pattern && this.__iurl?.includes(pattern)) {{
+                    this.addEventListener('load', function() {{
+                        if (!captured) {{
+                            try {{ captured = JSON.parse(this.responseText); captureResolve(); }} catch {{}}
+                        }}
+                    }});
+                }}
+                return origXhrSend.apply(this, arguments);
+            }}, 'send');
+
+            try {{
+                // ── 2. Find store (Pinia or Vuex) ──
+                let store = null;
+                const fw = {json.dumps(framework)};
+                const app = document.querySelector('#app');
+
+                if (!fw || fw === 'pinia') {{
+                    try {{
+                        const pinia = app?.__vue_app__?.config?.globalProperties?.$pinia;
+                        if (pinia?._s) store = pinia._s.get({safe_store});
+                    }} catch (e) {{ /* noop */ }}
+                }}
+                if (!store && (!fw || fw === 'vuex')) {{
+                    try {{
+                        const vuexStore = app?.__vue_app__?.config?.globalProperties?.$store
+                            ?? app?.__vue__?.$store;
+                        if (vuexStore) {{
+                            store = {{ [{safe_store}]: (...a) => vuexStore.dispatch({safe_store} + '/' + {safe_action}, ...a) }};
+                        }}
+                    }} catch (e) {{ /* noop */ }}
+                }}
+
+                if (!store) return {{ error: 'Store not found: ' + {safe_store},
+                    hint: 'Page may not be fully loaded or store name may be incorrect' }};
+                if (typeof store[{safe_action}] !== 'function') {{
+                    const available = Object.keys(store).filter(k =>
+                        typeof store[k] === 'function' && !k.startsWith('$') && !k.startsWith('_')
+                    );
+                    return {{ error: 'Action not found: ' + {safe_action} + ' on store ' + {safe_store},
+                        hint: 'Available: ' + available.join(', ') }};
+                }}
+
+                // ── 3. Call store action ──
+                await {action_call};
+
+                // ── 4. Wait for network response ──
+                if (!captured) {{
+                    const timeoutPromise = new Promise(r => setTimeout(r, {tap_timeout} * 1000));
+                    await Promise.race([capturePromise, timeoutPromise]);
+                }}
+            }} finally {{
+                // ── 5. Always restore originals ──
+                window.fetch = origFetch;
+                XMLHttpRequest.prototype.open = origXhrOpen;
+                XMLHttpRequest.prototype.send = origXhrSend;
+            }}
+
+            if (!captured) return {{ error: 'No matching response captured for pattern: ' + pattern }};
+            return captured{select_chain} ?? captured;
         }}
+        """
+    else:
+        # Simple mode (no interception) — original AB behavior + Vuex support
+        safe_getter = json.dumps(getter_name)
+        safe_args = json.dumps(raw_args if not isinstance(raw_args, list) else {})
+        js = f"""
+        (() => {{
+            let store = null;
+            const app = document.querySelector('#app');
 
-        // Access Pinia stores
-        const pinia = app?.config?.globalProperties?.$pinia;
-        if (!pinia) return {{error: 'Pinia not found'}};
+            // Try Pinia first
+            try {{
+                const pinia = app?.__vue_app__?.config?.globalProperties?.$pinia;
+                if (pinia?._s) store = pinia._s.get({safe_store});
+            }} catch (e) {{}}
 
-        const store = pinia._s.get({safe_store});
-        if (!store) return {{error: 'Store not found: ' + {safe_store}}};
+            // Fallback to Vuex
+            if (!store) {{
+                try {{
+                    const vuexStore = app?.__vue_app__?.config?.globalProperties?.$store
+                        ?? app?.__vue__?.$store;
+                    if (vuexStore) store = vuexStore;
+                }} catch (e) {{}}
+            }}
 
-        // Call action if specified
-        if ({safe_action} && typeof store[{safe_action}] === 'function') {{
-            await store[{safe_action}]({safe_args});
-        }}
+            if (!store) return {{ error: 'Store not found: ' + {safe_store},
+                hint: 'No Vue/Pinia/Vuex instance found on this page' }};
 
-        // Read getter if specified
-        if ({safe_getter}) {{
-            return store[{safe_getter}];
-        }}
+            // Call action if specified
+            if ({safe_action}) {{
+                const fn = store[{safe_action}] || (store.dispatch ? store.dispatch.bind(store, {safe_store}/{safe_action}) : null);
+                if (typeof fn === 'function') {{
+                    const args = {safe_args};
+                    await (Array.isArray(args) ? fn(...args) : fn(args));
+                }}
+            }}
 
-        // Return entire store state
-        return {{$toRaw(store.$state)}};
-    }})()
-    """
+            // Read getter if specified (AB simple shape)
+            if ({safe_getter}) {{
+                const val = store[{safe_getter}] ?? (store.state?.[{safe_getter}]) ?? (store.$state?.[{safe_getter}]);
+                return val;
+            }}
+
+            // Return state snapshot
+            if (store.$state) return {{$toRaw(store.$state)}};
+            if (store.state) return store.state;
+            return store;
+        }})()
+        """
+
     result = await page.evaluate(js)
     return result
 
@@ -501,12 +867,26 @@ async def step_fetch(session_id: str, params: Any, data: Any,
       - browser fetch (credentials: include, keeps cookies)
       - Python aiohttp (public API)
 
+    Accepts both OpenCLI and AB formats via _adapt_fetch().
+    OpenCLI: {url}, {url, params: {...}}
+    AB: {url, method, browser, headers}
+
     Security: URL validated for scheme + private IP blocking.
     """
-    if isinstance(params, str):
-        params = {"url": params}
+    params = _adapt_fetch(params)
 
     url = _validate_url(resolve(str(params.get("url", "")), **context))
+
+    # OpenCLI: append query params from _query_params to URL
+    query_params = params.get("_query_params")
+    if query_params:
+        from urllib.parse import urlencode, urlparse, parse_qs
+        parsed = urlparse(url)
+        existing = parse_qs(parsed.query)
+        if isinstance(query_params, dict):
+            existing.update({k: v for k, v in query_params.items()})
+        new_query = urlencode(existing, doseq=True)
+        url = parsed._replace(query=new_query).geturl()
 
     # SSRF protection: block private/internal IP ranges
     from urllib.parse import urlparse
@@ -570,8 +950,16 @@ async def step_fetch(session_id: str, params: Any, data: Any,
 @register("select")
 async def step_select(session_id: str, params: Any, data: Any,
                       context: dict, stealth: dict) -> Any:
-    """Extract sub-field by path from data."""
+    """Extract sub-field by path from data.
+
+    Accepts both OpenCLI and AB formats via _adapt_select().
+    OpenCLI: "data.data.list" (dot-path string over data)
+    AB: {path: "data"} or CSS selector string
+    """
+    params = _adapt_select(params)
+
     if isinstance(params, str):
+        # Legacy AB: CSS selector → evaluate in browser
         js_selector = resolve(params, **context)
         page = await _get_handle(session_id)
 
@@ -592,8 +980,11 @@ async def step_select(session_id: str, params: Any, data: Any,
         return await page.evaluate(js)
 
     if isinstance(params, dict):
+        # OpenCLI / AB dict format: dot-path extraction from data
         path = params.get("path", "")
-        parts = path.split(".")
+        # Also support _select_path alias (from tap capture sub-selection)
+        select_path = params.get("_select_path") or path
+        parts = select_path.split(".")
         result = data
         for part in parts:
             if result is None:

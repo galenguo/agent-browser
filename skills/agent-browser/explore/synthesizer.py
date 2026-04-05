@@ -1,7 +1,11 @@
 """YAML Synthesizer — 从 browser-use AgentHistoryList 生成可执行的 YAML 适配器
 
 Input:  AgentHistoryList JSON (browser-use action trace) + ExplorationResult
-Output: Executable YAML adapter file
+Output: Executable YAML adapter file (OpenCLI-compatible format)
+
+Emits OpenCLI-native YAML that both Agent Browser and OpenCLI can execute
+without modification. Strategy values, step shapes, and top-level schema
+all conform to OpenCLI specification.
 
 Core challenge: browser-use traces are noisy exploration artifacts.
 The synthesizer must distill them into clean, deterministic pipeline steps.
@@ -19,11 +23,11 @@ Selector Resolution Priority:
   3. Semantic fallback: [data-type="..."], [class*="..."]
   4. Index-of-type (with fragility warning)
 
-Strategy Auto-Detection:
+Strategy Auto-Detection (OpenCLI values):
   - store-action → tap step (zero network, best performance)
-  - public API → fetch step (no browser needed)
-  - cookie → evaluate(fetch) in browser (inherits auth)
-  - ui/dom → DOM scraping (fallback)
+  - public     → fetch step (no browser needed)
+  - intercept  → evaluate(fetch) in browser (inherits auth)
+  - ui/dom     → DOM scraping (fallback)
 """
 import json
 import logging
@@ -126,12 +130,22 @@ def synthesize(
     command_name: str = "list",
     adapter_dir: Optional[str] = None,
 ) -> dict:
-    """Backward-compatible: generate from ExplorationResult only (no trace)."""
+    """Backward-compatible: generate from ExplorationResult only (no trace).
+
+    Works with both old-style List[Dict] capabilities and new-style
+    InferredCapability objects.
+    """
     if not exploration.capabilities:
         return _generate_dom_adapter(site, command_name, exploration)
 
     best = exploration.capabilities[0]
-    strategy = best.get("strategy_guess", "cookie")
+    # Handle both InferredCapability (new) and Dict (legacy) formats
+    if hasattr(best, 'strategy'):
+        # New InferredCapability format
+        strategy = best.strategy
+    else:
+        # Legacy Dict format with strategy_guess key
+        strategy = best.get("strategy_guess", "intercept")
 
     if strategy == "public":
         adapter = _generate_fetch_adapter(site, command_name, best, exploration)
@@ -555,7 +569,8 @@ def detect_strategy(
     """
     Choose best execution strategy for the synthesized YAML.
 
-    Returns one of: 'store-action', 'public', 'cookie', 'ui'
+    Returns OpenCLI strategy values: 'store-action', 'public', 'intercept', 'ui'
+    (Note: 'intercept' is the OpenCLI name for what AB calls 'cookie' strategy)
     """
     if not exploration:
         return "ui"
@@ -583,7 +598,7 @@ def detect_strategy(
     elif has_json_api and has_public_endpoint and not needs_auth:
         return "public"           # Good: direct fetch, no browser needed
     elif has_json_api and needs_auth:
-        return "cookie"           # OK: browser fetch with credentials
+        return "intercept"        # OpenCLI name: browser fetch with credentials
     else:
         return "ui"               # Fallback: DOM scraping
 
@@ -649,15 +664,28 @@ def _build_pipeline(
 
     elif strategy == "store-action":
         store_name = _detect_store_name(exploration)
-        getter = _detect_getter_name(exploration)
+        action = _detect_action_name(exploration)
+        capture = _detect_capture_pattern(exploration)
+        # OpenCLI tap format: include capture + select for interceptor
+        tap_step: dict
+        if capture:
+            tap_step = {
+                "store": store_name,
+                "action": action,
+                "capture": capture,
+                "select": "data",  # OpenCLI: sub-select from captured response
+            }
+        else:
+            getter = _detect_getter_name(exploration)
+            tap_step = {"store": store_name, "getter": getter}
         return [
             {"navigate": base_url},
-            {"tap": {"store": store_name, "getter": getter}},
+            {"tap": tap_step},
             {"map": {"title": "${{ item.title }}", "url": "${{ item.url }}"}},
             {"limit": "${{ args.limit | default(20) }}"},
         ]
 
-    elif strategy == "cookie":
+    elif strategy == "intercept":  # OpenCLI name (AB-internal: 'cookie')
         cap = exploration.capabilities[0] if exploration and exploration.capabilities else {}
         endpoint = cap.get("endpoint", "")
         fields = cap.get("fields", {})
@@ -720,6 +748,38 @@ def _detect_getter_name(exploration: Optional[ExplorationResult]) -> str:
     return "items"
 
 
+def _detect_action_name(exploration: Optional[ExplorationResult]) -> str:
+    """Detect likely store action name from exploration data."""
+    if exploration and exploration.capabilities:
+        for cap in exploration.capabilities:
+            # Common action patterns in endpoint URLs
+            url = cap.get("endpoint", "").lower()
+            if any(w in url for w in ("list", "search", "query", "get")):
+                return "fetchList" if "list" in url else "search"
+            if any(w in url for w in ("detail", "info", "get")):
+                return "fetchDetail"
+    return "fetchData"
+
+
+def _detect_capture_pattern(exploration: Optional[ExplorationResult]) -> Optional[str]:
+    """Detect URL capture pattern for tap interceptor from exploration endpoints."""
+    if not exploration or not exploration.endpoints:
+        return None
+    # Find the most relevant JSON API endpoint
+    for ep in exploration.endpoints:
+        if ep.is_json and ep.status == 200 and ep.sample:
+            # Extract a short identifying pattern from the URL
+            from urllib.parse import urlparse
+            path = urlparse(ep.url).path
+            # Use last 2 path segments as pattern
+            parts = [p for p in path.split("/") if p]
+            if len(parts) >= 2:
+                return "/" + "/".join(parts[-2:])
+            elif len(parts) == 1:
+                return parts[0]
+    return None
+
+
 def _infer_args(actions: List[Dict], exploration: Optional[ExplorationResult]) -> Dict:
     """Infer user-facing arguments from trace actions."""
     args = {
@@ -771,7 +831,7 @@ def _generate_fetch_adapter(site, name, cap, exploration) -> dict:
 
 
 def _generate_cookie_adapter(site, name, cap, exploration) -> dict:
-    """Cookie strategy: navigate → evaluate(fetch) → map → limit"""
+    """Intercept strategy (OpenCLI name) / Cookie strategy (AB-internal): navigate → evaluate(fetch) → map → limit"""
     fields = cap.get("fields", {})
     columns = list(fields.keys())
     map_expr = {}
@@ -779,8 +839,9 @@ def _generate_cookie_adapter(site, name, cap, exploration) -> dict:
         map_expr[target] = f"${{ item.{source_key} }}"
     return {
         "site": site, "name": name,
-        "description": f"Auto-generated: {site} {name} (cookie)",
-        "strategy": "cookie", "browser": True,
+        "description": f"Auto-generated: {site} {name} (intercept)",
+        "strategy": "intercept",  # OpenCLI-compatible strategy name
+        "browser": True,
         "args": {"limit": {"type": "int", "default": 10}},
         "columns": columns,
         "pipeline": [
@@ -829,3 +890,99 @@ def _generate_dom_adapter(site, name, exploration) -> dict:
             {"limit": "${{ args.limit }}"},
         ],
     }
+
+
+def synthesize_from_artifacts(
+    artifact_dir: str,
+    site: Optional[str] = None,
+    command_name: str = "list",
+    adapter_dir: Optional[str] = None,
+) -> dict:
+    """
+    Generate YAML adapter from persisted exploration artifacts on disk.
+
+    This is the OpenCLI-compatible entry point that reads the JSON files
+    written by explore()'s write_explore_artifacts() and produces
+    an executable YAML adapter.
+    """
+    import os as _os
+
+    # Read artifacts
+    manifest_path = _os.path.join(artifact_dir, "manifest.json")
+    if not _os.path.isfile(manifest_path):
+        raise FileNotFoundError(f"No exploration artifacts found at {artifact_dir} (missing manifest.json)")
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    endpoints_path = _os.path.join(artifact_dir, "endpoints.json")
+    capabilities_path = _os.path.join(artifact_dir, "capabilities.json")
+
+    endpoints = []
+    if _os.path.isfile(endpoints_path):
+        with open(endpoints_path, "r") as f:
+            endpoints = json.load(f)
+
+    capabilities = []
+    if _os.path.isfile(capabilities_path):
+        with open(capabilities_path, "r") as f:
+            raw_caps = json.load(f)
+        for rc in raw_caps:
+            capabilities.append(InferredCapability(
+                name=rc.get("name", ""),
+                description=rc.get("description", ""),
+                strategy=rc.get("strategy", "public"),
+                confidence=rc.get("confidence", 0.5),
+                endpoint=rc.get("endpoint"),
+                item_path=rc.get("item_path"),
+                recommended_columns=rc.get("columns"),
+                recommended_args=rc.get("args"),
+                store_hint=rc.get("store_hint"),
+            ))
+
+    result = ExplorationResult(
+        url=manifest.get("url", ""),
+        final_url=manifest.get("final_url", ""),
+        title=manifest.get("title", ""),
+        site=site or manifest.get("site", detect_site_name(manifest.get("url", ""))),
+        framework=manifest.get("framework", {}),
+        top_strategy=manifest.get("top_strategy", "ui"),
+        out_dir=artifact_dir,
+        duration_ms=manifest.get("duration_ms", 0),
+        capabilities=capabilities,
+    )
+
+    from .explorer import Endpoint as EpClass
+    for ed in endpoints:
+        ep = EpClass(
+            url=ed.get("url", ""),
+            method=ed.get("method", "GET"),
+            status=ed.get("status", 0),
+            is_json=ed.get("is_json", False),
+            pattern=ed.get("pattern", ""),
+            content_type=ed.get("content_type", ""),
+            score=ed.get("score", 0.0),
+            has_search=ed.get("has_search", False),
+            has_pagination=ed.get("has_pagination", False),
+            has_limit=ed.get("has_limit", False),
+            auth_indicators=ed.get("auth_indicators", []),
+            item_path=ed.get("item_path"),
+            item_count=ed.get("item_count", 0),
+            detected_fields=ed.get("fields", {}),
+        )
+        result.endpoints.append(ep)
+
+    if not capabilities:
+        return _generate_dom_adapter(result.site or site or "unknown", command_name, result)
+
+    best = capabilities[0]
+    strategy = best.strategy
+
+    return build_adapter(
+        site=result.site or site or "unknown",
+        name=command_name,
+        strategy=strategy,
+        actions=[],
+        extraction_js="",
+        exploration=result,
+    )
