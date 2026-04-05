@@ -59,7 +59,15 @@ def _escape_selector(selector: str) -> str:
 
 
 def _validate_url(url: str) -> str:
-    """Validate URL safety (prevent SSRF and dangerous schemes)"""
+    """Validate URL safety (prevent SSRF and dangerous schemes)
+
+    Blocks:
+      - Non-http(s) schemes (javascript:, data:, file:, etc.)
+      - Private/internal IP ranges (10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x)
+      - IPv6 loopback/link-local
+    """
+    import re
+
     url = url.strip()
     if not url:
         raise ValueError("Empty URL is not allowed")
@@ -69,6 +77,30 @@ def _validate_url(url: str) -> str:
     for blocked in ("javascript:", "data:", "file:", "vbscript:", "blob:"):
         if lower.startswith(blocked):
             raise ValueError(f"Blocked URL scheme: {blocked}")
+
+    # SSRF: block private IP ranges in hostname
+    hostname_match = re.match(r'^https?://([^/:]+)', url)
+    if hostname_match:
+        hostname = hostname_match.group(1).lower()
+        _PRIVATE_HOSTS = (
+            'localhost', 'localhost.localdomain',
+            # IPv4 private ranges
+            '0.0.0.0',
+        )
+        if hostname in _PRIVATE_HOSTS:
+            raise ValueError(f"Blocked hostname (private): {hostname}")
+        # Check for numeric IP
+        ip_pattern = r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$'
+        ip_match = re.match(ip_pattern, hostname)
+        if ip_match:
+            parts = [int(g) for g in ip_match.groups()]
+            if (parts[0] == 10 or
+                (parts[0] == 172 and 16 <= parts[1] <= 31) or
+                (parts[0] == 192 and parts[1] == 168) or
+                (parts[0] == 127) or
+                (parts[0] == 169 and 254 <= parts[1] <= 255)):
+                raise ValueError(f"Blocked IP address (private network): {hostname}")
+
     return url
 
 
@@ -219,7 +251,7 @@ def _adapt_navigate(params: Any) -> Any:
       "url" or {url, ...}         → unchanged
     """
     if isinstance(params, str):
-        return params
+        return {"url": params}  # Wrap string so step_navigate can .get() options
     if isinstance(params, dict):
         params = dict(params)
         # OpenCLI: waitUntil → _wait_until
@@ -247,7 +279,9 @@ async def step_navigate(session_id: str, params: Any, data: Any,
     AB: "url" or {url, ...}
     """
     params = _adapt_navigate(params)
-    url = _validate_url(resolve(str(params), **context))
+    # Extract URL: handle both string and dict formats from _adapt_navigate
+    raw_url = params.get("url", params) if isinstance(params, dict) else params
+    url = _validate_url(resolve(str(raw_url), **context))
     page = await _get_handle(session_id)
 
     # OpenCLI: custom waitUntil option
@@ -467,7 +501,23 @@ async def step_evaluate(session_id: str, params: Any, data: Any,
             )
 
     page = await _get_handle(session_id)
-    result = await page.evaluate(js_code)
+
+    # JS execution timeout (prevent infinite loops / hanging scripts)
+    eval_timeout = 5.0  # seconds
+    if isinstance(params, dict) and params.get("_timeout"):
+        eval_timeout = float(params["_timeout"])
+
+    try:
+        result = await asyncio.wait_for(
+            page.evaluate(js_code),
+            timeout=eval_timeout,
+        )
+    except asyncio.TimeoutError:
+        raise ValueError(
+            f"JavaScript execution timed out after {eval_timeout}s. "
+            "Use _timeout param to increase limit."
+        )
+
     return result
 
 

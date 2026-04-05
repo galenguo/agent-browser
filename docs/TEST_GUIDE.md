@@ -390,5 +390,71 @@ enhancer = stealth.StealthEnhancer()
 
 ---
 
-**文档版本**: v1.0  
+**文档版本**: v2.0 (added integration test suite)
 **创建日期**: 2026-04-04
+**更新日期**: 2026-04-05 (新增 pytest 集成测试套件)
+
+---
+
+## A. Integration Test Suite (pytest-based) — NEW
+
+Replaces legacy `test_skill_scenarios.py` (662-line monolithic script).
+
+### File Structure
+
+```
+tests/integration/
+  __init__.py                    # Package marker
+  conftest.py                    # Shared fixtures (autouse reset + 3 tiers)
+  test_session_lifecycle.py      # [CORE] create -> navigate -> snapshot -> delete
+  test_pipeline_execution.py     # YAML pipeline + data transform + SSRF
+  test_template_engine.py        # ${{ }} expression engine edge cases
+  test_adapter_loading.py        # Discovery + OpenCLI normalization + validation
+  test_stealth_integrity.py      # Structural + circuit breaker + behavioral
+  test_mode_matrix.py            # 8 mode combos (parametrize + skipif)
+  test_security_boundaries.py    # Isolation, injection vectors, JS blocking
+```
+
+### Test Tiers
+
+| Tier | Marker | Prerequisite | Time |
+|------|--------|-------------|------|
+| **1: Mock** | (none) | Nothing | ~1s |
+| **2: Real Browser** | `@requires_browser` | CloakBrowser :19222 | ~10s |
+| **3: API Server** | `@api` | FastAPI :8000 | ~5s |
+
+### Run Commands
+
+```bash
+# Fast tier (CI, mocked backend) — < 45s
+pytest tests/integration/ -m "not slow and not api and not llm" -v
+
+# With real browser — < 3min
+pytest tests/integration/ -m "not llm" -v
+
+# Full suite
+pytest tests/integration/ -v
+
+# By file
+pytest tests/integration/test_session_lifecycle.py -v
+pytest tests/integration/test_template_engine.py -v
+```
+
+### Key Fixtures
+
+| Fixture | Description |
+|---------|-----------|
+| `reset_global_state` (autouse) | Resets _config, _middleware, BrowserDaemon, loader._registry every test |
+| `mock_backend` | ABC-level mock (spec=BrowserBackend), no CDP needed |
+| `mock_page_handle` | ABC-level mock (spec=BrowserPageHandle), all methods AsyncMock'd |
+| `skill_config_no_stealth` | SkillConfig with stealth_enabled=False |
+| `real_cdp_url` / `api_server_url` | Auto-skips if service unavailable |
+
+### Global State Reset (Critical)
+
+Module-level singletons reset by autouse fixture:
+1. `main.py`: `_config`, `_middleware`, `_middleware_lock`
+2. `daemon.py`: `BrowserDaemon` singleton
+3. `adapters/loader.py`: `_registry` dict
+
+NOTE: `steps.STEPS` is NOT cleared (populated at import time by `@register`).
