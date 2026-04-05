@@ -1,0 +1,5 @@
+keys:
+- enabled: true
+  key: sk_example_changeme
+  quota: 5
+  user: default
