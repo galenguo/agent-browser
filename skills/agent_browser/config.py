@@ -217,3 +217,45 @@ def load_config(**overrides) -> SkillConfig:
         cfg.browser_mode = "local"
 
     return cfg
+
+
+def from_deploy_config(dep_cfg) -> SkillConfig:
+    """Merge DeployConfig fields into SkillConfig.
+
+    Converts deployment-level settings (mode, browser type, CDP URL, etc.)
+    into the SkillConfig format used by the runtime. Called by setup() after
+    loading deploy-config.yaml.
+    """
+    cfg = SkillConfig()
+
+    # Map deployment mode → calling/browser mode
+    mode = getattr(dep_cfg, 'mode', 'local') or 'local'
+    if 'docker' in mode or 'k8s' in mode:
+        cfg.calling_mode = 'api'
+    else:
+        cfg.calling_mode = 'cli'
+
+    # Browser settings
+    cdp_url = getattr(dep_cfg, 'cdp_url', None)
+    if cdp_url:
+        cfg.cdp_url = cdp_url
+
+    headless = getattr(dep_cfg, 'headless', None)
+    if headless is not None:
+        cfg.headless = headless
+
+    # API settings (when in docker/k8s mode)
+    api_port = getattr(dep_cfg, 'api_port', None)
+    if api_port:
+        cfg.api_url = f"http://127.0.0.1:{api_port}"
+
+    # Stealth settings
+    stealth_enabled = getattr(dep_cfg, 'stealth_enabled', None)
+    if stealth_enabled is not None:
+        cfg.stealth_enabled = stealth_enabled
+
+    stealth_mode = getattr(dep_cfg, 'stealth_mode', None)
+    if stealth_mode in ('full', 'vanilla'):
+        cfg.stealth_mode = stealth_mode
+
+    return cfg

@@ -31,6 +31,67 @@ configure(mode="api", api_url="http://localhost:8000")
 
 ---
 
+## Quick Start（首次使用）
+
+### 零配置启动（推荐）
+
+首次使用时，Agent Browser 自动检测并修复缺失的依赖：
+
+```python
+import asyncio
+from agent_browser import create_session, snapshot, delete_session, setup
+
+# 可选：运行 setup() 检查环境（自动检测 + 修复）
+result = await setup()
+if not result["ready"]:
+    print(f"需要配置: {result['report'].suggestion}")
+    # CloakBrowser 会自动安装，CDP 端点会自动启动
+
+# 正常使用 — First-Session Recovery 在后台处理一切
+session_id = await create_session()
+await open_page(session_id, "https://example.com")
+snap = await snapshot(session_id)
+print(snap["title"])
+await delete_session(session_id)
+```
+
+### 手动完整配置
+
+```python
+from agent_browser import setup, DeployConfig
+
+result = await setup(
+    mode="local",           # local | docker-aio | k8s-aio
+    browser_type="cloakbrowser",
+    headless=False,
+)
+print(f"Ready: {result['ready']}")
+print(f"Config: {result['config_path']}")
+for issue in result["issues"]:
+    print(f"  [{issue.severity}] {issue.message}")
+```
+
+### 配置文件位置
+
+所有部署配置统一存储在 `~/.agent-browser/config.yaml`：
+
+```yaml
+deployment:
+  mode: local            # local | docker-aio | docker-distributed | k8s-aio
+browser:
+  type: cloakbrowser     # cloakbrowser | chrome | playwright
+  cdp_url: "http://127.0.0.1:19222"
+api:
+  port: 8000
+stealth:
+  enabled: true
+  mode: full             # full | vanilla
+```
+
+**配置优先级**: 显式参数 > 环境变量 (AGENT_BROWSER_*) > config.yaml > 自动探测 > 默认值
+
+---
+
 ## 模式 1：LLM ReAct（原子操作）
 
 外部 LLM（Claude/GPT）通过 ReAct 循环控制每一步。

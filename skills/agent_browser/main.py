@@ -1,10 +1,16 @@
-"""Agent Browser Skill 主入口 — 轻量级 facade（通过 StealthMiddleware 路由所有操作）"""
+"""Agent Browser Skill 主入口 — 轻量级 facade（通过 StealthMiddleware 路由所有操作）
+
+Phase 0: First-Session Recovery — auto-detect missing deps, auto-fix, retry.
+When something fails, return structured dict so Claude Code can present options.
+"""
 import asyncio
 import json
+import os
 import re
 import uuid
 import logging
-from typing import Any, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 from .config import SkillConfig, detect_mode, load_config
 
@@ -14,6 +20,126 @@ _REF_PATTERN = re.compile(r'^@e\d+$')
 _config: Optional[SkillConfig] = None
 _middleware = None
 _middleware_lock = asyncio.Lock()
+
+
+# ── Phase 0: Structured Recovery Types ──────────────────────
+
+@dataclass
+class DepStatus:
+    """Single dependency check result."""
+    name: str
+    available: bool
+    fixable: bool = False
+    fix_command: str = ""
+    message: str = ""
+
+
+@dataclass
+class RecoveryReport:
+    """Structured report returned when first-session setup needs attention.
+
+    Claude Code receives this and presents options via AskUserQuestion.
+    """
+    missing_deps: List[DepStatus] = field(default_factory=list)
+    fixable: List[DepStatus] = field(default_factory=list)
+    needs_human: List[DepStatus] = field(default_factory=list)
+
+    @property
+    def ready(self) -> bool:
+        return len(self.missing_deps) == 0
+
+    @property
+    def suggestion(self) -> str:
+        if self.ready:
+            return ""
+        auto_fix = [d for d in self.missing_deps if d.fixable]
+        return (
+            f"Missing {len(self.missing_deps)} dep(s): "
+            f"{', '.join(d.name for d in self.missing_deps)}. "
+            f"{len(auto_fix)} can be auto-fixed."
+        )
+
+
+async def detect_missing_deps(config: SkillConfig = None) -> RecoveryReport:
+    """Check environment for missing dependencies. Returns structured report.
+
+    Called by _ensure_middleware() on first use. Non-blocking checks only.
+    """
+    if config is None:
+        config = _config or SkillConfig()
+
+    report = RecoveryReport()
+
+    # 1. CloakBrowser package
+    try:
+        import cloakbrowser  # noqa: F401
+    except ImportError:
+        report.missing_deps.append(DepStatus(
+            name="cloakbrowser",
+            available=False,
+            fixable=True,
+            fix_command="pip install cloakbrowser==0.3.18",
+            message="CloakBrowser package not installed (anti-detection browser)",
+        ))
+
+    # 2. CDP reachability
+    cdp_ok = False
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as s:
+            async with s.get(f"{config.cdp_url}/json/version") as r:
+                cdp_ok = r.status == 200
+    except Exception:
+        pass
+
+    if not cdp_ok:
+        report.missing_deps.append(DepStatus(
+            name="cdp",
+            available=False,
+            fixable=True,
+            fix_command="auto-launch on connect",
+            message=f"CDP endpoint not reachable at {config.cdp_url}",
+        ))
+
+    # 3. LLM API key (only for agent mode)
+    has_key = bool(
+        os.getenv("OPENAI_API_KEY")
+        or os.getenv("ANTHROPIC_API_KEY")
+        or os.getenv("GLM_API_KEY")
+    )
+    if not has_key:
+        report.needs_human.append(DepStatus(
+            name="llm_api_key",
+            available=False,
+            fixable=False,
+            message="No LLM API key found (needed for Agent mode; LLM mode works without)",
+        ))
+
+    # 4. Playwright browsers installed
+    try:
+        from playwright.async_api import async_playwright
+        # Just check import succeeds; browser binary check is heavier
+    except ImportError:
+        report.missing_deps.append(DepStatus(
+            name="playwright",
+            available=False,
+            fixable=True,
+            fix_command="pip install playwright && playwright install chromium",
+            message="Playwright not installed",
+        ))
+
+    return report
+
+
+def _format_recovery_for_claude(report: RecoveryReport) -> Dict[str, Any]:
+    """Convert RecoveryReport to plain dict for Claude Code tool context."""
+    return {
+        "ready": report.ready,
+        "missing": [d.name for d in report.missing_deps],
+        "fixable": [{"name": d.name, "command": d.fix_command} for d in report.fixable or report.missing_deps if d.fixable],
+        "needs_human": [d.name for d in report.needs_human],
+        "suggestion": report.suggestion,
+    }
 
 
 async def _ensure_middleware(config: SkillConfig = None):
@@ -30,14 +156,47 @@ async def _ensure_middleware(config: SkillConfig = None):
         else:
             _config = await detect_mode()
 
+    # ── Phase 0: First-Session Recovery ──
+    # Quick pre-check: detect missing deps before attempting connection
+    report = await detect_missing_deps(_config)
+    if not report.ready:
+        logger.info(f"First-session recovery: {report.suggestion}")
+
     # ── 后端选择：Extension > Local (CloakBrowser) > Remote ──
     raw_backend = await _select_backend(_config)
 
     from src.stealth.middleware import StealthMiddleware
     _middleware = StealthMiddleware(raw_backend, _config)
-    await _middleware.connect()
-    logger.info(f"Middleware ready: {_config.calling_mode}/{_config.browser_mode}")
-    return _middleware
+
+    # Connect with recovery: if it fails, diagnose and return structured info
+    try:
+        await _middleware.connect()
+        logger.info(f"Middleware ready: {_config.calling_mode}/{_config.browser_mode}")
+        return _middleware
+    except Exception as e:
+        logger.warning(f"Middleware connect failed: {e}")
+        # Re-check deps after failure — may have more detail now
+        post_report = await detect_missing_deps(_config)
+        if not post_report.ready:
+            # Return structured dict for Claude Code to present to user
+            raise FirstSessionError(
+                message=f"Setup needed: {post_report.suggestion}",
+                recovery=_format_recovery_for_claude(post_report),
+                original_error=e,
+            )
+        raise
+
+
+class FirstSessionError(Exception):
+    """Structured error for first-session setup failures.
+
+    Carries a 'recovery' dict that Claude Code can use to present options.
+    """
+
+    def __init__(self, message: str, recovery: Dict[str, Any], original_error: Exception = None):
+        super().__init__(message)
+        self.recovery = recovery
+        self.original_error = original_error
 
 
 async def _select_backend(config: SkillConfig):
@@ -123,6 +282,71 @@ def reset():
             logger.warning(f"reset(): disconnect failed (non-fatal): {e}")
     _config = None
     _middleware = None
+
+
+async def setup(**kwargs) -> Dict[str, Any]:
+    """First-session setup: detect, validate, configure, and verify.
+
+    Designed for Claude Code context: returns structured dict, never calls input().
+    Callers (Claude Code) present options via AskUserQuestion based on the result.
+
+    Returns dict with keys:
+      - config: DeployConfig instance
+      - issues: list of ConfigIssue (from validate_config)
+      - report: RecoveryReport (from detect_missing_deps)
+      - ready: bool — True if system is ready to use
+
+    Kwargs are forwarded to DeployConfig constructor for programmatic override.
+    """
+    from .deploy_config import (
+        DeployConfig, load_deploy_config, generate_config,
+        validate_config, detect_environment,
+    )
+
+    # 1. Detect environment
+    env = detect_environment()
+
+    # 2. Load existing config or create from kwargs
+    cfg = load_deploy_config()
+
+    # Apply explicit overrides
+    for k, v in kwargs.items():
+        if hasattr(cfg, k) and v is not None:
+            setattr(cfg, k, v)
+
+    # Fill auto-detected fields
+    if not cfg.os:
+        cfg.os = env.get("os", "")
+    if not cfg.arch:
+        cfg.arch = env.get("arch", "")
+
+    # 3. Validate
+    issues = validate_config(cfg, env_check=True)
+
+    # 4. Check runtime deps
+    report = await detect_missing_deps()
+
+    # 5. Write config (atomic)
+    config_path = generate_config(cfg)
+
+    # 6. Determine readiness
+    errors = [i for i in issues if i.severity == "error"]
+    ready = len(errors) == 0 and report.ready
+
+    logger.info(
+        f"Setup complete: ready={ready}, "
+        f"issues={len(issues)} ({len(errors)} errors), "
+        f"missing_deps={len(report.missing_deps)}"
+    )
+
+    return {
+        "config": cfg,
+        "issues": issues,
+        "report": report,
+        "ready": ready,
+        "config_path": str(config_path),
+        "environment": env,
+    }
 
 
 # ── 内部工具 ──

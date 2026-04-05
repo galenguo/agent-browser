@@ -185,13 +185,23 @@ while [[ $# -gt 0 ]]; do
             OS="$2"
             shift 2
             ;;
+        --non-interactive)
+            NON_INTERACTIVE=true
+            shift
+            ;;
+        --config)
+            CONFIG_PATH="$2"
+            shift 2
+            ;;
         --help)
             echo "用法: $0 [选项]"
             echo ""
             echo "选项:"
-            echo "  --mode <mode>    部署模式: local, docker-aio, docker-distributed"
-            echo "  --os <os>        操作系统: macos, linux"
-            echo "  --help           显示帮助信息"
+            echo "  --mode <mode>          部署模式: local, docker-aio, docker-distributed"
+            echo "  --os <os>              操作系统: macos, linux"
+            echo "  --non-interactive      非交互模式：从 config.yaml 读取配置，跳过菜单"
+            echo "  --config <path>        指定 config.yaml 路径 (默认: ~/.agent-browser/config.yaml)"
+            echo "  --help                 显示帮助信息"
             exit 0
             ;;
         *)
@@ -200,6 +210,25 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# 非交互模式：从 config.yaml 读取部署模式
+if [[ "$NON_INTERACTIVE" == "true" ]]; then
+    CFG_FILE="${CONFIG_PATH:-$HOME/.agent-browser/config.yaml}"
+    if [[ -f "$CFG_FILE" ]]; then
+        # 用 grep+awk 提取 deployment.mode（兼容无 yq 的环境）
+        READ_MODE=$(grep -E '^\s*mode:' "$CFG_FILE" | head -1 | awk -F': '{print $2}' | tr -d ' "')
+        if [[ -n "$READ_MODE" && "$READ_MODE" != "" ]]; then
+            DEPLOY_MODE="$READ_MODE"
+            print_info "从 config.yaml 读取部署模式: $DEPLOY_MODE"
+        else
+            print_warning "config.yaml 中未找到 mode 字段，使用默认: local"
+            DEPLOY_MODE="local"
+        fi
+    else
+        print_warning "config.yaml 不存在 ($CFG_FILE)，使用默认: local"
+        DEPLOY_MODE="local"
+    fi
+fi
 
 # 运行主函数
 main

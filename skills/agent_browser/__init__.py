@@ -15,10 +15,23 @@ from .main import (
     configure,
     run_task,
     reset,
+    setup,
+    FirstSessionError,
+    detect_missing_deps,
 )
 
 # 配置系统
 from .config import SkillConfig, load_config
+
+# 部署配置（Phase 1+）
+from .deploy_config import (
+    DeployConfig,
+    ConfigIssue,
+    load_deploy_config,
+    generate_config,
+    validate_config,
+    detect_environment,
+)
 
 # 适配器系统
 from .adapters import list_adapters, run_adapter
@@ -49,6 +62,16 @@ __all__ = [
     "configure",
     "SkillConfig",
     "load_config",
+    # 部署配置 + First-Session Recovery
+    "setup",
+    "FirstSessionError",
+    "detect_missing_deps",
+    "DeployConfig",
+    "ConfigIssue",
+    "load_deploy_config",
+    "generate_config",
+    "validate_config",
+    "detect_environment",
     # 站点适配器
     "list_adapters",
     "run_adapter",
