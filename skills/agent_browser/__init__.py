@@ -14,6 +14,7 @@ from .main import (
     go_back,
     configure,
     run_task,
+    reset,
 )
 
 # 配置系统
@@ -43,6 +44,7 @@ __all__ = [
     "wait_for_selector",
     "go_back",
     "run_task",
+    "reset",
     # 配置
     "configure",
     "SkillConfig",

@@ -211,9 +211,10 @@ async def select_option(session_id: str, ref: str, value: str):
 async def hover(session_id: str, ref: str):
     _validate_ref(ref)
     page = await _get_page(session_id)
+    safe_ref = json.dumps(ref)
     box = await page.evaluate(
         f"""(() => {{
-            const el = document.querySelector('[data-ab-ref="{ref}"]');
+            const el = document.querySelector('[data-ab-ref=' + {safe_ref} + ']');
             if (!el) return null;
             const r = el.getBoundingClientRect();
             return {{x: r.x + r.width/2, y: r.y + r.height/2}};
