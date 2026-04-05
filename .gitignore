@@ -51,3 +51,8 @@ references/
 
 # Claude
 .claude/
+
+# Generated reports
+*_REPORT.md
+*_TEST_REPORT.md
+*_VERIFICATION_REPORT.md
