@@ -4,6 +4,7 @@
 - opencli 用独立 HTTP 进程（因为 CLI 每次是新的 subprocess）
 - 我们用进程内 singleton（因为 skill 运行在 Claude REPL 长生命周期中）
 - 共享：IdleManager 双条件退出、状态持久化、自动重连
+- 新增: WebSocket 服务器用于 Chrome Extension 连接
 """
 import sys
 from pathlib import Path
@@ -23,6 +24,164 @@ from playwright.async_api import Browser, BrowserContext, Page, Playwright, asyn
 from .config import SkillConfig
 
 logger = logging.getLogger(__name__)
+
+# ── Extension Bridge Types ──
+
+class ExtensionCommand:
+    """发送给 Chrome Extension 的命令"""
+    def __init__(self, method: str, params: Dict[str, Any] | None = None):
+        self.id = f"cmd_{time.time_ns()}"
+        self.method = method
+        self.params = params or {}
+        self._future: asyncio.Future = asyncio.get_event_loop().create_future()
+
+    @property
+    def future(self) -> asyncio.Future:
+        return self._future
+
+
+class ExtensionBridge:
+    """
+    WebSocket 服务器，供 Chrome Extension 连接。
+
+    安全模型（来自 OpenCLI）：
+    - 仅接受 localhost 连接
+    - 心跳检测 (15s ping/pong)
+    - 命令队列 + Future 匹配请求/响应
+    """
+
+    def __init__(self, port: int = 19825):
+        self._port = port
+        self._server: Optional[Any] = None  # websockets.serve
+        self._ws: Optional[Any] = None  # WebSocket connection
+        self._commands: Dict[str, ExtensionCommand] = {}  # id → Command
+        self._connected = False
+        self._heartbeat_task: Optional[asyncio.Task] = None
+        self._missed_pongs = 0
+
+    @property
+    def is_connected(self) -> bool:
+        return self._connected and self._ws is not None
+
+    async def start(self) -> None:
+        """启动 WebSocket 服务器，等待 Extension 连接"""
+        if self._server:
+            return
+
+        try:
+            import websockets
+        except ImportError:
+            logger.warning("websockets not installed. Extension bridge disabled. Run: pip install websockets")
+            return
+
+        async def _handler(ws, path: str):
+            # 仅接受 /ext 路径的连接
+            if path != "/ext":
+                await ws.close(4004, "Invalid path")
+                return
+
+            logger.info(f"Extension connected from {ws.remote_address}")
+            self._ws = ws
+            self._connected = True
+            self._missed_pongs = 0
+
+            try:
+                # 启动心跳
+                self._heartbeat_task = asyncio.create_task(self._heartbeat_loop(ws))
+
+                # 消息循环
+                async for raw in ws:
+                    try:
+                        msg = json.loads(raw)
+                        msg_type = msg.get("type")
+
+                        if msg_type == "pong":
+                            self._missed_pongs = 0
+                        elif "id" in msg and "data" in msg:
+                            # 响应消息：匹配 pending command
+                            cmd_id = msg["id"]
+                            cmd = self._commands.pop(cmd_id, None)
+                            if cmd and not cmd.future.done():
+                                if msg.get("error"):
+                                    cmd.future.set_exception(RuntimeError(msg["error"]))
+                                else:
+                                    cmd.future.set_result(msg["data"])
+                        elif msg.get("id") == "ready":
+                            logger.info(f"Extension ready: {msg.get('data', {})}")
+                    except json.JSONDecodeError:
+                        logger.warning(f"Invalid JSON from extension: {raw[:200]}")
+                    except Exception as e:
+                        logger.error(f"Extension message error: {e}")
+            finally:
+                self._connected = False
+                self._ws = None
+                if self._heartbeat_task:
+                    self._heartbeat_task.cancel()
+                    self._heartbeat_task = None
+                # 取消所有 pending 命令
+                for cmd in self._commands.values():
+                    if not cmd.future.done():
+                        cmd.future.set_exception(ConnectionError("Extension disconnected"))
+                self._commands.clear()
+                logger.info("Extension disconnected")
+
+        self._server = await websockets.serve(_handler, "127.0.0.1", self._port)
+        logger.info(f"Extension bridge listening on ws://127.0.0.1:{self._port}/ext")
+
+    async def stop(self) -> None:
+        """停止 WebSocket 服务器"""
+        if self._heartbeat_task:
+            self._heartbeat_task.cancel()
+            self._heartbeat_task = None
+        if self._ws:
+            try:
+                await self._ws.close()
+            except Exception:
+                pass
+            self._ws = None
+        self._connected = False
+        if self._server:
+            self._server.close()
+            await self._server.wait_closed()
+            self._server = None
+
+    async def send_command(self, method: str, params: Dict[str, Any] | None = None, timeout: float = 30.0) -> Any:
+        """发送命令到 Extension 并等待响应"""
+        if not self._connected or not self._ws:
+            raise ConnectionError("Extension not connected")
+
+        cmd = ExtensionCommand(method, params)
+        self._commands[cmd.id] = cmd
+
+        try:
+            payload = {"id": cmd.id, "method": cmd.method, "params": cmd.params}
+            await self._ws.send(json.dumps(payload))
+            return await asyncio.wait_for(cmd.future, timeout=timeout)
+        except asyncio.TimeoutError:
+            self._commands.pop(cmd.id, None)
+            raise TimeoutError(f"Extension command '{method}' timed out after {timeout}s")
+        except Exception:
+            self._commands.pop(cmd.id, None)
+            raise
+
+    async def _heartbeat_loop(self, ws) -> None:
+        """心跳循环：每 15s 发送 ping"""
+        try:
+            while True:
+                await asyncio.sleep(15)
+                if not self._connected:
+                    break
+                try:
+                    await ws.send(json.dumps({"type": "ping"}))
+                    self._missed_pongs += 1
+                    if self._missed_pongs >= 2:
+                        logger.warning("Extension missed heartbeats, closing connection")
+                        await ws.close(1011, "Missed heartbeats")
+                        break
+                except Exception:
+                    break
+        except asyncio.CancelledError:
+            pass
 
 
 class BrowserDaemon:
@@ -48,6 +207,8 @@ class BrowserDaemon:
         self._last_activity = time.time()
         self._idle_task: Optional[asyncio.Task] = None
         self._state_path = Path(config.daemon_state_path).expanduser()
+        # Extension Bridge (WebSocket server for Chrome Extension)
+        self._extension_bridge: Optional[ExtensionBridge] = None
 
     @classmethod
     def get(cls, config: SkillConfig = None) -> "BrowserDaemon":
@@ -65,6 +226,11 @@ class BrowserDaemon:
 
     async def ensure_connected(self) -> None:
         """确保浏览器已连接（懒连接 + 自动重连）"""
+        # 启动 Extension Bridge（如果尚未启动）
+        if not self._extension_bridge:
+            self._extension_bridge = ExtensionBridge(port=19825)
+            await self._extension_bridge.start()
+
         if self._connected and self._browser:
             try:
                 _ = self._browser.contexts  # 存活性检查
@@ -103,6 +269,11 @@ class BrowserDaemon:
     async def disconnect(self) -> None:
         """断开浏览器连接"""
         self._stop_idle_monitor()
+
+        # 停止 Extension Bridge
+        if self._extension_bridge:
+            await self._extension_bridge.stop()
+            self._extension_bridge = None
 
         # 关闭所有 session
         for sid in list(self._sessions.keys()):
@@ -183,6 +354,11 @@ class BrowserDaemon:
     @property
     def active_session_count(self) -> int:
         return len(self._sessions)
+
+    @property
+    def extension_bridge(self) -> Optional[ExtensionBridge]:
+        """Extension Bridge (WebSocket server for Chrome Extension)"""
+        return self._extension_bridge
 
     # ── IdleManager（双条件自动断开）──
 

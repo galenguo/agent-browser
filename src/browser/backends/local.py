@@ -323,7 +323,9 @@ class LocalCDPBackend(BrowserBackend):
             context, page = await self._daemon.create_context(session_id)
             if self._stealth:
                 from ..stealth import StealthEnhancer
-                await StealthEnhancer.inject_timing_noise(page)
+                from src.core.stealth_patches import inject_stealth_patches
+                await inject_stealth_patches(page)  # JS 属性级隐匿补丁
+                await StealthEnhancer.inject_timing_noise(page)  # 定时器噪声
             page_handle = PlaywrightPageHandle(page)
             self._sessions[session_id] = LocalSession(
                 page_handle=page_handle,
@@ -340,7 +342,9 @@ class LocalCDPBackend(BrowserBackend):
         # 注入隐匿增强
         if self._stealth:
             from ..stealth import StealthEnhancer
-            await StealthEnhancer.inject_timing_noise(page)
+            from src.core.stealth_patches import inject_stealth_patches
+            await inject_stealth_patches(page)  # JS 属性级隐匿补丁
+            await StealthEnhancer.inject_timing_noise(page)  # 定时器噪声
 
         page_handle = PlaywrightPageHandle(page)
         self._sessions[session_id] = LocalSession(
