@@ -191,14 +191,20 @@ def mock_page_for_steps() -> mock.MagicMock:
 
 @pytest.fixture
 def patched_get_handle(mock_page_for_steps):
-    """Patch _get_handle() so steps don't need real middleware init.
+    """Patch _get_handle() + _ensure_middleware() so steps don't need real backend.
 
     Used by pipeline execution and security tests that call step handlers directly.
+    Also covers step_snapshot which calls _ensure_middleware() directly.
     """
     from skills.agent_browser.pipeline import steps
+    from skills.agent_browser import main as skill_main
 
     async def _fake_handle(sid):
         return mock_page_for_steps
 
-    with mock.patch.object(steps, "_get_handle", side_effect=_fake_handle):
+    _mock_mw = mock.AsyncMock()
+    _mock_mw.get_page = mock.AsyncMock(return_value=mock_page_for_steps)
+
+    with mock.patch.object(steps, "_get_handle", side_effect=_fake_handle), \
+         mock.patch.object(skill_main, "_ensure_middleware", return_value=_mock_mw):
         yield mock_page_for_steps

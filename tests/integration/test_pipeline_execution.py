@@ -69,38 +69,26 @@ class TestPipelineExecution:
         )
         assert result == {"key": "val"}  # data passes through
 
-    @pytest.mark.xfail(reason="ProcessLookupError during teardown with mock.patch.object on _get_handle", strict=False)
     @pytest.mark.asyncio
-    async def test_snapshot_step_returns_elements(self):
+    async def test_snapshot_step_returns_elements(self, patched_get_handle):
         """step_snapshot() returns list of element dicts."""
         from skills.agent_browser.pipeline.steps import step_snapshot
 
-        page = mock.MagicMock()
-        page.evaluate = mock.AsyncMock(return_value=[
+        patched_get_handle.evaluate = mock.AsyncMock(return_value=[
             {"_index": 0, "tag": "div", "text": "hello", "attrs": {}},
             {"_index": 1, "tag": "span", "text": "world", "attrs": {}},
         ])
 
-        import skills.agent_browser.pipeline.steps as steps_mod
-        original_get_handle = steps_mod._get_handle
-
-        async def fake_handle(sid):
-            return page
-
-        steps_mod._get_handle = fake_handle
-        try:
-            result = await step_snapshot(
-                session_id="test-001",
-                params="*",
-                data=None,
-                context={},
-                stealth={},
-            )
-            assert isinstance(result, list)
-            assert len(result) == 2
-            assert result[0]["tag"] == "div"
-        finally:
-            steps_mod._get_handle = original_get_handle
+        result = await step_snapshot(
+            session_id="test-001",
+            params="*",
+            data=None,
+            context={},
+            stealth={},
+        )
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result[0]["tag"] == "div"
 
 
 # ══════════════════════════════════════════════
@@ -160,40 +148,26 @@ class TestPipelineErrorHandling:
 class TestOutputSchema:
     """Step outputs match expected schema."""
 
-    @pytest.mark.xfail(reason="ProcessLookupError during teardown with mock.patch.object on _get_handle", strict=False)
     @pytest.mark.asyncio
-    async def test_snapshot_output_has_expected_keys(self):
+    async def test_snapshot_output_has_expected_keys(self, patched_get_handle):
         """snapshot output contains tag, text, attrs keys per element."""
         from skills.agent_browser.pipeline.steps import step_snapshot
 
-        # Use a dedicated mock page (no module-level patch = no teardown crash)
-        page = mock.MagicMock()
-        page.evaluate = mock.AsyncMock(return_value=[
+        patched_get_handle.evaluate = mock.AsyncMock(return_value=[
             {"_index": 0, "tag": "h1", "text": "Title", "attrs": {"class": "header"}},
         ])
 
-        # Patch _get_handle only within this test's scope
-        import skills.agent_browser.pipeline.steps as steps_mod
-        original_get_handle = steps_mod._get_handle
-
-        async def fake_handle(sid):
-            return page
-
-        steps_mod._get_handle = fake_handle
-        try:
-            result = await step_snapshot(
-                session_id="test",
-                params="h1",
-                data=None,
-                context={},
-                stealth={},
-            )
-            assert isinstance(result[0], dict)
-            assert "_index" in result[0]
-            assert "tag" in result[0]
-            assert "text" in result[0]
-        finally:
-            steps_mod._get_handle = original_get_handle
+        result = await step_snapshot(
+            session_id="test",
+            params="h1",
+            data=None,
+            context={},
+            stealth={},
+        )
+        assert isinstance(result[0], dict)
+        assert "_index" in result[0]
+        assert "tag" in result[0]
+        assert "text" in result[0]
 
     @pytest.mark.asyncio
     async def test_navigate_returns_data_unchanged(self):
