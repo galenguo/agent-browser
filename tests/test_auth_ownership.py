@@ -150,24 +150,25 @@ class TestSessionOwnership:
         )
         assert resp.status_code == 200
 
-    def test_other_user_403(self):
+    def test_other_user_404(self):
+        """Other user's session returns 404 (not 403, prevents enumeration)"""
         sid = "sess_abc"
         resp, _ = get(
             f"/sessions/{sid}", key="my-key",
             sessions={sid: _make_mock_session("other-key", sid)},
             headers={"X-API-Key": "my-key"},
         )
-        assert resp.status_code == 403
+        assert resp.status_code == 404
 
-    def test_403_message(self):
+    def test_access_denied_returns_not_found(self):
+        """Access denied message is generic 'Session not found' (no leakage)"""
         sid = "sess_abc"
         resp, _ = get(
             f"/sessions/{sid}", key="my-key",
             sessions={sid: _make_mock_session("other-key", sid)},
             headers={"X-API-Key": "my-key"},
         )
-        detail = resp.json()["detail"].lower()
-        assert "denied" in detail or "another user" in detail
+        assert resp.json()["detail"] == "Session not found"
 
     def test_owner_can_delete(self):
         sid = "sess_abc"
@@ -185,7 +186,7 @@ class TestSessionOwnership:
             sessions={sid: _make_mock_session("other-key", sid)},
             headers={"X-API-Key": "my-key"},
         )
-        assert resp.status_code == 403
+        assert resp.status_code == 404
 
     def test_list_sessions_scoped_to_user(self):
         """list_sessions 只返回当前用户的会话（IDOR 防护）"""

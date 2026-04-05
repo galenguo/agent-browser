@@ -13,38 +13,95 @@ _REF_PATTERN = re.compile(r'^@e\d+$')
 
 _config: Optional[SkillConfig] = None
 _middleware = None
+_middleware_lock = asyncio.Lock()
 
 
 async def _ensure_middleware(config: SkillConfig = None):
     global _config, _middleware
     if _middleware is not None:
         return _middleware
-    if config:
-        _config = config
-    elif _config is not None:
-        pass
-    else:
-        _config = await detect_mode()
+    async with _middleware_lock:
+        if _middleware is not None:
+            return _middleware
+        if config:
+            _config = config
+        elif _config is not None:
+            pass
+        else:
+            _config = await detect_mode()
 
-    if _config.calling_mode == "cli":
-        from .backends.local import LocalCDPBackend
-        raw_backend = LocalCDPBackend(_config)
-    elif _config.calling_mode == "api":
-        try:
-            from .backends.remote import RemoteAPIBackend
-            raw_backend = RemoteAPIBackend(_config)
-        except ImportError:
-            from .backends.local import LocalCDPBackend
-            raw_backend = LocalCDPBackend(_config)
-    else:
-        from .backends.local import LocalCDPBackend
-        raw_backend = LocalCDPBackend(_config)
+    # ── 后端选择：Extension > Local (CloakBrowser) > Remote ──
+    raw_backend = await _select_backend(_config)
 
     from src.stealth.middleware import StealthMiddleware
     _middleware = StealthMiddleware(raw_backend, _config)
     await _middleware.connect()
     logger.info(f"Middleware ready: {_config.calling_mode}/{_config.browser_mode}")
     return _middleware
+
+
+async def _select_backend(config: SkillConfig):
+    """
+    后端选择逻辑（优先级）：
+
+    1. Extension 模式：Chrome Extension 已连接 → 使用用户真实 Chrome
+    2. Local 模式：CloakBrowser CDP 可达 → 使用本地反检测浏览器
+    3. API 模式：FastAPI 服务可用 → 远程调用
+    4. Fallback: Local 模式（默认）
+    """
+    # Priority 1: Try Extension mode (user's real Chrome)
+    if await _try_extension_connection(config):
+        try:
+            from .backends.extension import ExtensionBackend
+            logger.info("Using Extension backend (real Chrome via Chrome Extension)")
+            return ExtensionBackend(config)
+        except Exception as e:
+            logger.warning(f"Extension backend failed, falling back to local: {e}")
+
+    # Priority 2-4: Existing logic (Local / API / fallback)
+    if config.calling_mode == "cli":
+        from .backends.local import LocalCDPBackend
+        return LocalCDPBackend(config)
+    elif config.calling_mode == "api":
+        try:
+            from .backends.remote import RemoteAPIBackend
+            return RemoteAPIBackend(config)
+        except ImportError:
+            from .backends.local import LocalCDPBackend
+            return LocalCDPBackend(config)
+    else:
+        from .backends.local import LocalCDPBackend
+        return LocalCDPBackend(config)
+
+
+async def _try_extension_connection(config: SkillConfig) -> bool:
+    """
+    检测 Chrome Extension 是否已连接。
+
+    方法：通过 Daemon 的 ExtensionBridge 检查 WebSocket 连接状态。
+    不需要实际创建后端，只做轻量级探测。
+    """
+    # 快速检查：如果配置明确禁用 Extension，跳过
+    if getattr(config, 'extension_enabled', True) is False:
+        return False
+
+    try:
+        from ..daemon import BrowserDaemon, ExtensionBridge
+
+        daemon = BrowserDaemon.get(config)
+        await daemon.ensure_connected()
+
+        bridge = daemon.extension_bridge
+        if bridge and bridge.is_connected:
+            logger.info("Chrome Extension detected and connected")
+            return True
+    except ImportError:
+        # websockets 未安装，跳过 Extension 模式
+        pass
+    except Exception as e:
+        logger.debug(f"Extension detection failed (non-fatal): {e}")
+
+    return False
 
 
 def configure(**kwargs) -> SkillConfig:
@@ -62,8 +119,8 @@ def reset():
                 asyncio.create_task(_middleware.disconnect())
             else:
                 loop.run_until_complete(_middleware.disconnect())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"reset(): disconnect failed (non-fatal): {e}")
     _config = None
     _middleware = None
 
@@ -84,9 +141,10 @@ async def _ref_op(session_id: str, ref: str, js_body: str):
     """通过 data-ab-ref 执行 JS（统一验证 + 查询 + 错误处理）"""
     _validate_ref(ref)
     page = await _get_page(session_id)
+    safe_ref = json.dumps(ref)
     result = await page.evaluate(
         f"""(() => {{
-            const el = document.querySelector('[data-ab-ref="{ref}"]');
+            const el = document.querySelector('[data-ab-ref=' + {safe_ref} + ']');
             if (!el) return {{error: 'not found'}};
             {js_body}
             return {{status: 'ok'}};
@@ -116,6 +174,8 @@ async def delete_session(session_id: str):
 
 
 async def open_page(session_id: str, url: str):
+    from .pipeline.steps import _validate_url
+    url = _validate_url(url)
     page = await _get_page(session_id)
     await page.goto(url)
     mw = await _ensure_middleware()

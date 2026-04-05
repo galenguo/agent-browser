@@ -136,10 +136,7 @@ async def verify_session_ownership(session_id: str, api_key: Optional[str] = Non
     # 使用 API Key 作为 user_id 标识（简化实现）
     # 生产环境应维护 API Key → user_id 映射表
     if api_key and session.user_id != api_key:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Access denied: session {session_id} belongs to another user"
-        )
+        raise HTTPException(status_code=404, detail="Session not found")
 
 
 @asynccontextmanager
@@ -355,7 +352,6 @@ async def list_sessions(api_key: str = Depends(verify_api_key)):
             continue
         sessions.append({
             "session_id": session_id,
-            "user_id": session.user_id,
             "created_at": session.created_at,
             "last_activity": session.last_activity,
             "task_count": len(session.tasks),

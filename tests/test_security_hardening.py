@@ -410,6 +410,17 @@ class TestListSessionsIdor:
         assert resp.status_code == 200
         assert resp.json()["total"] == 2
 
+    def test_user_id_not_leaked(self):
+        """list_sessions 不应返回 user_id（防止 API key 泄露）"""
+        sessions = {
+            "s1": _make_mock_session("secret-api-key-123", "s1"),
+        }
+        resp, _ = _api_get("/sessions", key="secret-api-key-123", sessions=sessions,
+                           headers={"X-API-Key": "secret-api-key-123"})
+        assert resp.status_code == 200
+        for s in resp.json()["sessions"]:
+            assert "user_id" not in s, "user_id should not be leaked in list_sessions"
+
 
 # ═══════════════════════════════════════════════════════════════
 #  7. API: Constant-Time Key Comparison
@@ -494,9 +505,11 @@ class TestStepRegistration:
 
     def test_all_expected_steps_registered(self):
         from skills.agent_browser.pipeline.steps import STEPS
+        # All 16 registered steps must be present
         expected = {
-            "navigate", "evaluate", "click", "type", "wait",
-            "fetch", "select", "map", "filter", "limit",
+            "navigate", "click", "type", "wait", "press",
+            "snapshot", "evaluate", "intercept", "tap", "download",
+            "fetch", "select", "map", "filter", "sort", "limit",
         }
         assert set(STEPS.keys()) == expected, \
             f"Missing steps: {expected - set(STEPS.keys())}"
