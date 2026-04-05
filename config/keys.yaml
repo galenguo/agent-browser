@@ -1,0 +1,21 @@
+# API Keys 配置
+# 每个 key 可以访问 Gateway 服务
+
+keys:
+  - key: "dev-key-12345"
+    user: "dev"
+    quota: 5
+    enabled: true
+  - key: "prod-key-67890"
+    user: "prod"
+    quota: 10
+    enabled: true
+  - key: "test-key-abcde"
+    user: "test"
+    quota: 2
+    enabled: true
+
+# 注意：
+# 1. API Key 泄漏即可被盗用，请妥善保管
+# 2. 修改后自动热重载（无需重启 Gateway）
+# 3. 生产环境建议使用强随机字符串

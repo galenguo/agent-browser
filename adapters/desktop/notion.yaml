@@ -1,0 +1,22 @@
+app: notion
+type: electron
+name: Notion
+detect: '"Notion" in (window_title or process_name)'
+cdp:
+  auto_discover: true
+  port_range: [9222, 9230]
+applescript:
+  activate: 'tell application "Notion" to activate'
+  is_running: 'application "Notion" is running'
+commands:
+  status:
+    pipeline:
+      - applescript: 'application "Notion" is running'
+      - cdp_discover: null
+  activate:
+    pipeline:
+      - activate: true
+  screenshot:
+    pipeline:
+      - is_running: true
+      - screenshot: true

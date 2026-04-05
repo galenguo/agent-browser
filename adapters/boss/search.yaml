@@ -1,0 +1,57 @@
+site: boss
+name: search
+description: Boss直聘职位搜索
+strategy: cookie
+browser: true
+
+stealth:
+  warmup: true
+  human_click: true
+  human_type: true
+  request_delay: [1.0, 3.0]
+  scroll_before: true
+  jitter: true
+
+args:
+  query:
+    type: str
+    required: true
+    description: 搜索关键词
+  city:
+    type: str
+    default: ""
+    description: 城市代码（如 101010100 北京）
+  limit:
+    type: int
+    default: 10
+    description: 返回结果数
+
+columns: [title, salary, company, location, experience, education]
+
+pipeline:
+  - navigate: "https://www.zhipin.com/web/geek/job?query=${{ args.query | urlencode }}&city=${{ args.city }}"
+  - wait:
+      selector: ".job-list-box li, .search-job-result li"
+      timeout: 10000
+  - evaluate: |
+      (() => {
+        const items = [];
+        document.querySelectorAll('.job-list-box li, .search-job-result .job-card-wrapper').forEach((el) => {
+          const titleEl = el.querySelector('.job-name a, .job-title');
+          const salaryEl = el.querySelector('.salary, .job-salary');
+          const companyEl = el.querySelector('.company-name a, .company-name');
+          const locationEl = el.querySelector('.job-area, .job-area');
+          const tagEls = el.querySelectorAll('.tag-list li, .job-info .tag-list li');
+          const tags = Array.from(tagEls).map(t => t.textContent.trim());
+          items.push({
+            title: titleEl ? titleEl.textContent.trim() : '',
+            salary: salaryEl ? salaryEl.textContent.trim() : '',
+            company: companyEl ? companyEl.textContent.trim() : '',
+            location: locationEl ? locationEl.textContent.trim() : '',
+            experience: tags[0] || '',
+            education: tags[1] || ''
+          });
+        });
+        return items;
+      })()
+  - limit: "${{ args.limit }}"

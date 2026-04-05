@@ -28,10 +28,9 @@ logger = logging.getLogger(__name__)
 class HumanBehaviorSimulator:
     """模拟真人不完美行为，对抗行为分析反爬"""
 
-    # 预热 URL 列表：先建立正常用户基线
+    # 预热 URL 列表：先建立正常用户基线（精简到2个，减少预热时间）
     WARMUP_URLS = [
         "https://www.baidu.com",
-        "https://www.163.com",
         "https://www.zhipin.com",  # Boss 直聘首页预热（不直接搜索）
     ]
 
@@ -56,7 +55,7 @@ class HumanBehaviorSimulator:
                 logger.info(f"Warmup: visiting {url}")
                 await page.goto(url, wait_until="domcontentloaded", timeout=20_000)
                 await self._random_scroll(page)
-                await asyncio.sleep(random.uniform(3, 8))
+                await asyncio.sleep(random.uniform(2, 5))
 
                 # 随机鼠标游走
                 await self._random_mouse_move(page)
@@ -139,7 +138,7 @@ class HumanBehaviorSimulator:
         for _ in range(count):
             distance = random.randint(100, 600)
             await page.evaluate(f"window.scrollBy(0, {distance})")
-            await asyncio.sleep(random.uniform(0.5, 3.0))
+            await asyncio.sleep(random.uniform(0.3, 2.0))
 
             # 20% 概率回滚（真人经常这样：看到感兴趣的往上翻）
             if random.random() < 0.2:
@@ -150,7 +149,7 @@ class HumanBehaviorSimulator:
     async def _random_mouse_move(self, page: Page) -> None:
         """随机鼠标游走（使用贝塞尔曲线模拟真人轨迹）"""
         viewport = page.viewport_size or {"width": 1920, "height": 1080}
-        moves = random.randint(2, 4)
+        moves = random.randint(1, 2)
 
         # 起始位置
         cx = random.randint(200, viewport["width"] - 200)
@@ -161,7 +160,7 @@ class HumanBehaviorSimulator:
             ty = random.randint(100, viewport["height"] - 100)
             await self._bezier_mouse_move(page, cx, cy, tx, ty)
             cx, cy = tx, ty
-            await asyncio.sleep(random.uniform(0.2, 1.0))
+            await asyncio.sleep(random.uniform(0.1, 0.5))
 
     async def _bezier_mouse_move(
         self,
@@ -170,7 +169,7 @@ class HumanBehaviorSimulator:
         start_y: int,
         end_x: int,
         end_y: int,
-        steps: int = 20,
+        steps: int = 8,
     ) -> None:
         """沿三次贝塞尔曲线移动鼠标（模拟人类手部运动轨迹）"""
         # 生成 2 个随机控制点，偏移直线路径
@@ -192,53 +191,14 @@ class HumanBehaviorSimulator:
                  + t ** 3 * end_y)
             await page.mouse.move(int(x), int(y))
             # ease-in-out 变速：起点和终点慢，中间快
-            base_delay = 0.005 + 0.02 * math.sin(math.pi * t)
-            await asyncio.sleep(base_delay + random.uniform(0, 0.008))
+            base_delay = 0.002 + 0.010 * math.sin(math.pi * t)
+            await asyncio.sleep(base_delay + random.uniform(0, 0.003))
 
     async def reading_pause(self, min_sec: float = 2.0, max_sec: float = 8.0) -> None:
         """模拟阅读停顿"""
         duration = random.uniform(min_sec, max_sec)
         logger.debug(f"Reading pause: {duration:.1f}s")
         await asyncio.sleep(duration)
-
-    async def natural_browse_zhipin(self, page: Page, keyword: str, city: str = "") -> None:
-        """
-        Boss 直聘专项：模拟自然搜索流程（非直达目标）。
-
-        流程：首页 → 随机浏览推荐 → 搜索框 → 输入（真人打字）→ 搜索
-        """
-        # 1. 访问首页
-        await page.goto("https://www.zhipin.com", wait_until="networkidle", timeout=30_000)
-        await self.reading_pause(2, 5)
-
-        # 2. 随机滚动首页（模拟浏览推荐职位）
-        await self._random_scroll(page, scroll_count=2)
-        await self.reading_pause(1, 3)
-
-        # 3. 找到搜索框并输入（真人打字）
-        search_selectors = [
-            "input[name='query']",
-            "input[placeholder*='搜索']",
-            "input[placeholder*='职位']",
-            ".search-input input",
-        ]
-        for sel in search_selectors:
-            try:
-                if await page.locator(sel).count() > 0:
-                    await self.human_type(page, sel, keyword)
-                    break
-            except Exception:
-                continue
-
-        await asyncio.sleep(random.uniform(0.5, 1.5))
-
-        # 4. 回车搜索
-        await page.keyboard.press("Enter")
-        await asyncio.sleep(random.uniform(2, 4))
-
-        # 5. 搜索结果页随机浏览
-        await self._random_scroll(page, scroll_count=2)
-        await self.reading_pause(2, 5)
 
     @staticmethod
     async def inject_timing_noise(page: Page, max_offset_ms: int = 5) -> None:

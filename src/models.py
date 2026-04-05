@@ -7,14 +7,16 @@
 - LocalBrowserInstance（本地 Chromium 浏览器实例）
 - DockerBrowserInstance（Docker 浏览器实例）
 - UserSession（用户会话）
+- 原子操作请求模型
 - 异常类
 """
 
 import time
 import asyncio
 from enum import Enum
-from typing import Optional, Any, TYPE_CHECKING
+from typing import Optional, Any, List, Dict, TYPE_CHECKING
 from dataclasses import dataclass, field
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from playwright.async_api import Playwright, Browser
@@ -37,6 +39,11 @@ class ResourceExhaustedError(Exception):
 class SessionNotFoundError(Exception):
     """会话不存在异常"""
     pass
+
+
+# Re-export PipelineError from skill layer (for API layer consumption)
+# Avoids src/api.py importing from skills.agent_browser.* directly
+from skills.agent_browser.pipeline.errors import PipelineError as PipelineError
 
 
 # ============ 浏览器实例 ============
@@ -105,3 +112,73 @@ class UserSession:
     def mark_activity(self):
         """标记活动"""
         self.last_activity = time.time()
+
+
+# ============ 原子操作请求模型 (Pydantic) ============
+
+class NavigateRequest(BaseModel):
+    """页面导航请求"""
+    url: str
+    wait_until: str = "domcontentloaded"  # load | domcontentloaded | networkidle
+    timeout: int = 30000  # ms
+
+
+class ClickRequest(BaseModel):
+    """点击元素请求"""
+    ref: str  # 元素引用，如 @e0, @e1
+    button: str = "left"  # left | right | middle
+    click_count: int = 1
+    delay: Optional[int] = None  # 点击延迟 ms
+
+
+class FillRequest(BaseModel):
+    """填充输入框请求"""
+    ref: str  # 元素引用
+    text: str
+    clear_first: bool = True  # 是否先清空
+    human_like: bool = False  # 是否模拟人类输入
+
+
+class EvaluateRequest(BaseModel):
+    """执行 JavaScript 请求"""
+    expression: str
+    return_by_value: bool = True
+
+
+class ScrollRequest(BaseModel):
+    """滚动请求"""
+    direction: str = "down"  # up | down
+    amount: int = 300  # 像素
+    smooth: bool = True
+
+
+class WaitRequest(BaseModel):
+    """等待请求"""
+    selector: Optional[str] = None  # CSS 选择器
+    timeout: int = 10000  # ms
+    state: str = "visible"  # visible | hidden | attached | detached
+
+
+# ============ 原子操作响应模型 ============
+
+class ElementInfo(BaseModel):
+    """元素信息"""
+    ref: str  # @e0, @e1...
+    tag: str
+    text: Optional[str] = None
+    role: Optional[str] = None
+    type: Optional[str] = None
+    placeholder: Optional[str] = None
+    href: Optional[str] = None
+    is_visible: bool = True
+    is_enabled: bool = True
+    bounding_box: Optional[Dict] = None
+
+
+class SnapshotResponse(BaseModel):
+    """快照响应"""
+    url: str
+    title: str
+    elements: List[ElementInfo]
+    raw_html_size: Optional[int] = None
+    snapshot_size: Optional[int] = None

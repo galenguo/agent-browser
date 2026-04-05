@@ -3,7 +3,7 @@
 ## 模式 1：本地开发
 
 ```python
-from skills.agent_browser import create_session, open_page, snapshot, click
+from agent_browser import create_session, open_page, snapshot, click
 
 # 创建会话
 session_id = await create_session()
@@ -30,10 +30,12 @@ session_id = await create_session("ws://remote-host:19222")
 
 ```bash
 # 启动 API
-uvicorn src.api_gateway:app --port 8000
+cd src && uvicorn api:app --host 0.0.0.0 --port 8000
 
-# 使用 WebSocket
-ws://localhost:8000/ws/sessions/{session_id}
+# REST API (JSON)
+curl -X POST http://localhost:8000/sessions/create \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "my-user"}'
 ```
 
 ## 部署
