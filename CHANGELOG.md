@@ -4,6 +4,35 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added (v2.3 — Intelligence Release)
+- **错误分类器** (`pipeline/classifier.py`) -- ErrorCategory 枚举 (6 类别) + 启发式分类
+  - 按异常类型精确匹配 (SelectorNotFoundError → SELECTOR_DRIFT)
+  - 按消息内容启发式匹配 (401/403 → AUTH_FAILURE, timeout → TIMEOUT)
+  - `category_description()` 面向用户的中文描述
+- **Agent Fallback** (`pipeline/fallback.py`) -- 自动错误恢复策略
+  - SELECTOR_DRIFT → re-snapshot 页面验证元素存在
+  - TIMEOUT → 增加超时后重试 (1.5x 或默认 30s)
+  - AUTH_FAILURE → 标记 _reauth_required (需用户重新登录)
+  - 动态 handler 解析 (`_get_fallback_handler`) 支持 unittest.mock.patch
+- **Pipeline Debugger** (`pipeline/debugger.py`) -- 单步执行 + 断点调试
+  - DebugSession: breakpoints, step history (StepRecord), state inspection
+  - `debug_pipeline()` 入口: 完成时返回数据, 断点时返回状态字典
+  - 未知步骤自动跳过并记录错误 (不崩溃)
+- **本地 Telemetry** (`pipeline/telemetry.py`) -- JSONL 统计收集
+  - 存储在 `~/.agent-browser/telemetry.jsonl`
+  - record/get_stats/get_recent/clear, 支持全局和 per-adapter 聚合
+  - 非阻塞设计: telemetry 失败不影响 pipeline 执行
+- **58 个单元测试** -- classifier (16) + telemetry (16) + debugger (16) + fallback (10)
+
+### Changed
+- **Executor Fallback 集成** (`pipeline/executor.py`) -- fail_fast=False 时自动调用 attempt_fallback()
+- **Executor Telemetry** (`pipeline/executor.py`) -- pipeline 结束时非阻塞记录执行统计
+- **main.py debug_pipeline()** -- 适配器级别的调试入口, 路由到 pipeline/debugger.py
+
+### Fixed
+- template.py: 允许算术表达式中使用括号
+- middleware.py: CloakBrowser C 扩展未安装时优雅降级
+
 ### Added (v2.2 — Quality Release)
 - **PipelineError 异常层次** (`pipeline/errors.py`) -- 类型化错误替代裸字符串
   - 6 个异常类: PipelineError, AdapterLoadError, AdapterValidationError, PipelineStepError, StepTimeoutError, SelectorNotFoundError, URLError
