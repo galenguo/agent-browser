@@ -1,10 +1,9 @@
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-markers = [
-    "integration: requires running services (API server, Gateway)",
-    "manual: requires human interaction (QR code scan)",
-    "slow: tests that take more than 10 seconds",
-    "requires_browser: requires a real CloakBrowser instance",
-]
-addopts = "-v --tb=short"
+timeout = 30
+addopts = "-v --tb=short --durations=10 --maxfail=5"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
