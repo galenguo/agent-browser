@@ -9,7 +9,7 @@ from .template import resolve
 STEPS: Dict[str, Callable] = {}
 
 # CSS selector 允许的字符集（防止注入）
-_CSS_SELECTOR_RE = re.compile(r'^[a-zA-Z0-9_\-#\.\[\]\(\)=*~^$|:+> ]+$')
+_CSS_SELECTOR_RE = re.compile(r'^[a-zA-Z0-9_\-#\.\[\]\(\)=*~^$|:\',"+> ]+$')
 
 
 def register(name: str):

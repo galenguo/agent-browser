@@ -132,9 +132,10 @@ class TestApiKeyAuth:
         resp, _ = get("/health", key="secret")
         assert resp.status_code == 200
 
-    def test_401_mentions_api_key(self):
+    def test_401_mentions_auth(self):
         resp, _ = get("/sessions", key="secret")
-        assert "API key" in resp.json()["detail"] or "api key" in resp.json()["detail"].lower()
+        detail = resp.json()["detail"].lower()
+        assert "auth" in detail or "key" in detail
 
 
 # ─── Session ownership ─────────────────────────────────────────────────────

@@ -131,7 +131,7 @@ async def verify_session_ownership(session_id: str, api_key: Optional[str] = Non
 
     session = _session_manager.sessions.get(session_id)
     if not session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+        raise HTTPException(status_code=404, detail="Session not found")
 
     # 使用 API Key 作为 user_id 标识（简化实现）
     # 生产环境应维护 API Key → user_id 映射表
@@ -567,7 +567,7 @@ async def evaluate_js(session_id: str, request: EvaluateRequest, api_key: str = 
     )
     lowered = js_code.lower()
     for pat in _dangerous_js:
-        if pat in lowered:
+        if pat.lower() in lowered:
             logger.warning(f"Blocked dangerous JS in evaluate: {pat} found")
             raise HTTPException(
                 status_code=400,

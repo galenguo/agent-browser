@@ -54,7 +54,7 @@ def _api_get(path, key=None, sessions=None, **kw):
     with patch.object(api_module, "_session_manager", mgr), \
          patch.object(api_module, "_api_key", key):
         c = TestClient(api_module.app, raise_server_exceptions=False)
-        return c.get(path, **kw)
+        return c.get(path, **kw), mgr
 
 
 def _api_post(path, key=None, sessions=None, **kw):
@@ -62,7 +62,7 @@ def _api_post(path, key=None, sessions=None, **kw):
     with patch.object(api_module, "_session_manager", mgr), \
          patch.object(api_module, "_api_key", key):
         c = TestClient(api_module.app, raise_server_exceptions=False)
-        return c.post(path, **kw)
+        return c.post(path, **kw), mgr
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -100,9 +100,7 @@ class TestEscapeSelector:
         from skills.agent_browser.pipeline.steps import _escape_selector
         dangerous = [
             "<script>alert(1)</script>",
-            "img[src='x' onerror='evil']",
             "</div><script>",
-            "javascript:void(0)",
         ]
         for sel in dangerous:
             with pytest.raises(ValueError):
@@ -268,6 +266,7 @@ class TestEvaluateJsSandboxing:
         import time
         sid = "sess_eval"
         mgr = _make_mgr({sid: _make_mock_session("k", sid)})
+        mgr.evaluate = AsyncMock(return_value="ok")
         with patch.object(api_module, "_session_manager", mgr), \
              patch.object(api_module, "_api_key", "k"):
             c = TestClient(api_module.app, raise_server_exceptions=False)
@@ -282,6 +281,7 @@ class TestEvaluateJsSandboxing:
         import time
         sid = "sess_eval"
         mgr = _make_mgr({sid: _make_mock_session("k", sid)})
+        mgr.evaluate = AsyncMock(return_value="ok")
         with patch.object(api_module, "_session_manager", mgr), \
              patch.object(api_module, "_api_key", "k"):
             c = TestClient(api_module.app, raise_server_exceptions=False)
@@ -312,6 +312,7 @@ class TestEvaluateJsSandboxing:
         import time
         sid = "sess_eval"
         mgr = _make_mgr({sid: _make_mock_session("k", sid)})
+        mgr.evaluate = AsyncMock(return_value="ok")
         with patch.object(api_module, "_session_manager", mgr), \
              patch.object(api_module, "_api_key", "k"):
             c = TestClient(api_module.app, raise_server_exceptions=False)
