@@ -130,8 +130,6 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> list[ConfigIss
             )
     if cfg.cdp_url and "19222" in cfg.cdp_url and env_check:
         try:
-            import asyncio
-
             import aiohttp
 
             async def _check():
@@ -149,7 +147,7 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> list[ConfigIss
                             )
                         )
 
-            asyncio.run(_check())
+            _run_async(_check())
         except Exception:
             issues.append(
                 ConfigIssue(
@@ -211,8 +209,6 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> list[ConfigIss
     # API port check
     if cfg.api_enabled and env_check:
         try:
-            import asyncio
-
             import aiohttp
 
             async def _check_api():
@@ -231,7 +227,7 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> list[ConfigIss
                             )
                         )
 
-            asyncio.run(_check_api())
+            _run_async(_check_api())
         except Exception:
             pass  # API not required for basic usage
 
@@ -256,6 +252,27 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> list[ConfigIss
 
 
 # ── Environment Detection ──────────────────────────────────────────
+
+
+def _run_async(coro):
+    """Run an async coroutine, handling both standalone and running-loop contexts.
+
+    In pytest-asyncio tests, an event loop is already running so asyncio.run()
+    would raise RuntimeError. This helper bridges both cases.
+    """
+    import asyncio
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    else:
+        # Event loop already running (e.g., pytest-asyncio context)
+        import concurrent.futures
+
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            future = pool.submit(asyncio.run, coro)
+            return future.result(timeout=10)
 
 
 def detect_environment() -> dict[str, Any]:

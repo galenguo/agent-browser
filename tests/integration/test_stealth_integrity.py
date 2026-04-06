@@ -61,7 +61,7 @@ class TestMiddlewareInit:
 
     def test_init_stealth_on_with_enhancer(self, mock_backend_for_stealth):
         """With stealth_enabled=True and Enhancer available, _stealth is set."""
-        from agent_browser.core.stealth_enhancer import StealthEnhancer
+        from agent_browser.stealth.enhancer import StealthEnhancer
         from agent_browser.stealth.middleware import StealthMiddleware
 
         if StealthEnhancer is None:
@@ -419,7 +419,7 @@ class TestStealthOffSessionLifecycle:
     @pytest.mark.asyncio
     async def test_delete_session_clears_circuit(self, mock_backend_for_stealth):
         """delete_session removes per-session circuit state (stealth ON)."""
-        from agent_browser.core.stealth_enhancer import StealthEnhancer
+        from agent_browser.stealth.enhancer import StealthEnhancer
         from agent_browser.stealth.middleware import StealthMiddleware
 
         if StealthEnhancer is None:

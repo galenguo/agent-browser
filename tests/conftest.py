@@ -363,6 +363,10 @@ def pytest_configure(config):
     """注册自定义 marker"""
     config.addinivalue_line("markers", "requires_browser: mark test as needing real CloakBrowser")
     config.addinivalue_line("markers", "manual: mark test as manual (e.g., Boss Zhipin - high flake risk)")
+    config.addinivalue_line("markers", "integration: mark test as integration test")
+    config.addinivalue_line("markers", "slow: mark test as slow (longer timeout needed)")
+    config.addinivalue_line("markers", "boss: mark test as Boss Zhipin-specific")
+    config.addinivalue_line("markers", "gateway: mark test as API gateway related")
 
 
 def pytest_runtest_logreport(report):

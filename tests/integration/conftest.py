@@ -48,7 +48,7 @@ def reset_global_state():
 
     # 2. Reset BrowserDaemon singleton
     try:
-        from agent_browser.daemon import BrowserDaemon
+        from agent_browser.browser.daemon import BrowserDaemon
 
         BrowserDaemon.reset()
     except ImportError:
@@ -66,7 +66,7 @@ def reset_global_state():
 
     # Post-test cleanup
     try:
-        from agent_browser.daemon import BrowserDaemon
+        from agent_browser.browser.daemon import BrowserDaemon
 
         BrowserDaemon.reset()
     except ImportError:

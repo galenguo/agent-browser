@@ -64,7 +64,7 @@ class TestSessionIsolation:
     @pytest.mark.asyncio
     async def test_delete_one_session_doesnt_affect_other(self):
         """Deleting session A doesn't invalidate session B's circuit."""
-        from agent_browser.core.stealth_enhancer import StealthEnhancer
+        from agent_browser.stealth.enhancer import StealthEnhancer
         from agent_browser.stealth.middleware import StealthMiddleware
 
         if StealthEnhancer is None:
@@ -97,7 +97,7 @@ class TestSessionCleanup:
     @pytest.mark.asyncio
     async def test_delete_removes_circuit_state(self):
         """After delete, circuit is gone (stealth ON)."""
-        from agent_browser.core.stealth_enhancer import StealthEnhancer
+        from agent_browser.stealth.enhancer import StealthEnhancer
         from agent_browser.stealth.middleware import StealthMiddleware
 
         if StealthEnhancer is None:

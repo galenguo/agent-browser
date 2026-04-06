@@ -14,8 +14,8 @@ def get_skill_classes() -> dict[str, Any]:
     Returns:
         Dict containing SkillConfig, load_config, BrowserDaemon, StealthEnhancer
     """
+    from agent_browser.browser.daemon import BrowserDaemon
     from agent_browser.config import SkillConfig, load_config
-    from agent_browser.daemon import BrowserDaemon
     from agent_browser.stealth.enhancer import StealthEnhancer
 
     return {

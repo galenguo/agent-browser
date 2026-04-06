@@ -19,9 +19,9 @@ import click
 from browser_use.browser import BrowserProfile, BrowserSession
 
 from agent_browser.cli.session_manager import CLISessionManager
-from agent_browser.core.browser_controller import ActionResult, BrowserController
-from agent_browser.core.session_manager import SessionContext, UnifiedSessionManager
 from agent_browser.models import BrowserInstance
+from agent_browser.session.session_manager import SessionContext, UnifiedSessionManager
+from agent_browser.stealth.browser_controller import ActionResult, BrowserController
 
 logger = logging.getLogger(__name__)
 
@@ -539,7 +539,7 @@ async def _run_task(task, session_name, url, max_steps, headed, llm_provider, ll
         from browser_use import BrowserSession as BUSession
         from browser_use.tools.service import Tools
 
-        from agent_browser.core.stealth_actions import register_stealth_actions
+        from agent_browser.stealth.actions import register_stealth_actions
 
         def _make_stealth_tools(ctx):
             """Build Tools instance with StealthEnhancer injected (CLI=API anti-detection 100% aligned)."""
