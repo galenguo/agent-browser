@@ -1,9 +1,103 @@
+[project]
+name = "agent-browser"
+version = "0.1.0"
+description = "Anti-detection browser automation framework built on browser-use"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Agent Browser Contributors"},
+]
+keywords = [
+    "browser-automation",
+    "anti-detection",
+    "browser-use",
+    "stealth",
+    "web-scraping",
+    "playwright",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+]
+
+dependencies = [
+    "browser-use>=0.12.0",
+    "playwright>=1.40.0",
+    "pydantic>=2.0",
+    "PyYAML>=6.0",
+    "structlog>=24.0",
+    "aiohttp>=3.9.0",
+]
+
+[project.optional-dependencies]
+cloak = [
+    "cloakbrowser>=0.3.0",
+    "patchright>=0.1.0",
+]
+full = [
+    "agent-browser[cloak]",
+    "langchain-openai>=0.1",
+    "langchain-anthropic>=0.1",
+    "fastapi>=0.100",
+    "uvicorn>=0.20",
+    "websockets>=12.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-timeout>=2.0",
+    "ruff>=0.1",
+    "pytest-cov>=4.0",
+]
+
+[project.scripts]
+agent-browser = "agent_browser.cli.main:app"
+
+[project.urls]
+Homepage = "https://github.com/your-org/agent-browser"
+Repository = "https://github.com/your-org/agent-browser"
+Issues = "https://github.com/your-org/agent-browser/issues"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 timeout = 30
 addopts = "-v --tb=short --durations=10 --maxfail=5"
 
-[build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # naming conventions
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "SIM",   # flake8-simplify
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "N802",  # function name should be lowercase (stealth_* etc.)
+    "N806",  # variable name should be lowercase
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agent_browser"]
+
+[tool.setuptools.packages.find]
+include = ["agent_browser*"]
+exclude = ["tests*", "docs*", "examples*", "scripts*", "adapters*", "data*", "docker*", "helm*", "k8s*", "config*"]

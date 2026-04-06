@@ -19,6 +19,33 @@ print_error() { echo -e "${RED}❌ $1${NC}"; }
 # 默认配置
 MODE="aio"  # aio 或 distributed
 REGISTRY_URL=${REGISTRY_URL:-"localhost:5000"}
+CONFIG_PATH=""  # config.yaml 路径（--config 参数）
+
+
+# 从 config.yaml 读取 Docker 配置
+load_config_from_yaml() {
+    local cfg_file="$1"
+    if [[ ! -f "$cfg_file" ]]; then
+        return 1
+    fi
+
+    # 提取 docker.* 设置（grep+awk 兼容无 yq 的环境）
+    local registry image_tag shm_size memory cpu
+
+    registry=$(grep -A5 '^docker:' "$cfg_file" | grep 'registry:' | awk -F": " '{print $2}' | tr -d '" ')
+    image_tag=$(grep -A10 '^docker:' "$cfg_file" | grep 'image_tag:' | awk -F": " '{print $2}' | tr -d '" ')
+    shm_size=$(grep -A15 '^docker:' "$cfg_file" | grep 'shm_size:' | awk -F": " '{print $2}' | tr -d '" ')
+    memory=$(grep -E '^\s*memory:' "$cfg_file" | tail -1 | awk -F": " '{print $2}' | tr -d '" ')
+    cpu=$(grep -E '^\s*cpu:' "$cfg_file" | tail -1 | awk -F": " '{print $2}' | tr -d '" ')
+
+    [[ -n "$registry" ]] && REGISTRY_URL="$registry"
+    [[ -n "$image_tag" ]] && DOCKER_IMAGE_TAG="$image_tag"
+    [[ -n "$shm_size" ]] && DOCKER_SHM_SIZE="$shm_size"
+    [[ -n "$memory" ]] && DOCKER_MEMORY="$memory"
+    [[ -n "$cpu" ]] && DOCKER_CPU="$cpu"
+
+    print_info "已从 $cfg_file 加载 Docker 配置"
+}
 
 # 检查 Docker
 check_docker() {
@@ -212,12 +239,36 @@ while [[ $# -gt 0 ]]; do
             REGISTRY_URL="$2"
             shift 2
             ;;
+        --config)
+            CONFIG_PATH="$2"
+            shift 2
+            ;;
+        --validate)
+            # 验证 config.yaml 中 Docker 相关字段是否存在
+            CFG="${CONFIG_PATH:-$HOME/.agent-browser/config.yaml}"
+            if [[ -f "$CFG" ]]; then
+                print_info "验证配置文件: $CFG"
+                for key in docker registry image_tag; do
+                    if grep -q "$key:" "$CFG"; then
+                        print_success "  $key: 存在"
+                    else
+                        print_warning "  $key: 缺失（将使用默认值）"
+                    fi
+                done
+                exit 0
+            else
+                print_error "配置文件不存在: $CFG"
+                exit 1
+            fi
+            ;;
         --help)
             echo "用法: $0 [选项]"
             echo ""
             echo "选项:"
             echo "  --mode <mode>      部署模式: aio, distributed (默认: aio)"
             echo "  --registry <url>   Registry URL (默认: localhost:5000)"
+            echo "  --config <path>   从 config.yaml 读取 Docker 配置"
+            echo "  --validate         验证 config.yaml 中 Docker 字段完整性"
             echo "  --help             显示帮助信息"
             exit 0
             ;;
@@ -227,6 +278,11 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# 如果指定了 --config，加载配置
+if [[ -n "$CONFIG_PATH" ]]; then
+    load_config_from_yaml "$CONFIG_PATH"
+fi
 
 # 验证模式
 if [[ "$MODE" != "aio" && "$MODE" != "distributed" ]]; then

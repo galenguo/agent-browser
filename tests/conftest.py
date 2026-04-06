@@ -25,14 +25,13 @@ from pathlib import Path
 from datetime import datetime
 from unittest import mock
 
-# 添加项目根目录到 Python 路径
-sys.path.insert(0, str(Path(__file__).parent.parent))
-# 添加 skill 路径
-sys.path.insert(0, str(Path(__file__).parent.parent / "skills"))
-# 添加 src 路径（用于 src.stealth, src.core 等模块的绝对导入）
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+# pytest-asyncio 配置
+pytest_plugins = ('pytest_asyncio',)
+
 
 # ── 输出目录 ──
+
 _SCREENSHOT_DIR = Path(__file__).parent / "screenshots"
 _RESULT_DIR = Path(__file__).parent / "results"
 
@@ -48,21 +47,8 @@ def event_loop():
 @pytest.fixture
 def skill_config():
     """默认 SkillConfig"""
-    # 使用 skill 包的 config
-    config_module = __import__(
-        "config",
-        fromlist=["SkillConfig"],
-        level=0
-    )
-    # 动态导入
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        "config",
-        Path(__file__).parent.parent / "skills" / "agent-browser" / "config.py"
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.SkillConfig()
+    from agent_browser.config import SkillConfig
+    return SkillConfig()
 
 
 @pytest.fixture
@@ -76,7 +62,7 @@ def mock_page():
     page.mouse.wheel = mock.AsyncMock()
     page.keyboard = mock.MagicMock()
     page.keyboard.type = mock.AsyncMock()
-    page.keyboard.press = mock.AsyncMock()
+    keyboard.press = mock.AsyncMock()
     page.viewport_size = {"width": 1920, "height": 1080}
     page.add_init_script = mock.AsyncMock()
     page.locator = mock.MagicMock()
@@ -89,7 +75,7 @@ def mock_context(mock_page):
     """Mock BrowserContext"""
     context = mock.MagicMock()
     context.new_page = mock.AsyncMock(return_value=mock_page)
-    context.close = mock.AsyncMock()
+    context.close = AsyncMock()
     return context
 
 
@@ -98,7 +84,7 @@ def mock_browser(mock_context):
     """Mock Playwright Browser"""
     browser = mock.MagicMock()
     browser.new_context = mock.AsyncMock(return_value=mock_context)
-    browser.close = mock.AsyncMock()
+    browser.close = AsyncMock()
     browser.contexts = []
     return browser
 
@@ -140,7 +126,7 @@ def clean_env():
 
 
 # pytest-asyncio 配置
-pytest_plugins = ('pytest_asyncio',)
+pytest_plugins = ("pytest_asyncio",)
 
 
 # ── Tier 3: CloakBrowser 生命周期管理 ──
@@ -184,7 +170,7 @@ def cdp_url(request):
     # 端口空闲 — 通过 Playwright 启动有头模式（macOS 兼容）
     print(f"\n[CloakBrowser] Port {_CDP_PORT} free, launching headed browser...")
     try:
-        from src.browser.stealth_launcher import launch_stealth_browser, close_browser
+        from agent_browser.browser.stealth_launcher import launch_stealth_browser, close_browser
 
         loop = asyncio.new_event_loop()
         try:
@@ -213,8 +199,7 @@ def cdp_url(request):
                             timeout=15
                         )
                     except (asyncio.TimeoutError, Exception):
-                        # 超时或异常：强制关闭
-                        pass
+                        pass  # 超时或异常：强制关闭
                 loop.run_until_complete(_force_close())
             except Exception as e:
                 print(f"[CloakBrowser] Warning during close: {e}")
@@ -290,9 +275,9 @@ async def browser_page(browser_context):
                 pass
 
 
-# ════════════════════════════════════════════
+# ══════════════════════════════════════════
 #  Real Browser Test Helpers
-# ════════════════════════════════════════════
+# ════════════════════════════════════════
 
 _SCREENSHOT_DIR = Path(__file__).parent / "screenshots"
 _RESULT_DIR = Path(__file__).parent / "results"
@@ -409,12 +394,12 @@ def pytest_runtest_logreport(report):
             )
         else:
             _collected_skips.append(
-                f"  SKIP  {report.nodeid}: {reason[:120]}"
+                f"  SKIP  {report.nodeid}: {reason}"
             )
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
-    """测试结束时打印 skip 摘要（anti-detection 跳过高亮警告）"""
+    """测试结束时打印 skip 摘要"""
     global _collected_skips
     if _collected_skips:
         terminalreporter.write_sep("=", f"Skip Summary ({len(_collected_skips)} skipped)")

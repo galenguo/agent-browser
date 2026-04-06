@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 import pytest
-from skills.agent_browser.pipeline.telemetry import Telemetry, _TEL_FILE, _TEL_DIR
+from agent_browser.pipeline.telemetry import Telemetry, _TEL_FILE, _TEL_DIR
 
 
 @pytest.fixture(autouse=True)

@@ -21,8 +21,8 @@ from datetime import datetime
 
 import pytest
 
-from skills.agent_browser.pipeline.executor import execute_pipeline
-from skills.agent_browser.pipeline.errors import (
+from agent_browser.pipeline.executor import execute_pipeline
+from agent_browser.pipeline.errors import (
     PipelineStepError,
     SelectorNotFoundError,
 )
@@ -51,7 +51,7 @@ class TestPipelineBasicNavigation:
 
         # 使用真实 page handle 执行 pipeline
         # 通过 monkey-patch _get_handle 返回我们的真实 page
-        import skills.agent_browser.pipeline.steps as steps_module
+        import agent_browser.pipeline.steps as steps_module
 
         original_get = getattr(steps_module, "_get_handle", None)
 
@@ -151,7 +151,7 @@ class TestPipelineFormInteraction:
             {"snapshot": "url"},
         ]
 
-        import skills.agent_browser.pipeline.steps as steps_module
+        import agent_browser.pipeline.steps as steps_module
 
         class RealPageHandle:
             def __init__(self, page):
@@ -271,7 +271,7 @@ class TestPipelineScrollAndExtract:
             {"snapshot": "a[href]"},  # 滚动后再次提取
         ]
 
-        import skills.agent_browser.pipeline.steps as steps_module
+        import agent_browser.pipeline.steps as steps_module
 
         links_before = []
         links_after = []
@@ -380,7 +380,7 @@ class TestPipelineErrorHandling:
             {"snapshot": "body"},  # 不应执行到这步
         ]
 
-        import skills.agent_browser.pipeline.steps as steps_module
+        import agent_browser.pipeline.steps as steps_module
 
         class RealPageHandle:
             def __init__(self, page):
@@ -484,7 +484,7 @@ class TestPipelineErrorHandling:
             {"snapshot": "body"},  # 应该仍然执行
         ]
 
-        import skills.agent_browser.pipeline.steps as steps_module
+        import agent_browser.pipeline.steps as steps_module
 
         snapshot_executed = False
 
@@ -588,7 +588,7 @@ class TestPipelineTemplates:
     @pytest.mark.asyncio
     async def test_template_variable_url(self, browser_page, scorecard_writer):
         """Pipeline 中使用 ${{ args.url }} 变量渲染 URL"""
-        from skills.agent_browser.pipeline.template import render_value, TemplateContext
+        from agent_browser.pipeline.template import render_value, TemplateContext
 
         ctx = TemplateContext(args={"host": "example.com", "path": "/"})
         rendered = render_value("${{ args.host }}${{ args.path }}", ctx)
@@ -620,7 +620,7 @@ class TestPipelineTemplates:
             {"evaluate": "1 + 1"},  # 简单 JS 验证
         ]
 
-        import skills.agent_browser.pipeline.steps as steps_module
+        import agent_browser.pipeline.steps as steps_module
 
         results_log = []
 
@@ -712,8 +712,8 @@ class TestPipelineTelemetry:
     @pytest.mark.asyncio
     async def test_telemetry_written_after_pipeline(self, browser_page, tmp_path, scorecard_writer, monkeypatch):
         """Pipeline 执行后 telemetry.jsonl 有记录"""
-        from skills.agent_browser.pipeline import telemetry as tel_module
-        import skills.agent_browser.pipeline.steps as steps_module
+        from agent_browser.pipeline import telemetry as tel_module
+        import agent_browser.pipeline.steps as steps_module
 
         tel_file = tmp_path / "tel_test.jsonl"
         original_tel_file = tel_module._TEL_FILE

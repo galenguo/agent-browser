@@ -14,7 +14,7 @@ correctly in the context it's used (pipeline variable substitution).
 """
 import pytest
 
-from skills.agent_browser.pipeline.template import (
+from agent_browser.pipeline.template import (
     TemplateContext,
     resolve,
     render_template,

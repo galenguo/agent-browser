@@ -10,25 +10,21 @@ CRITICAL: autouse reset clears ALL module-level singletons between tests.
 Without this, tests leak state through _config, _middleware, _registry, etc.
 """
 import asyncio
-import sys
 from pathlib import Path
 from unittest import mock
 import pytest
 
 # ── Path setup (mirrors parent conftest) ──
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(_PROJECT_ROOT))
-sys.path.insert(0, str(_PROJECT_ROOT / "skills"))
-sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 
-# Import ABCs from the shim path (same as main.py does)
-from skills.agent_browser.backends import BrowserBackend, BrowserPageHandle
+# Import ABCs from the new package path
+from agent_browser.browser import BrowserBackend, BrowserPageHandle
 
 # Skip legacy monolithic test (not pytest-compatible, calls sys.exit at import)
 collect_ignore = ["test_skill_scenarios.py"]
 
 
-# ══════════════════════════════════════════════
+# ════════════════════════════════════════════
 #  GLOBAL STATE RESET (autouse)
 # ══════════════════════════════════════════════
 
@@ -44,19 +40,19 @@ def reset_global_state():
           decorators at import time and is read-only thereafter.
     """
     # 1. Reset main module globals
-    from skills.agent_browser import main as skill_main
+    from agent_browser import main as skill_main
     skill_main.reset()
 
     # 2. Reset BrowserDaemon singleton
     try:
-        from src.browser.daemon import BrowserDaemon
+        from agent_browser.daemon import BrowserDaemon
         BrowserDaemon.reset()
     except ImportError:
         pass
 
     # 3. Clear adapter registry
     try:
-        from skills.agent_browser.adapters import loader
+        from agent_browser.adapters import loader
         loader._registry = {}
     except (ImportError, AttributeError):
         pass
@@ -65,13 +61,13 @@ def reset_global_state():
 
     # Post-test cleanup
     try:
-        from src.browser.daemon import BrowserDaemon
+        from agent_browser.daemon import BrowserDaemon
         BrowserDaemon.reset()
     except ImportError:
         pass
 
 
-# ══════════════════════════════════════════════
+# ════════════════════════════════════════════
 #  TIER 1: Mock Backend (always available)
 # ══════════════════════════════════════════════
 
@@ -125,7 +121,7 @@ def mock_backend(mock_page_handle) -> mock.MagicMock:
 @pytest.fixture
 def skill_config_no_stealth():
     """SkillConfig with stealth disabled (avoids StealthEnhancer C extension)."""
-    from skills.agent_browser.config import SkillConfig
+    from agent_browser.config import SkillConfig
     return SkillConfig(
         calling_mode="cli",
         browser_mode="local",
@@ -134,7 +130,7 @@ def skill_config_no_stealth():
     )
 
 
-# ══════════════════════════════════════════════
+# ════════════════════════════════════════════
 #  TIER 2: Real Browser (requires CloakBrowser :19222)
 # ══════════════════════════════════════════════
 
@@ -154,7 +150,7 @@ def real_cdp_url():
     return "http://127.0.0.1:19222"
 
 
-# ══════════════════════════════════════════════
+# ════════════════════════════════════════════
 #  TIER 3: API Server (requires FastAPI :8000)
 # ══════════════════════════════════════════════
 
@@ -174,7 +170,7 @@ def api_server_url():
     return "http://127.0.0.1:8000"
 
 
-# ══════════════════════════════════════════════
+# ════════════════════════════════════════════
 #  Pipeline Step Helpers
 # ══════════════════════════════════════════════
 
@@ -196,8 +192,8 @@ def patched_get_handle(mock_page_for_steps):
     Used by pipeline execution and security tests that call step handlers directly.
     Also covers step_snapshot which calls _ensure_middleware() directly.
     """
-    from skills.agent_browser.pipeline import steps
-    from skills.agent_browser import main as skill_main
+    from agent_browser.pipeline import steps
+    from agent_browser import main as skill_main
 
     async def _fake_handle(sid):
         return mock_page_for_steps

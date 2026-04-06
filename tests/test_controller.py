@@ -1,24 +1,53 @@
-"""测试 BrowserController"""
+"""Tests for BrowserController and ActionResult."""
 import pytest
-from skills.agent_browser.controller import BrowserController
+from unittest.mock import AsyncMock, MagicMock
+from agent_browser.stealth.browser_controller import BrowserController, ActionResult
 
 
-@pytest.mark.asyncio
-async def test_create_session():
-    """测试创建会话"""
-    controller = BrowserController()
-    session = await controller.create_session("test-1", "ws://127.0.0.1:19222")
-    assert session.session_id == "test-1"
-    await controller.delete_session("test-1")
+class TestActionResult:
+    def test_default_ok(self):
+        result = ActionResult()
+        assert result.status == "ok"
+        assert result.error is None
+        assert result.data is None
+
+    def test_to_dict_minimal(self):
+        result = ActionResult()
+        d = result.to_dict()
+        assert d == {"status": "ok"}
+
+    def test_to_dict_with_error(self):
+        result = ActionResult(error="element not found")
+        d = result.to_dict()
+        assert d["status"] == "ok"
+        assert d["error"] == "element not found"
+
+    def test_to_dict_with_data(self):
+        result = ActionResult(data={"url": "https://example.com"})
+        d = result.to_dict()
+        assert d["data"]["url"] == "https://example.com"
+
+    def test_to_dict_full(self):
+        result = ActionResult(
+            status="error",
+            error="timeout",
+            data={"retry_after": 5},
+        )
+        d = result.to_dict()
+        assert d["status"] == "error"
+        assert d["error"] == "timeout"
+        assert d["data"]["retry_after"] == 5
 
 
-@pytest.mark.asyncio
-async def test_snapshot():
-    """测试快照"""
-    controller = BrowserController()
-    await controller.create_session("test-2", "ws://127.0.0.1:19222")
-    await controller.open("test-2", "https://example.com")
-    snapshot = await controller.snapshot("test-2")
-    assert "url" in snapshot
-    assert "elements" in snapshot
-    await controller.delete_session("test-2")
+class TestBrowserController:
+    def test_init_requires_args(self):
+        """BrowserController requires browser_session and session_id."""
+        mock_session = MagicMock()
+        ctrl = BrowserController(browser_session=mock_session, session_id="test-1")
+        assert ctrl.session_id == "test-1"
+        assert ctrl.session is mock_session
+
+    def test_session_property(self):
+        mock_session = MagicMock()
+        ctrl = BrowserController(browser_session=mock_session, session_id="s1")
+        assert ctrl.session is mock_session

@@ -1,297 +1,163 @@
 # Agent Browser
 
-AI 驱动的反检测浏览器自动化平台，支持多模式、多用户隔离、灵活部署。
+> Anti-detection browser automation framework built on [browser-use](https://github.com/browser-use/browser-use).
 
-## 项目概述
+Agent Browser extends **browser-use** with industrial-grade anti-detection capabilities, a YAML pipeline engine, site exploration, and adapter synthesis. It is designed for **browser-use power users** who hit detection walls when automating interactions with protected websites.
 
-Agent Browser 是一个基于 FastAPI + browser-use 的浏览器自动化系统，专为高防护网站设计。核心特性：
+## Features
 
-- **CloakBrowser 引擎**：Chromium + C++ 级指纹伪装（33 项补丁）
-- **6 层反检测栈**：编译级指纹 → 驱动级 CDP 修补 → 运行时泄漏修复 → 连接隐匿 → 持久会话 → 行为模拟
-- **多模式支持**：CLI/API × LLM/Agent 灵活组合
-- **多用户隔离**：每个用户独立 Session、Profile、Cookie、指纹
+### 7-Layer Anti-Detection Stack
 
-## 架构
+| Layer | Component | What it does |
+|-------|-----------|--------------|
+| 1 | CloakBrowser | C++-level fingerprint spoofing (33 patches) |
+| 2 | patchright | Driver-level CDP patching |
+| 3 | rebrowser-patches | Runtime.Enable leak fix |
+| 4 | Non-standard port 19222 | Connection obfuscation |
+| 5 | Persistent CDP sessions | Prevents frequent attach/detach |
+| 6 | StealthEnhancer | Human-like delays, Bezier mouse curves, per-character typing |
+| 7 | StealthMiddleware | Centralized stealth layer with per-session circuit breaker |
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     SKILL.md (Facade)                            │
-│          模式检测 + ReAct/Agent 路由                              │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────────┐
-│                      main.py (Facade API, ~194 lines)            │
-│       _ensure_middleware() → StealthMiddleware 路由              │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────────┐
-│                  StealthMiddleware (src/stealth/)               │
-│   ┌─────────────────┐  ┌──────────────────┐  ┌───────────────┐ │
-│   │ Pre-action 延迟  │  │ StealthPageHandle │  │ Circuit Breaker│ │
-│   │ (按操作类型分类)  │  │ (自动隐匿包装)     │  │ (per-session)  │ │
-│   └─────────────────┘  └──────────────────┘  └───────────────┘ │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-        ┌────────────────────┼────────────────────┐
-        │                    │                    │
-┌───────▼────────┐  ┌────────▼────────┐  ┌────────▼────────┐
-│LocalCDPBackend │  │RemoteAPIBackend │  │ YAML Pipeline   │
-│(唯一核心实现)   │  │(HTTP 传输层)    │  │(steps.py)       │
-└────────────────┘  └─────────────────┘  └─────────────────┘
-```
+### Pipeline Engine v2.3
 
-### 7 层反检测栈
+- YAML-driven automation pipelines
+- 19 template filters with arithmetic expressions
+- Typed error hierarchy (6 error categories)
+- Automatic error classification and recovery
+- Single-step debugger with breakpoints
+- JSONL telemetry for execution tracking
 
-| 层 | 组件 | 功能 |
-|---|------|------|
-| 1 | CloakBrowser | C++ 编译级指纹伪装（33 项补丁） |
-| 2 | patchright | 驱动级 CDP 修补（移除 `__playwright__binding__`） |
-| 3 | rebrowser-patches | Runtime.Enable 泄漏修复（addBinding 模式） |
-| 4 | 非标准端口 19222 | 绑定 127.0.0.1，连接隐匿 |
-| 5 | BrowserDaemon | 持久单 CDP 会话，禁止频繁 attach/detach |
-| 6 | StealthEnhancer | 贝塞尔鼠标 + 逐字输入 + 定时器噪声 |
-| 7 | **StealthMiddleware** | **集中隐匿层：自动 pre/post 延迟 + 熔断器** |
+### Site Explorer
 
-### 模式矩阵
+- Automatic DOM structure analysis
+- Cascade CSS selector generation
+- YAML adapter synthesis from exploration results
 
-| 调用模式 | 浏览器模式 | 后端实现 | 智能模式 | 数据流 |
-|---------|-----------|---------|---------|--------|
-| CLI | local | LocalCDPBackend (daemon) | LLM | Agent → Python API → CDP |
-| CLI | local | LocalCDPBackend | Agent | Agent → run_task → browser-use → CDP |
-| API | local | RemoteAPIBackend → localhost FastAPI | LLM/Agent | Agent → HTTP → FastAPI → CDP |
-| API | remote | RemoteAPIBackend → Gateway → Docker | LLM/Agent | Agent → HTTP → Gateway → Docker CDP |
+## Quick Start
 
-## 快速开始
-
-### 一键安装（推荐）
+### Install
 
 ```bash
-# 克隆仓库
-git clone https://github.com/your-org/agent-browser.git
-cd agent-browser
+# Basic (stealth layers 6-7 only, works with standard Playwright)
+pip install agent-browser
 
-# 运行安装脚本
-./scripts/install.sh
+# Full anti-detection (all 7 layers, requires CloakBrowser)
+pip install agent-browser[cloak]
+
+# With server mode (FastAPI + LLM integrations)
+pip install agent-browser[full]
 ```
 
-### 环境要求
-
-- Python 3.11+
-- Docker（可选，用于容器化部署）
-
-### 本地开发
-
-```bash
-cd agent-browser
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env 设置 OPENAI_API_KEY 等
-
-# 启动 API 服务
-cd src && python -m uvicorn api:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### Docker 部署
-
-```bash
-# All-in-One 模式
-docker-compose -f docker/docker-compose.yml --profile all-in-one up -d
-
-# 分布式模式
-docker-compose -f docker/docker-compose.yml --profile distributed up -d
-```
-
-## Skill 使用（Claude Code / OpenClaw）
-
-### LLM ReAct 模式（原子操作）
-
-外部 LLM 通过 ReAct 循环控制每一步：
+### Basic Usage
 
 ```python
-from agent_browser import create_session, delete_session, open_page, snapshot, click, fill
+import asyncio
+from agent_browser import create_session, open_page, snapshot, click, fill
 
-# 创建会话
-sid = await create_session()
+async def main():
+    # Create a stealth-wrapped browser session
+    session_id = await create_session()
 
-# ReAct 循环
-await open_page(sid, "https://example.com")
-snap = await snapshot(sid)  # {url, title, elements: [{ref, text, role}]}
+    # Navigate to a page (automatic stealth delays applied)
+    await open_page(session_id, "https://example.com")
 
-# 分析 snap["elements"] 找到目标元素
-for el in snap["elements"]:
-    if "搜索" in el.get("text", ""):
-        await fill(sid, el["ref"], "关键词")
-    if "提交" in el.get("text", ""):
-        await click(sid, el["ref"])
+    # Take a snapshot (returns interactive elements with refs)
+    data = await snapshot(session_id)
+    print(f"Found {len(data['elements'])} elements")
 
-# 清理
-await delete_session(sid)
+    # Interact using element refs
+    await click(session_id, "@e0")  # Click first interactive element
+    await fill(session_id, "@e1", "hello world")
+
+asyncio.run(main())
 ```
 
-### Agent 模式（自主执行）
-
-内置 browser-use Agent 自主完成整个任务：
+### Pipeline Mode
 
 ```python
-from agent_browser import create_session, delete_session, run_task
+from agent_browser.pipeline import PipelineExecutor
 
-sid = await create_session()
-result = await run_task(
-    sid,
-    task="访问百度搜索 AI coding，提取前5条结果",
-    intelligence="agent",
-    max_steps=10,
-)
-await delete_session(sid)
-
-# result = {"status": "completed", "result": "...", "steps": 8}
+executor = PipelineExecutor(stealth_enabled=True)
+result = await executor.run("adapters/my-site.yaml")
+print(result)
 ```
 
-### 适配器模式（零 LLM 成本）
+### Explore Mode
 
 ```python
-from agent_browser import run_adapter
+from agent_browser.explore import Explorer, Synthesizer
+from agent_browser import create_session, open_page
 
-# 直接执行预录制 pipeline
-results = await run_adapter("baidu", "search", query="AI coding", limit=5)
+async def main():
+    session_id = await create_session()
+    await open_page(session_id, "https://target.com")
+
+    explorer = Explorer(session_id)
+    snapshot = await explorer.explore()
+
+    # Generate an adapter YAML from the exploration snapshot
+    adapter_yaml = Synthesizer.synthesize(snapshot)
+    print(adapter_yaml)
+
+asyncio.run(main())
 ```
 
-## API 参考
-
-### Session 管理
-
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| POST | `/sessions/create` | 创建新会话 |
-| GET | `/sessions/{session_id}` | 查询会话状态 |
-| DELETE | `/sessions/{session_id}` | 删除会话 |
-
-### 任务管理
-
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| POST | `/sessions/{session_id}/task` | 提交 Agent 任务 |
-| GET | `/sessions/{session_id}/tasks/{task_id}` | 查询任务状态 |
-
-### 原子操作（LLM 模式）
-
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/sessions/{session_id}/snapshot` | 获取页面快照 + 元素 refs |
-| POST | `/sessions/{session_id}/click` | 点击元素 |
-| POST | `/sessions/{session_id}/fill` | 填充输入框 |
-| POST | `/sessions/{session_id}/scroll` | 滚动页面 |
-
-## 配置参考
-
-### Skill 配置（skills/agent-browser/）
-
-| 环境变量 | 默认值 | 说明 |
-|---------|-------|------|
-| `AGENT_BROWSER_CALLING_MODE` | `cli` | 调用模式 (cli/api) |
-| `AGENT_BROWSER_BROWSER_MODE` | `local` | 浏览器模式 (local/remote) |
-| `AGENT_BROWSER_INTELLIGENCE` | `llm` | 智能模式 (llm/agent) |
-| `AGENT_BROWSER_CDP_URL` | `http://127.0.0.1:19222` | CDP 地址 |
-| `AGENT_BROWSER_API_URL` | `http://localhost:8000` | FastAPI 地址 |
-| `AGENT_BROWSER_DAEMON_ENABLED` | `true` | 启用 Daemon 持久化 |
-| `AGENT_BROWSER_DAEMON_IDLE_TIMEOUT` | `1800` | Daemon 空闲超时（秒） |
-| `AGENT_BROWSER_STEALTH_ENABLED` | `true` | 启用隐匿增强 |
-| `AGENT_BROWSER_STEALTH_MODE` | `full` | 隐匿模式: `full`(CloakBrowser+全栈) / `vanilla`(Playwright+延迟) |
-
-### 服务端配置（src/）
-
-| 环境变量 | 默认值 | 说明 |
-|---------|-------|------|
-| `OPENAI_API_KEY` | — | OpenAI API Key |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI API 基地址 |
-| `MAX_SESSIONS` | `10` | 最大并发会话数 |
-| `IDLE_TIMEOUT_SECONDS` | `1800` | 会话空闲超时（秒） |
-| `CDP_PORT` | `19222` | CDP 调试端口 |
-| `HEADLESS` | `false` | 是否无头模式 |
-
-## 项目结构
-
-```
-agent-browser/
-├── src/                              # 核心实现（唯一真实代码位置）
-│   ├── api.py                        # FastAPI 入口
-│   ├── browser/                      # 浏览器引擎层
-│   │   ├── backends/                 # LocalCDPBackend + RemoteAPIBackend
-│   │   │   ├── __init__.py           # BrowserBackend ABC
-│   │   │   ├── local.py              # 唯一浏览器操作核心
-│   │   │   └── remote.py             # HTTP 传输适配器
-│   │   └── daemon.py                # BrowserDaemon 单例
-│   ├── stealth/                      # ★ StealthMiddleware 集中隐匿层
-│   │   ├── __init__.py               # 导出: StealthMiddleware, StealthPageHandle
-│   │   └── middleware.py             # 核心: 隐匿包装 + 熔断器
-│   ├── core/                         # 底层组件
-│   │   └── stealth_enhancer.py       # StealthEnhancer (贝塞尔鼠标等)
-│   ├── session/                      # 会话管理层
-│   └── agent/                        # Agent 层
-│
-├── skills/agent-browser/             # Skill 包（轻量级 facade + 向后兼容 shim）
-│   ├── main.py                       # Facade API (~194 lines)
-│   ├── config.py                     # 配置系统 (含 stealth_mode)
-│   ├── backends/                     # → 重导出到 src/browser/backends/ (DEPRECATED)
-│   ├── daemon.py                     # → 重导出到 src/browser/daemon.py (DEPRECATED)
-│   ├── stealth.py                    # → 重导出到 core.stealth_enhancer (DEPRECATED)
-│   ├── intelligence/                 # 智能模式路由
-│   ├── pipeline/                     # YAML pipeline (已集成 StealthMiddleware)
-│   │   └── steps.py                  # 所有步骤通过 StealthPageHandle 执行
-│   ├── adapters/                     # 站点适配器
-│   ├── explore/                      # 站点探索
-│   └── SKILL.md                      # Skill 文档
-│
-├── tests/                            # 测试套件
-│   └── test_stealth_middleware.py    # 19 个测试 (熔断器/中间件/回归)
-├── scripts/                          # 实用脚本
-│   └── baseline_measurements.py      # 反检测性能基准测试
-├── docker/                           # Docker 配置
-└── docs/                             # 文档
-```
-
-## 测试
+### CLI
 
 ```bash
-# 反检测测试
-python tests/test_anti_detection.py
-
-# API 端点测试
-python tests/test_api.py
-
-# 性能测试
-python tests/performance_test.py
+agent-browser --help
 ```
 
-## 已知问题与最佳实践
+## Architecture
 
-### browser-use Agent 已知问题
+```
+agent_browser/
+├── browser/          # Backend ABCs + implementations (local, remote, extension)
+├── stealth/         # Anti-detection: middleware, enhancer, actions, patches
+├── pipeline/        # YAML pipeline engine v2.3
+├── explore/         # Site explorer + adapter synthesizer
+├── adapters/        # Site adapter loader/runner/validator
+├── intelligence/    # Agent task execution (browser-use integration)
+├── session/         # Multi-user session management
+├── cli/             # Command-line interface
+└── utils/           # Shared utilities
+```
 
-1. **`evaluate()` action**：browser-use 0.12.2 有 pydantic schema 验证 bug，任务 prompt 中应禁止使用
-2. **LLM 90s 超时**：复杂页面截图导致推理超时，建议控制 prompt 长度
-3. **iframe DOM 失效**：iframe 内 DOM 元素 ID 在面板打开后失效
+## How It Compares to Raw browser-use
 
-### 最佳实践
+| Feature | browser-use | Agent Browser |
+|---------|------------|-------------|
+| AI agent automation | Yes | Yes (wraps browser-use) |
+| Anti-detection | No | 7-layer stack |
+| Human behavior simulation | No | Bezier mouse, per-char typing |
+| Circuit breaker | No | Per-session auto-degradation |
+| YAML pipeline engine | No | 19-filter template engine |
+| Error classification | No | 6-category typed errors |
+| Auto-recovery | No | Per-error-category fallback |
+| Site exploration | No | DOM analysis -> adapter synthesis |
+| Telemetry | No | JSONL execution tracing |
+| Debugger | No | Single-step with breakpoints |
 
-- 任务 prompt 中明确禁止 `evaluate()`
-- 优先用 `click(coordinate_x, coordinate_y)` 而非 `click(index=N)`
-- 用 `extract()` 提取内容比截图识别更可靠
-- 使用 Daemon 持久化连接避免频繁 attach/detach
+## Dependencies
 
-## 使用场景
+### Core (always installed)
 
-- **高防护网站数据采集**：Boss 直聘、淘宝等有多层反爬的站点
-- **AI Agent 自动化交互**：LLM 驱动的类人浏览器操作
-- **多账号隔离管理**：每个用户独立指纹、Cookie、代理
-- **反检测测试验证**：评估网站反爬系统的检测能力
+- `browser-use>=0.12.0` - AI browser agent framework
+- `playwright>=1.40.0` - Browser automation
+- `pydantic>=2.0` - Data validation
+- `PyYAML>=6.0` - YAML config/pipeline parsing
+- `structlog>=24.0` - Structured logging
+- `aiohttp>=3.9.0` - Async HTTP client
 
-## 相关文档
+### Optional
 
-- [CLAUDE.md](./CLAUDE.md) - Claude Code 开发指南
-- [SKILL.md](./skills/agent-browser/SKILL.md) - Skill 使用文档
-- [ARCHITECTURE.md](./docs/ARCHITECTURE.md) - 架构设计
-- [部署文档](./docs/DEPLOYMENT.md) - 部署指南
+- `[cloak]` - CloakBrowser C++ fingerprinting + patchright (layers 1-5)
+- `[full]` - FastAPI server + LLM integrations (langchain-openai, langchain-anthropic)
+
+## License
+
+Apache 2.0. See [LICENSE](LICENSE) for details.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style guidelines, and pull request process.

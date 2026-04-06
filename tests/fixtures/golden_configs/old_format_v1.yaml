@@ -1,0 +1,20 @@
+# Golden Master: pre-deploy-wizard format (v1)
+# Represents config.yaml BEFORE deploy wizard was added
+# Used by: test_golden_master_migration_from_v1
+skill:
+  calling_mode: cli
+  browser_mode: local
+  intelligence: llm
+  cdp_url: "http://127.0.0.1:19222"
+  api_url: "http://localhost:8000"
+  browser:
+    headless: false
+    default_timeout: 30000
+  stealth:
+    enabled: true
+    mode: full
+    warmup: false
+  daemon:
+    enabled: true
+    idle_timeout: 1800
+    state_path: "~/.agent-browser/daemon-state.json"

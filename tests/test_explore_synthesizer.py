@@ -1,7 +1,7 @@
 """Synthesizer 测试 — YAML pipeline 生成"""
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
-from skills.agent_browser.explore.synthesizer import (
+from agent_browser.explore.synthesizer import (
     distill_trace,
     detect_strategy,
     build_adapter,
