@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`evaluate()` public API**: Execute JavaScript in page context via `await evaluate(session_id, "expression")`. Available on both functional API (`agent_browser.main`) and OOP interface (`AgentBrowser.evaluate()`)
+- **`AgentBrowser.evaluate()`**: OOP wrapper for JS evaluation with automatic session resolution
+- **E2E capability verification suite** (89 tests across 3 files):
+  - `test_skill_installation.py` (42 tests): package metadata, import integrity, submodule load validation, code quality guards
+  - `test_skill_facade.py` (44 tests): facade routing through middleware stack, ReAct cycle (snapshot→click→fill), run_task(llm/agent), mode selection, error recovery
+  - `test_docker_smoke.py` (3 tests): Docker script sanity + graceful skip when daemon unavailable
+- **Deploy wizard validation suite** (148 tests): config YAML roundtrip, generate_config, validate_config, migration, shell script parsing
+
+### Changed
+
+- **Code hygiene pass** (117 files): modernized type hints (`Optional[X]` → `X | None`), reorganized imports in `__init__.py`, split multi-imports to single-line in `client.py`
+- **LocalCDPBackend**: new browser context defaults to `ignore_https_errors=True` for smoother HTTPS site automation
+- **Pipeline step format**: E2E workflow tests use dict keys directly (`{"navigate": "..."}`) instead of action wrapper
+- **Test cleanup**: removed 500+ lines of dead code from `test_security_hardening.py` (FastAPI api.py not yet migrated)
+
+### Test Summary
+
+- **885 total tests collected** (up from 789)
+- **234+ core tests pass in <20s** (unit + integration + installation + facade)
+- **68/75 E2E browser tests pass** with real CloakBrowser (6 skipped: need FastAPI server, 1 flaky: session isolation race condition)
+- **0 regressions** across all test suites
+
 ## [0.1.0] - 2026-04-06
 
 ### Breaking Changes

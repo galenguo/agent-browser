@@ -48,11 +48,11 @@ pip install agent-browser[cloak]
 pip install agent-browser[full]
 ```
 
-### Basic Usage
+### Basic Usage (Functional API)
 
 ```python
 import asyncio
-from agent_browser import create_session, open_page, snapshot, click, fill
+from agent_browser import create_session, open_page, snapshot, click, fill, evaluate
 
 async def main():
     # Create a stealth-wrapped browser session
@@ -69,8 +69,62 @@ async def main():
     await click(session_id, "@e0")  # Click first interactive element
     await fill(session_id, "@e1", "hello world")
 
+    # Execute JavaScript in page context
+    title = await evaluate(session_id, "document.title")
+    print(f"Page title: {title}")
+
 asyncio.run(main())
 ```
+
+### OOP Interface
+
+```python
+import asyncio
+from agent_browser import AgentBrowser
+
+async def main():
+    async with AgentBrowser() as ab:
+        # Create session (auto-tracked)
+        await ab.create_session()
+
+        # All methods omit session_id when tracked
+        await ab.open_page("https://example.com")
+        snap = await ab.snapshot()
+        print(f"Found {len(snap['elements'])} elements")
+
+        await ab.click("@e0")
+        await ab.fill("@e1", "hello world")
+        result = await ab.evaluate("document.title")
+        print(f"Title: {result}")
+
+        # Run autonomous agent task
+        task_result = await ab.run_task("Find the search box and type 'python'")
+        print(f"Task: {task_result['status']}")
+
+asyncio.run(main()
+```
+
+### Public API Reference
+
+| Function | Description |
+|----------|-------------|
+| `create_session()` | Create browser session, returns UUID |
+| `open_page(sid, url)` | Navigate to URL |
+| `snapshot(sid)` | Get DOM snapshot with `@eN` element refs |
+| `click(sid, ref)` | Click element by ref (`"@e0"`) |
+| `fill(sid, ref, text)` | Type text into input element |
+| `scroll(sid, direction, amount)` | Scroll page |
+| `select_option(sid, ref, value)` | Select dropdown option |
+| `hover(sid, ref)` | Move mouse to element center |
+| `press_key(sid, key)` | Press keyboard key |
+| `wait_for_selector(sel, timeout)` | Wait for CSS selector |
+| `go_back(sid)` | Navigate back |
+| **`evaluate(sid, expr)`** | Execute JS, return result |
+| `run_task(sid, task, intelligence)` | LLM/Agent autonomous task |
+| `delete_session(sid)` | Release session resources |
+| `configure(**kwargs)` | Update config for next session |
+| `reset()` | Clear all global state |
+| `setup()` | Full first-session setup with validation |
 
 ### Pipeline Mode
 
@@ -112,14 +166,20 @@ agent-browser --help
 
 ```
 agent_browser/
-├── browser/          # Backend ABCs + implementations (local, remote, extension)
+├── __init__.py      # Public API exports + __version__
+├── main.py          # Facade API (create_session, snapshot, click, run_task, etc.)
+├── client.py        # AgentBrowser OOP interface (session tracking, context manager)
+├── config.py        # SkillConfig dataclass + mode detection
+├── deploy_config.py # DeployConfig for Docker/K8s deployments
+├── browser/         # Backend ABCs + implementations (local, remote, extension)
 ├── stealth/         # Anti-detection: middleware, enhancer, actions, patches
 ├── pipeline/        # YAML pipeline engine v2.3
 ├── explore/         # Site explorer + adapter synthesizer
 ├── adapters/        # Site adapter loader/runner/validator
 ├── intelligence/    # Agent task execution (browser-use integration)
 ├── session/         # Multi-user session management
-├── cli/             # Command-line interface
+├── cli/             # Command-line interface (Typer)
+├── llm/             # LLM factory (OpenAI, Anthropic, GLM)
 └── utils/           # Shared utilities
 ```
 
