@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+## [0.2.0] - 2026-04-07
+
+### Added
+- **Chrome Extension popup UI** (`extension/popup.html` + `popup.js`): Dark theme status panel (280x380px) showing connection state, current tab info, session stats, and troubleshoot section with copy-paste fix commands
+- **Extension getStatus protocol**: background.js `chrome.runtime.onMessage` handler for popup status queries with auto-refresh every 2s
+- **SKILL.md rewrite** (`agent_browser/skill/SKILL.md`, ~435 lines): Conforms to Claude Code skill spec with bilingual triggers (Chinese + English), ARGUMENTS/Execution Environment blockquotes, doctor.py Quick Start checklist, Extension Mode docs, conversational error recovery with IF/THEN decision tree, and progressive disclosure via references/
+- **Reference docs** (`agent_browser/skill/references/`): adapter-guide.md for site adapters/explore pipeline; react-workflow.md, error-recovery.md, api-reference.md ported from canonical
+- **Environment diagnostic** (`agent_browser/skill/scripts/doctor.py`): 7-check diagnosis (Python version, package, Playwright, CloakBrowser, CDP endpoint, LLM API key, websockets) with auto-fix capability and structured DoctorReport output
+- **install-skill CLI command** (`agent-browser install-skill`): Copies SKILL.md + references + scripts to `~/.claude/skills/agent-browser/` for Claude Code discovery; supports `--path` and `--force` flags
+- **91 tests** across 12 test classes in `tests/skill/test_skill_extension.py`: SKILL.md conformance (21), Extension popup (8), manifest (9), background.js (13), snapshot.js (8), doctor script (6), install-skill (5), config extension field (2), pyproject package data (6), reference docs (6), backend snapshot (2)
+
+### Changed
+- **ExtensionBackend.snapshot()**: New method on ExtensionBackend that routes snapshot commands through the page handle or bridge (previously missing, would crash with AttributeError)
+- **SkillConfig.extension_enabled**: New field (default True) with env var (`AGENT_BROWSER_EXTENSION_ENABLED`) and YAML override support
+- **Extension tools list**: Added `select_option` to LLM-mode tool list for Extension backend
+- **manifest.json**: Added `default_popup: "popup.html"` so toolbar icon opens the status panel
+- **DoctorReport.ready semantics**: Now requires both zero failures AND zero warnings (previously returned True with 7 warnings)
+- **pyproject.toml package_data**: Added popup files (popup.html, popup.js) and reference docs to packaged data
+
+### Fixed
+- **pendingCommands variable shadowing** (background.js): `let pendingCommands = 0` shadowed the `const pendingCommands = Map()`, causing rejectAllPending() TypeError and always-zero command stats in popup. Renamed counter to `commandCount`
+- **auto_fix() tally corruption** (doctor.py): Double-decremented both warned AND failed counters regardless of original check status, producing negative tallies. Now saves original status before overwrite
+- **install_skill partial install** (cli/main.py): File operations now wrapped in try/except to prevent partial installs on failure (e.g., PermissionError midway through copytree)
+- **JS injection in debugger ops** (background.js): All selector/value interpolation now uses jsEscape()/jsEscapeSelector() helpers with JSON.stringify+parse pattern for values, preventing arbitrary code execution via malicious LLM output
+- **ensureDebuggerAttached() race condition** (background.js): Added attach mutex (_attaching promise) so concurrent commands queue instead of triggering duplicate chrome.debugger.attach() calls
+
 - **SECURITY.md**: Vulnerability reporting policy, supported versions, security best practices for API keys, browser profiles, and CDP ports
 - **CODE_OF_CONDUCT.md**: Contributor Covenant v2.1 for community governance
 
