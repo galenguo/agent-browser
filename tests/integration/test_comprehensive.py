@@ -822,7 +822,7 @@ class TestDockerRemoteBackend:
 
     @pytest.mark.asyncio
     async def test_remote_backend_sends_auth_header(self):
-        from agent_browser.backends.remote import RemoteAPIBackend
+        from agent_browser.browser.remote import RemoteAPIBackend
         from agent_browser.config import SkillConfig
 
         cfg = SkillConfig(

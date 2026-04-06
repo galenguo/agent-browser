@@ -16,6 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `test_skill_facade.py` (44 tests): facade routing through middleware stack, ReAct cycle (snapshot→click→fill), run_task(llm/agent), mode selection, error recovery
   - `test_docker_smoke.py` (3 tests): Docker script sanity + graceful skip when daemon unavailable
 - **Deploy wizard validation suite** (148 tests): config YAML roundtrip, generate_config, validate_config, migration, shell script parsing
+- **FastAPI REST API server** (`agent_browser.api`): 25 endpoints mapped to SessionPoolManager business logic
+  - Session CRUD: `GET /sessions`, `POST /sessions/create`, `GET/DELETE /sessions/{id}`
+  - Navigation: `POST /sessions/{id}/navigate`, `/back`, `GET /url`, `/title`
+  - Interaction: `POST /snapshot`, `/click`, `/fill`, `/scroll`, `/evaluate`, `/wait`, `/mouse/move`, `/keyboard/press`
+  - Agent tasks: `POST /sessions/{id}/task`, `GET /tasks/{task_id}`
+  - Legacy compat: `POST /tasks`, `GET /tasks/{id}`
+  - Health check: `GET /health` (pool stats + mode)
+  - Startup/shutdown lifecycle with SessionPoolManager singleton
+  - Error mapping: `SessionNotFoundError` → 404, `ResourceExhaustedError` → 503
+  - Profile storage auto-configured for macOS (`PROFILE_STORAGE` env var)
 
 ### Changed
 
@@ -28,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **885 total tests collected** (up from 789)
 - **234+ core tests pass in <20s** (unit + integration + installation + facade)
-- **68/75 E2E browser tests pass** with real CloakBrowser (6 skipped: need FastAPI server, 1 flaky: session isolation race condition)
+- **74/75 E2E browser tests pass** with real CloakBrowser (1 flaky: session isolation race condition; FastAPI server gap closed, 6 api/local tests now pass)
 - **0 regressions** across all test suites
 
 ## [0.1.0] - 2026-04-06
