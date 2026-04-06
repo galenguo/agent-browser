@@ -1,132 +1,83 @@
-# autoresearch — Agent Browser 自主优化
+# autoresearch -- Agent Browser Autonomous Optimization
 
 ## Setup
 
-与用户确认后:
-1. 创建分支: `git checkout -b autoresearch/<tag>` (tag 基于日期，如 `apr2`)
-2. 读取所有 in-scope 文件获取上下文
-3. 运行基准: `python scripts/benchmark/parallel_benchmark.py`，记录基线到 `scripts/benchmark/results.tsv`
-4. 确认 setup 完成后开始实验循环
+After user confirmation:
+1. Create branch: `git checkout -b autoresearch/<tag>` (tag based on date, e.g., `apr2`)
+2. Read all in-scope files for context
+3. Run baseline: record baseline metrics
+4. Confirm setup complete before starting experiment loop
 
-## 优化目标
+## Optimization Goal
 
-**主指标: success_rate (越高越好)**
-通过 `python scripts/benchmark/parallel_benchmark.py | grep success_rate` 读取。
+**Primary metric: success_rate (higher is better)**
 
-**次要指标**: avg_steps (越低越好), avg_time_seconds (越低越好), passed_tests (越高越好)
+**Secondary metrics**: avg_steps (lower is better), avg_time_seconds (lower is better), passed_tests (higher is better)
 
-**测试范围**: 10 个场景分类，20+ 测试用例，全部通过 skill 接口执行：
-1. 会话生命周期 (create/delete/reconnect)
-2. 基础导航 (百度/Bing/GitHub)
-3. 搜索交互 (百度搜索 ai coding 提取前5条)
-4. 数据提取 (标题/元素/结果列表)
-5. 多步复合 (完整搜索+提取+整理)
-6. 多标签页 (并行站点操作)
-7. 远程 CDP 连接
-8. 错误处理 (无效ref/不存在session/无效URL)
-9. 反检测验证 (指纹检查/自动化检测)
-10. 多站点覆盖 (百度/Bing/淘宝/知乎/GitHub)
+**Test scope**: 10 scenario categories, 20+ test cases:
+1. Session lifecycle (create/delete/reconnect)
+2. Basic navigation (Baidu/Bing/GitHub)
+3. Search interaction (Baidu search "ai coding", extract top 5)
+4. Data extraction (title/elements/result lists)
+5. Multi-step composite (full search + extract + organize)
+6. Multi-tab (parallel site operations)
+7. Remote CDP connection
+8. Error handling (invalid ref/non-existent session/invalid URL)
+9. Anti-detection verification (fingerprint check/automation detection)
+10. Multi-site coverage (Baidu/Bing/Taobao/Zhihu/GitHub)
 
-## In-Scope 文件（Agent 可以修改）
+## In-Scope Files (Agent may modify)
 
-### Skill 接口层 (最常修改)
-- `skills/agent-browser/controller.py` — 浏览器控制器（snapshot/click/fill 实现）
-- `skills/agent-browser/refs_generator.py` — 元素引用生成
-- `skills/agent-browser/session_manager.py` — 会话管理
-- `skills/agent-browser/SKILL.md` — Skill 声明式指令（参考 openclaw ReAct 模式）
+### Facade API layer (most frequently modified)
+- `agent_browser/main.py` -- Facade API (create_session, snapshot, click, fill)
+- `agent_browser/utils/refs_generator.py` -- Element reference generation
+- `agent_browser/session/session_manager.py` -- Session management
 
-### Agent 层
-- `src/agent/runner.py` — Agent 执行逻辑、提示模板、动作注册
-- `src/core/stealth_actions.py` — 隐身动作覆写
-- 新增 `src/agent/prompts.py` — 提示模板（browser-use 有 9 种变体）
+### Agent layer
+- `agent_browser/intelligence/agent_runner.py` -- Agent execution logic, prompt templates, action registration
+- `agent_browser/stealth/actions.py` -- Stealth action overrides
 
-### 行为模拟
-- `src/browser/human_behavior.py` — 类人行为模拟参数
+### Behavior simulation
+- `agent_browser/browser/human_behavior.py` -- Human behavior simulation parameters
 
-### DOM 处理 (新增模块)
-- 新增 `src/dom/service.py` — 多树合并 DOM 服务
-- 新增 `src/dom/serializer.py` — LLM 友好 DOM 序列化
+### DOM processing
+- `agent_browser/explore/analysis.py` -- DOM structure analysis
+- Explore module for LLM-friendly DOM serialization
 
-### Agent 增强 (新增模块)
-- 新增 `src/agent/loop_detector.py` — 动作循环检测
-- 新增 `src/agent/planner.py` — 任务规划系统
+### Agent enhancements
+- Loop detection and task planning within intelligence module
 
-## Read-Only 文件（禁止修改）
+## Read-Only Files (do not modify)
 
-- `scripts/benchmark/benchmark.py` — 串行评估脚本（指标来源，公平性保证）
-- `scripts/benchmark/parallel_benchmark.py` — 并行评估脚本（3x 更快，同等公平性）
-- `AUTORESEARCH.md` — 本文件（实验规则）
-- `results.tsv` — 结果日志（Agent 只追加，不修改已有行）
-- `src/browser/stealth_launcher.py` — 反检测栈核心（6层防护）
-- `src/browser/instance_pool.py` — 浏览器实例池
-- `src/session/session_manager.py` — 指纹-IP-Cookie 一致性
-- `src/session/profile_manager.py` — 配置文件管理
-- `src/config/manager.py` — 配置系统
-- `skills/agent-browser/main.py` — Skill 入口（公共 API 接口）
-- `pyproject.toml` — 项目依赖
-- `requirements.txt` — 依赖锁定
+- `AUTORESEARCH.md` -- This file (experiment rules)
+- `pyproject.toml` -- Project dependencies
+- Test files and benchmark scripts
+- Core stealth stack (`agent_browser/browser/stealth_launcher.py`)
+- Browser instance pool (`agent_browser/browser/instance_pool.py`)
 
-## 实验
+## Experiment Loop
 
-每个实验:
-1. 修改一个或少量文件（原子变更）
-2. `git add` + `git commit -m "experiment: <描述>"`
-3. 运行: `python scripts/benchmark/parallel_benchmark.py > run.log 2>&1`（重定向输出，不要刷屏上下文）
-4. 读取结果: `grep "^success_rate:" run.log`
-5. 改进 → 保留 commit; 退步 → `git reset --hard HEAD~1`
-6. 记录到 `results.tsv`（不 commit 此文件）
+Each experiment:
+1. Modify one or a few files (atomic changes)
+2. `git add` + `git commit -m "experiment: <description>"`
+3. Run evaluation
+4. Read results
+5. Improvement -> keep commit; Regression -> `git reset --hard HEAD~1`
+6. Record to results log
 
-## results.tsv 格式
+## Simplicity Principle
 
-```
-commit	success_rate	avg_steps	avg_time	status	description
-a1b2c3d	0.850000	12.3	5.1	baseline	初始基线
-b2c3d4e	0.950000	10.1	4.8	keep	优化 DOM 序列化减少噪音
-c3d4e5f	0.800000	14.5	6.2	discard	移除等待策略导致不稳定
-```
-
-字段:
-- commit: 7 字符 git hash
-- success_rate: 加权成功率 (0.0 - 1.0)
-- avg_steps: 平均步骤数
-- avg_time: 平均耗时秒
-- status: baseline / keep / discard / crash
-- description: 一句话描述实验内容
-
-## 实验方向（已验证的高价值方向）
-
-### A. Skill ReAct 模式优化（参考 openclaw skills/）
-- 重写 SKILL.md 为声明式 ReAct 指令
-- 新增 observe/reason_and_act/check_result 方法
-- 参考 `references/openclaw/skills/gh-issues/SKILL.md` 的分阶段模式
-
-### B. DOM 序列化优化（参考 browser-use dom/service.py）
-- 当前仅用 Playwright 单一树 → browser-use 三树合并
-- 参考 `references/browser-use/browser_use/dom/service.py`
-
-### C. Agent 提示优化（参考 browser-use agent/system_prompts/）
-- 当前硬编码单一提示 → 9 种变体
-- 参考 `references/browser-use/browser_use/agent/system_prompts/`
-
-### D. 行为参数调优
-- 当前手工设定 → autoresearch 自动搜索最优参数
-- 修改 `src/browser/human_behavior.py` 的延迟、速度、滚动参数
-
-## 简洁性原则
-
-等价结果下，更简单的代码更优:
-- 删除代码得到相同结果 = **必须保留**
-- 0.01 的 success_rate 提升如果增加 50 行复杂代码 = 可能不值得
-- 优先尝试"删除 X 能否保持 success_rate"而非"添加 Y 能否提升"
+Given equivalent results, simpler code wins:
+- Deleting code with same result = **must keep**
+- 0.01 success_rate improvement adding 50 lines of complex code = probably not worth it
+- Prefer "can I delete X and maintain success_rate" over "can I add Y to improve"
 
 ## NEVER STOP
 
-实验循环开始后**不要暂停**。不要问"要继续吗？"。自主运行直到被手动中断 (Ctrl+C)。
+Once the experiment loop starts, **do not pause**. Do not ask "should I continue?". Run autonomously until manually interrupted (Ctrl+C).
 
-如果感觉陷入停滞:
-- 重新读取 in-scope 文件寻找新灵感
-- 参考 `references/` 目录中的 browser-use / openclaw 源码
-- 尝试更激进的架构变更（不只是参数调整）
-- 回到基线，换一个实验方向
-
-你是自主研究员。你的目标是找到最简洁、最有效的代码让 scripts/benchmark/benchmark.py 的 success_rate 达到 0.95+。
+If stuck:
+- Re-read in-scope files for new inspiration
+- Reference browser-use source code for patterns
+- Try more aggressive architectural changes (not just parameter tuning)
+- Return to baseline, switch experiment direction

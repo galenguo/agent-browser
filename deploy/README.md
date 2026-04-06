@@ -23,7 +23,7 @@ v2 架构支持多用户隔离，每个用户拥有独立的浏览器会话、Pr
 ### 1. 配置环境变量
 
 ```bash
-cd /Users/galen/OpenSource/browser-controller/agent-browser/scheme1/docker
+cd deploy/docker
 cp .env.v2.example .env
 ```
 
@@ -256,8 +256,6 @@ deploy:
 ### 运行自动化测试
 
 ```bash
-cd /Users/galen/OpenSource/browser-controller/agent-browser/scheme1
-
 # 安装测试依赖
 pip install pytest httpx pytest-asyncio
 
@@ -420,7 +418,7 @@ nano k8s/secret.yaml
 
 ```bash
 # 使用脚本（推荐）
-./scripts/deploy-k8s.sh --mode aio --registry registry.example.com
+./k8s/deploy-k8s.sh --mode aio --registry registry.example.com
 
 # 或手动部署
 kubectl apply -f k8s/namespace.yaml
@@ -435,7 +433,7 @@ kubectl apply -f k8s/aio-service.yaml
 
 ```bash
 # 使用脚本（推荐）
-./scripts/deploy-k8s.sh --mode distributed --registry registry.example.com
+./k8s/deploy-k8s.sh --mode distributed --registry registry.example.com
 
 # 或手动部署
 kubectl apply -f k8s/namespace.yaml
@@ -665,7 +663,6 @@ kubectl exec -n agent-browser <pod-name> -- curl http://localhost:8000/health
 ### 详细文档
 
 更多详细信息请参考：
-- [安装指南](./INSTALL.md)
-- [Kubernetes 配置](../k8s/)
-- [Helm Chart](../helm/agent-browser/)
+- [Kubernetes 配置](./k8s/)
+- [Helm Chart](./helm/agent-browser/)
 - [ ] 实现自动扩缩容
