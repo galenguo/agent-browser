@@ -24,6 +24,9 @@ from .main import (
     detect_missing_deps,
 )
 
+# OOP interface
+from .client import AgentBrowser
+
 # Configuration
 from .config import SkillConfig, load_config, detect_mode
 
@@ -37,6 +40,8 @@ from .explore import explore, synthesize, cascade_explore as cascade
 from .llm.factory import LLMFactory
 
 __all__ = [
+    # OOP interface
+    "AgentBrowser",
     # Facade API
     "create_session",
     "delete_session",

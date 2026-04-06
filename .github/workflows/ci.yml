@@ -1,0 +1,59 @@
+# Main CI Pipeline
+# Runs linting, formatting, type checking, and unit tests across Python 3.11-3.13
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run ruff lint
+        run: ruff check agent_browser/ tests/
+
+      - name: Run ruff format check
+        run: ruff format --check agent_browser/ tests/
+
+      - name: Run mypy (optional)
+        if: always()
+        continue-on-error: true
+        run: |
+          pip install mypy
+          mypy agent_browser/ tests/ || true
+
+      - name: Run unit tests
+        run: |
+          pytest tests/ \
+            --ignore=tests/e2e \
+            --ignore=tests/integration \
+            -k "not (api or anti_detection or perf or distributed or persistent or remote_cdp or mode2 or mode3 or zhipin or xiaohongshu or scenario)" \
+            -x \
+            --timeout=60

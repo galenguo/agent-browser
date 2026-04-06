@@ -1,0 +1,63 @@
+# Security Scanning
+# Scans dependencies for known vulnerabilities and checks Python code for security issues
+
+name: Security
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Run weekly on Monday at 00:00 UTC
+    - cron: "0 0 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Install security tools
+        run: pip install pip-audit bandit
+
+      - name: Run pip-audit (dependency vulnerability scan)
+        run: pip-audit --desc -r <(pip freeze | grep -v "^agent-browser")
+
+      - name: Run bandit (security lint)
+        run: bandit -r agent_browser/ -ll --skip B101,B311
+
+  code-security:
+    name: Code Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install bandit
+        run: pip install bandit
+
+      - name: Run bandit on tests
+        run: bandit -r tests/ -ll --skip B101,B311
