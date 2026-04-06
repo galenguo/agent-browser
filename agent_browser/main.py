@@ -293,7 +293,9 @@ def reset():
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                asyncio.create_task(_middleware.disconnect())
+                # Fire-and-forget in running loop; best-effort cleanup
+                t = asyncio.create_task(_middleware.disconnect())
+                t.add_done_callback(lambda _: None)  # suppress Task warning
             else:
                 loop.run_until_complete(_middleware.disconnect())
         except Exception as e:
