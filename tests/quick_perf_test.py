@@ -1,9 +1,33 @@
 #!/usr/bin/env python3
 """
-快速性能压测脚本
+Quick performance benchmark script.
 
-测试 512MB 内存配置下的性能表现
+Tests performance under 512MB memory configuration.
+Requires FastAPI server at localhost:8000.
+Skipped automatically when server is unavailable.
 """
+
+import pytest
+
+
+def _api_server_available():
+    """Check if the agent-browser API server is reachable and healthy."""
+    try:
+        import httpx
+
+        resp = httpx.get("http://localhost:8000/health", timeout=2)
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
+if not _api_server_available():
+    pytest.skip(
+        reason="API server not available at localhost:8000 "
+        "(run distributed mode first: ./scripts/start-distributed.sh)",
+        allow_module_level=True,
+    )
+
 import asyncio
 import time
 
@@ -20,17 +44,17 @@ async def test_sequential_tasks(num_tasks=5):
         results = []
 
         for i in range(num_tasks):
-            print(f"\n任务 {i+1}/{num_tasks}")
+            print(f"\n任务 {i + 1}/{num_tasks}")
 
             # 提交任务
             start = time.time()
             resp = await client.post(
                 f"{base_url}/tasks",
                 json={
-                    "task": f"访问 https://example.com 并获取页面标题（任务 {i+1}）",
+                    "task": f"访问 https://example.com 并获取页面标题（任务 {i + 1}）",
                     "model": "glm-5-turbo",
-                    "max_steps": 3
-                }
+                    "max_steps": 3,
+                },
             )
             task_data = resp.json()
             task_id = task_data["task_id"]
@@ -52,11 +76,7 @@ async def test_sequential_tasks(num_tasks=5):
             print(f"  状态: {status}")
             print(f"  耗时: {elapsed:.2f}s")
 
-            results.append({
-                "task_id": task_id,
-                "status": status,
-                "elapsed": elapsed
-            })
+            results.append({"task_id": task_id, "status": status, "elapsed": elapsed})
 
             # 任务间隔 5 秒
             if i < num_tasks - 1:
@@ -86,11 +106,7 @@ async def test_memory_stress():
         # 提交一个任务
         resp = await client.post(
             f"{base_url}/tasks",
-            json={
-                "task": "访问 https://www.zhipin.com 并获取页面标题",
-                "model": "glm-5-turbo",
-                "max_steps": 5
-            }
+            json={"task": "访问 https://www.zhipin.com 并获取页面标题", "model": "glm-5-turbo", "max_steps": 5},
         )
         task_data = resp.json()
         task_id = task_data["task_id"]
@@ -105,19 +121,18 @@ async def test_memory_stress():
         for i in range(20):  # 监控 60 秒
             try:
                 result = subprocess.run(
-                    ["docker", "stats", "agent-browser", "--no-stream",
-                     "--format", "{{.CPUPerc}},{{.MemUsage}}"],
+                    ["docker", "stats", "agent-browser", "--no-stream", "--format", "{{.CPUPerc}},{{.MemUsage}}"],
                     capture_output=True,
                     text=True,
-                    timeout=5
+                    timeout=5,
                 )
 
                 if result.returncode == 0:
                     output = result.stdout.strip()
                     if output:
-                        cpu, mem = output.split(',')
+                        cpu, mem = output.split(",")
                         samples.append({"cpu": cpu, "memory": mem})
-                        print(f"  采样 {i+1}: CPU={cpu}, 内存={mem}")
+                        print(f"  采样 {i + 1}: CPU={cpu}, 内存={mem}")
             except Exception as e:
                 print(f"  采样失败: {e}")
 

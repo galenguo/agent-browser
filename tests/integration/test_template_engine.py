@@ -25,6 +25,7 @@ from agent_browser.pipeline.template import (
 #  Test 1: Pipe Chaining with Logical OR
 # ══════════════════════════════════════════════
 
+
 class TestPipeChaining:
     """OpenCLI-compatible pipe splitting on single | (preserves ||).
 
@@ -65,6 +66,7 @@ class TestPipeChaining:
 # ══════════════════════════════════════════════
 #  Test 2: Arithmetic Expressions
 # ══════════════════════════════════════════════
+
 
 class TestArithmetic:
     """JS-style arithmetic translated to Python.
@@ -110,22 +112,19 @@ class TestArithmetic:
 #  Test 3: Nested Property Access After Filter
 # ══════════════════════════════════════════════
 
+
 class TestNestedPropertyAccess:
     """filter.property_path pattern: items[0].title after | first."""
 
     def test_first_then_property(self):
         """| first then .name extracts field from first element."""
-        ctx = TemplateContext(
-            data=[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]
-        )
+        ctx = TemplateContext(data=[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}])
         result = ctx.resolve("data | first.name")
         assert result == "Alice"
 
     def test_last_then_property(self):
         """| last then .name from last element."""
-        ctx = TemplateContext(
-            data=[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]
-        )
+        ctx = TemplateContext(data=[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}])
         result = ctx.resolve("data | last.name")
         assert result == "Bob"
 
@@ -139,6 +138,7 @@ class TestNestedPropertyAccess:
 # ══════════════════════════════════════════════
 #  Test 4: Null/Empty Semantics (OpenCLI Compat)
 # ══════════════════════════════════════════════
+
 
 class TestDefaultFilterSemantics:
     """default() filter triggers on None AND empty string (OpenCLI compat)."""
@@ -168,6 +168,7 @@ class TestDefaultFilterSemantics:
 # ══════════════════════════════════════════════
 #  Test 5: Security Sandbox
 # ══════════════════════════════════════════════
+
 
 class TestSecuritySandbox:
     """AST-based safe eval blocks dangerous patterns."""
@@ -233,16 +234,32 @@ class TestSecuritySandbox:
 #  Test 6: All 19 Pipe Filters Registered
 # ══════════════════════════════════════════════
 
+
 class TestAllFiltersRegistered:
     """Verify all 19 OpenCLI-compatible pipe filters exist and work."""
 
     EXPECTED_FILTERS = {
-        "default", "truncate", "replace", "join",
-        "upper", "lower", "trim", "strip",
-        "keys", "length", "first", "last",
-        "json", "slugify", "sanitize", "ext",
-        "basename", "urlencode", "urldecode",
-        "int", "float",
+        "default",
+        "truncate",
+        "replace",
+        "join",
+        "upper",
+        "lower",
+        "trim",
+        "strip",
+        "keys",
+        "length",
+        "first",
+        "last",
+        "json",
+        "slugify",
+        "sanitize",
+        "ext",
+        "basename",
+        "urlencode",
+        "urldecode",
+        "int",
+        "float",
     }
 
     def test_all_filters_present(self):
@@ -346,6 +363,7 @@ class TestAllFiltersRegistered:
 # ══════════════════════════════════════════════
 #  Bonus: Template Rendering in Context
 # ══════════════════════════════════════════════
+
 
 class TestTemplateRendering:
     """render_template() replaces all ${{ }} expressions in strings."""

@@ -10,6 +10,7 @@ Verifies:
 - CSS selector injection blocked
 - Path traversal in adapter loading blocked
 """
+
 from unittest import mock
 
 import pytest
@@ -18,6 +19,7 @@ import pytest
 def _make_config_with_stealth():
     """Config with stealth ON (for circuit-dependent tests)."""
     from agent_browser.config import SkillConfig
+
     return SkillConfig(
         calling_mode="cli",
         browser_mode="local",
@@ -29,6 +31,7 @@ def _make_config_with_stealth():
 # ══════════════════════════════════════════════
 #  Test 1: Session Isolation
 # ══════════════════════════════════════════════
+
 
 class TestSessionIsolation:
     """Two sessions must not share state."""
@@ -87,6 +90,7 @@ class TestSessionIsolation:
 #  Test 3: Session Cleanup Verification
 # ══════════════════════════════════════════════
 
+
 class TestSessionCleanup:
     """delete_session removes all associated resources."""
 
@@ -130,6 +134,7 @@ class TestSessionCleanup:
 #  Test 4: Resource Limits
 # ══════════════════════════════════════════════
 
+
 class TestResourceLimits:
     """Max sessions and resource constraints."""
 
@@ -140,13 +145,14 @@ class TestResourceLimits:
         cfg = SkillConfig()
         # Config doesn't hardcode max_sessions; that's a backend concern
         # But we verify config is extensible
-        assert hasattr(cfg, 'daemon_idle_timeout')
+        assert hasattr(cfg, "daemon_idle_timeout")
         assert isinstance(cfg.daemon_idle_timeout, int)
 
 
 # ══════════════════════════════════════════════
 #  Test 5: CDP URL Validation (SSRF Protection)
 # ══════════════════════════════════════════════
+
 
 class TestCDPURLValidation:
     """CDP URL validation (TODO: not enforced at config level yet).
@@ -174,6 +180,7 @@ class TestCDPURLValidation:
 # ══════════════════════════════════════════════
 #  Test 7: CSS Selector Injection Prevention
 # ══════════════════════════════════════════════
+
 
 class TestSelectorInjection:
     """_escape_selector() blocks dangerous CSS selectors."""
@@ -225,6 +232,7 @@ class TestSelectorInjection:
 #  Test 8: Path Traversal Prevention
 # ══════════════════════════════════════════════
 
+
 class TestPathTraversal:
     """Adapter loading prevents directory traversal attacks."""
 
@@ -233,11 +241,13 @@ class TestPathTraversal:
         from agent_browser.adapters.loader import _normalize_adapter
 
         # Even if someone puts weird chars in name, it stays a string key
-        adapter = _normalize_adapter({
-            "site": "test",
-            "name": "../../etc/passwd",
-            "pipeline": [{"snapshot": "*"}],
-        })
+        adapter = _normalize_adapter(
+            {
+                "site": "test",
+                "name": "../../etc/passwd",
+                "pipeline": [{"snapshot": "*"}],
+            }
+        )
         # The name is just stored as-is; it becomes a dict key, not a path
         assert adapter["name"] == "../../etc/passwd"
         # It won't be used as a filesystem path by loader.py (which uses os.walk)
@@ -254,6 +264,7 @@ class TestPathTraversal:
 # ══════════════════════════════════════════════
 #  Security: JS Evaluate Blocking
 # ══════════════════════════════════════════════
+
 
 class TestJSEvaluateBlocking:
     """step_evaluate blocks dangerous JavaScript patterns."""

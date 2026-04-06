@@ -20,6 +20,7 @@ We just need to prove:
   7. Error handling: FirstSessionError carries recovery dict
   8. Mode routing: _select_backend picks correct backend per config
 """
+
 import asyncio
 import os
 import sys
@@ -58,10 +59,12 @@ from agent_browser.main import (
 # Fixtures
 # ════════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture(autouse=True)
 def _reset_globals():
     """Reset module-level globals before/after each test."""
     import agent_browser.main as mod
+
     saved_config = mod._config
     saved_middleware = mod._middleware
     mod._config = None
@@ -79,20 +82,24 @@ def _make_mock_middleware():
     mw.create_session = mock.AsyncMock()
     mw.delete_session = mock.AsyncMock()
     mw.get_page = mock.AsyncMock()
-    mw.snapshot = mock.AsyncMock(return_value={
-        "url": "https://example.com",
-        "title": "Example",
-        "elements": [
-            {"ref": "@e0", "tag": "button", "text": "Submit"},
-            {"ref": "@e1", "tag": "input", "type": "text"},
-            {"ref": "@e2", "tag": "a", "href": "/next", "text": "Next"},
-        ],
-    })
-    mw.run_task = mock.AsyncMock(return_value={
-        "status": "completed",
-        "result": "Task done",
-        "steps_taken": 3,
-    })
+    mw.snapshot = mock.AsyncMock(
+        return_value={
+            "url": "https://example.com",
+            "title": "Example",
+            "elements": [
+                {"ref": "@e0", "tag": "button", "text": "Submit"},
+                {"ref": "@e1", "tag": "input", "type": "text"},
+                {"ref": "@e2", "tag": "a", "href": "/next", "text": "Next"},
+            ],
+        }
+    )
+    mw.run_task = mock.AsyncMock(
+        return_value={
+            "status": "completed",
+            "result": "Task done",
+            "steps_taken": 3,
+        }
+    )
     mw.cache_snapshot_after_open = mock.AsyncMock()
     return mw
 
@@ -115,8 +122,8 @@ def _make_mock_page():
 # A. setup() [P0]
 # ════════════════════════════════════════════════════════════════════
 
-class TestSetup:
 
+class TestSetup:
     async def test_setup_returns_structured_dict(self):
         """setup() returns dict with expected top-level keys."""
         with (
@@ -124,9 +131,12 @@ class TestSetup:
             mock.patch("agent_browser.deploy_config.load_deploy_config") as mock_load,
             mock.patch("agent_browser.deploy_config.validate_config", return_value=[]),
             mock.patch("agent_browser.deploy_config.generate_config", return_value="/tmp/config.yaml"),
-            mock.patch("agent_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()),
+            mock.patch(
+                "agent_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()
+            ),
         ):
             from agent_browser.deploy_config import DeployConfig
+
             mock_load.return_value = DeployConfig(mode="local")
             result = await setup()
             assert isinstance(result, dict)
@@ -144,9 +154,12 @@ class TestSetup:
             mock.patch("agent_browser.deploy_config.load_deploy_config") as mock_load,
             mock.patch("agent_browser.deploy_config.validate_config", return_value=[]),
             mock.patch("agent_browser.deploy_config.generate_config", return_value="/tmp/config.yaml"),
-            mock.patch("agent_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()),
+            mock.patch(
+                "agent_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()
+            ),
         ):
             from agent_browser.deploy_config import DeployConfig
+
             mock_load.return_value = DeployConfig(mode="local")
             result = await setup()
             assert result["ready"] is True
@@ -154,15 +167,19 @@ class TestSetup:
     async def test_setup_not_ready_with_errors(self):
         """setup() ready=False when validation errors exist."""
         from agent_browser.deploy_config import ConfigIssue
+
         issues = [ConfigIssue(severity="error", section="deployment", message="bad mode")]
         with (
             mock.patch("agent_browser.deploy_config.detect_environment", return_value={"os": "linux", "arch": "amd64"}),
             mock.patch("agent_browser.deploy_config.load_deploy_config") as mock_load,
             mock.patch("agent_browser.deploy_config.validate_config", return_value=issues),
             mock.patch("agent_browser.deploy_config.generate_config", return_value="/tmp/config.yaml"),
-            mock.patch("agent_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()),
+            mock.patch(
+                "agent_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()
+            ),
         ):
             from agent_browser.deploy_config import DeployConfig
+
             mock_load.return_value = DeployConfig(mode="local")
             result = await setup()
             assert result["ready"] is False
@@ -174,9 +191,12 @@ class TestSetup:
             mock.patch("agent_browser.deploy_config.load_deploy_config") as mock_load,
             mock.patch("agent_browser.deploy_config.validate_config", return_value=[]),
             mock.patch("agent_browser.deploy_config.generate_config", return_value="/tmp/test-config.yaml") as mock_gen,
-            mock.patch("agent_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()),
+            mock.patch(
+                "agent_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()
+            ),
         ):
             from agent_browser.deploy_config import DeployConfig
+
             mock_load.return_value = DeployConfig(mode="local")
             result = await setup()
             mock_gen.assert_called_once()
@@ -187,8 +207,8 @@ class TestSetup:
 # B. configure() + reset() [P0]
 # ════════════════════════════════════════════════════════════════════
 
-class TestConfigureReset:
 
+class TestConfigureReset:
     def test_configure_updates_global_config(self):
         """configure() sets _config globally."""
         cfg = configure(calling_mode="api", cdp_url="http://custom:9222")
@@ -200,11 +220,13 @@ class TestConfigureReset:
         """configure() returns a SkillConfig instance."""
         cfg = configure()
         from agent_browser.config import SkillConfig
+
         assert isinstance(cfg, SkillConfig)
 
     def test_reset_clears_globals(self):
         """reset() sets _config and _middleware to None."""
         import agent_browser.main as mod
+
         mod._config = SkillConfig(calling_mode="api")
         mod._middleware = _make_mock_middleware()
         reset()
@@ -221,8 +243,8 @@ class TestConfigureReset:
 # C. create_session() [P0]
 # ════════════════════════════════════════════════════════════════════
 
-class TestCreateSession:
 
+class TestCreateSession:
     async def test_create_session_returns_uuid_hex(self):
         """create_session() returns a hex string (UUID format)."""
         mw = _make_mock_middleware()
@@ -252,7 +274,9 @@ class TestCreateSession:
     async def test_create_session_with_cdp_url(self):
         """create_session(cdp_url=...) passes custom CDP URL."""
         mw = _make_mock_middleware()
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw) as mock_ens:
+        with mock.patch(
+            "agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw
+        ) as mock_ens:
             await create_session(cdp_url="http://localhost:9222")
             call_kwargs = mock_ens.call_args[0][0] if mock_ens.call_args else None
             if call_kwargs:
@@ -263,8 +287,8 @@ class TestCreateSession:
 # D. ReAct Cycle: snapshot -> click -> fill [P0-CORE]
 # ════════════════════════════════════════════════════════════════════
 
-class TestReactCycle:
 
+class TestReactCycle:
     async def test_snapshot_returns_elements(self):
         """snapshot() returns dict with url, title, elements list."""
         mw = _make_mock_middleware()
@@ -324,8 +348,8 @@ class TestReactCycle:
 # E. Other Facade Operations [P0]
 # ════════════════════════════════════════════════════════════════════
 
-class TestOtherOperations:
 
+class TestOtherOperations:
     async def test_open_page_navigates(self):
         """open_page() calls page.goto() with validated URL."""
         mw = _make_mock_middleware()
@@ -414,8 +438,8 @@ class TestOtherOperations:
 # F. run_task() [P0]
 # ════════════════════════════════════════════════════════════════════
 
-class TestRunTask:
 
+class TestRunTask:
     async def test_run_task_delegates_to_middleware(self):
         """run_task() calls middleware.run_task() with correct args."""
         mw = _make_mock_middleware()
@@ -470,30 +494,39 @@ class TestRunTask:
 # G. _select_backend() Mode Routing [P0]
 # ════════════════════════════════════════════════════════════════════
 
-class TestBackendSelection:
 
+class TestBackendSelection:
     def test_cli_mode_selects_local(self):
         """CLI calling_mode selects LocalCDPBackend (no extension)."""
         cfg = SkillConfig(calling_mode="cli")
-        with mock.patch("agent_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=False):
+        with mock.patch(
+            "agent_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=False
+        ):
             backend = asyncio.get_event_loop().run_until_complete(_select_backend(cfg))
             from agent_browser.browser.local import LocalCDPBackend
+
             assert isinstance(backend, LocalCDPBackend)
 
     def test_api_mode_selects_remote(self):
         """API calling_mode selects RemoteAPIBackend."""
         cfg = SkillConfig(calling_mode="api")
-        with mock.patch("agent_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=False):
+        with mock.patch(
+            "agent_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=False
+        ):
             backend = asyncio.get_event_loop().run_until_complete(_select_backend(cfg))
             from agent_browser.browser.remote import RemoteAPIBackend
+
             assert isinstance(backend, RemoteAPIBackend)
 
     def test_unknown_mode_falls_back_to_local(self):
         """Unknown calling_mode falls back to LocalCDPBackend."""
         cfg = SkillConfig(calling_mode="weird-mode")
-        with mock.patch("agent_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=False):
+        with mock.patch(
+            "agent_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=False
+        ):
             backend = asyncio.get_event_loop().run_until_complete(_select_backend(cfg))
             from agent_browser.browser.local import LocalCDPBackend
+
             assert isinstance(backend, LocalCDPBackend)
 
     def test_extension_available_takes_priority(self):
@@ -511,8 +544,8 @@ class TestBackendSelection:
 # H. Error Handling: FirstSessionError [P0]
 # ════════════════════════════════════════════════════════════════════
 
-class TestErrorHandling:
 
+class TestErrorHandling:
     def test_first_session_error_carries_recovery(self):
         """FirstSessionError carries structured recovery dict."""
         recovery = {
@@ -552,11 +585,15 @@ class TestErrorHandling:
             mock.patch("aiohttp.ClientSession") as mock_session,
         ):
             mock_sess = mock.Mock()
-            mock_sess.__aenter__ = mock.AsyncMock(return_value=mock.Mock(
-                get=mock.AsyncMock(return_value=mock.AsyncMock(
-                    __aenter__=mock.AsyncMock(return_value=mock.Mock(status=200)),
-                )),
-            ))
+            mock_sess.__aenter__ = mock.AsyncMock(
+                return_value=mock.Mock(
+                    get=mock.AsyncMock(
+                        return_value=mock.AsyncMock(
+                            __aenter__=mock.AsyncMock(return_value=mock.Mock(status=200)),
+                        )
+                    ),
+                )
+            )
             mock_sess.__aexit__ = mock.AsyncMock(return_value=None)
             mock_session.return_value = mock_sess
             os.environ.setdefault("OPENAI_API_KEY", "sk-test")
@@ -573,8 +610,8 @@ class TestErrorHandling:
 # I. Mode Switching [P1]
 # ════════════════════════════════════════════════════════════════════
 
-class TestModeSwitching:
 
+class TestModeSwitching:
     def test_configure_switches_to_api(self):
         """configure() can switch from CLI to API mode."""
         cfg = configure(calling_mode="cli")

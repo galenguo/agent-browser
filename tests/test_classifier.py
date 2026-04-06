@@ -1,4 +1,5 @@
 """Classifier 测试 — 错误分类逻辑"""
+
 from agent_browser.pipeline.classifier import (
     ErrorCategory,
     _extract_status_code,
@@ -33,7 +34,8 @@ class TestClassifyByType:
     def test_selector_not_found(self):
         err = SelectorNotFoundError(
             message="element .job-card not found",
-            step_index=2, step_name="select",
+            step_index=2,
+            step_name="select",
             adapter_name="boss/search",
         )
         cat, meta = classify(err)
@@ -43,7 +45,8 @@ class TestClassifyByType:
     def test_timeout_error(self):
         err = StepTimeoutError(
             message="timed out after 30s",
-            step_index=1, step_name="wait",
+            step_index=1,
+            step_name="wait",
             session_id="s1",
         )
         cat, meta = classify(err)
@@ -53,9 +56,10 @@ class TestClassifyByType:
     def test_url_error(self):
         err = URLError(
             message="connection refused to https://example.com",
-            step_index=0, step_name="navigate",
+            step_index=0,
+            step_name="navigate",
         )
-        cat, meta = classify(err)
+        cat, _meta = classify(err)
         assert cat == ErrorCategory.NAVIGATION_ERROR
 
 
@@ -65,7 +69,8 @@ class TestClassifyByMessage:
     def test_auth_keywords(self):
         err = PipelineStepError(
             message="401 unauthorized - cookie expired",
-            step_index=3, step_name="fetch",
+            step_index=3,
+            step_name="fetch",
         )
         cat, meta = classify(err)
         assert cat == ErrorCategory.AUTH_FAILURE
@@ -74,7 +79,8 @@ class TestClassifyByMessage:
     def test_forbidden_keyword(self):
         err = PipelineStepError(
             message="403 forbidden: need login",
-            step_index=0, step_name="navigate",
+            step_index=0,
+            step_name="navigate",
         )
         cat, _ = classify(err)
         assert cat == ErrorCategory.AUTH_FAILURE
@@ -82,7 +88,8 @@ class TestClassifyByMessage:
     def test_timeout_in_message(self):
         err = PipelineStepError(
             message="operation timed out waiting for element",
-            step_index=4, step_name="click",
+            step_index=4,
+            step_name="click",
         )
         cat, _ = classify(err)
         assert cat == ErrorCategory.TIMEOUT
@@ -90,7 +97,8 @@ class TestClassifyByMessage:
     def test_selector_in_message(self):
         err = PipelineStepError(
             message="selector #ref-5 not found in page",
-            step_index=1, step_name="click",
+            step_index=1,
+            step_name="click",
         )
         cat, _ = classify(err)
         assert cat == ErrorCategory.SELECTOR_DRIFT
@@ -98,7 +106,8 @@ class TestClassifyByMessage:
     def test_navigation_in_message(self):
         err = PipelineStepError(
             message="dns resolution failed for target.com",
-            step_index=0, step_name="navigate",
+            step_index=0,
+            step_name="navigate",
         )
         cat, _ = classify(err)
         assert cat == ErrorCategory.NAVIGATION_ERROR
@@ -106,7 +115,8 @@ class TestClassifyByMessage:
     def test_data_quality_in_message(self):
         err = PipelineStepError(
             message="key error 'title' on empty data",
-            step_index=5, step_name="map",
+            step_index=5,
+            step_name="map",
         )
         cat, _ = classify(err)
         assert cat == ErrorCategory.DATA_QUALITY
@@ -114,7 +124,8 @@ class TestClassifyByMessage:
     def test_unknown_falls_back(self):
         err = PipelineStepError(
             message="something completely unexpected",
-            step_index=2, step_name="evaluate",
+            step_index=2,
+            step_name="evaluate",
         )
         cat, _ = classify(err)
         assert cat == ErrorCategory.UNKNOWN

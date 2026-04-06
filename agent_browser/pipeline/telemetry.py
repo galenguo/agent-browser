@@ -9,6 +9,7 @@ Usage:
     stats = Telemetry.get_stats("boss/search")  # Single adapter
     stats = Telemetry.get_stats()               # Global
 """
+
 import json
 import time
 from collections import defaultdict
@@ -48,7 +49,7 @@ class Telemetry:
 
         try:
             _TEL_DIR.mkdir(parents=True, exist_ok=True)
-            with open(_TEL_FILE, "a", encoding="utf-8") as f:
+            with _TEL_FILE.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except OSError:
             pass  # telemetry must never block main flow
@@ -121,7 +122,7 @@ class Telemetry:
         """Clear all telemetry data. Returns number of deleted records."""
         if not _TEL_FILE.exists():
             return 0
-        with open(_TEL_FILE) as f:
+        with _TEL_FILE.open() as f:
             count = sum(1 for _ in f)
         _TEL_FILE.unlink(missing_ok=True)
         return count
@@ -133,7 +134,7 @@ class Telemetry:
         if not _TEL_FILE.exists():
             return entries
         try:
-            with open(_TEL_FILE, encoding="utf-8") as f:
+            with _TEL_FILE.open(encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line:

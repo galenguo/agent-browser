@@ -1,4 +1,5 @@
 """小红书场景测试"""
+
 import pytest
 
 from agent_browser.main import create_session, open_page, snapshot

@@ -34,26 +34,30 @@ class RemotePageHandle(BrowserPageHandle):
 
     async def goto(self, url: str, wait_until: str = "domcontentloaded", timeout: int = 8000) -> None:
         await self._backend._request(
-            "POST", f"/sessions/{self._remote_id}/navigate",
+            "POST",
+            f"/sessions/{self._remote_id}/navigate",
             {"url": url, "wait_until": wait_until, "timeout": timeout},
         )
 
     async def go_back(self, wait_until: str = "domcontentloaded", timeout: int = 10000) -> None:
         await self._backend._request(
-            "POST", f"/sessions/{self._remote_id}/back",
+            "POST",
+            f"/sessions/{self._remote_id}/back",
             {"wait_until": wait_until, "timeout": timeout},
         )
 
     async def evaluate(self, expression: str) -> Any:
         result = await self._backend._request(
-            "POST", f"/sessions/{self._remote_id}/evaluate",
+            "POST",
+            f"/sessions/{self._remote_id}/evaluate",
             {"expression": expression},
         )
         return result.get("result")
 
     async def wait_for_selector(self, selector: str, timeout: int = 10000) -> None:
         await self._backend._request(
-            "POST", f"/sessions/{self._remote_id}/wait",
+            "POST",
+            f"/sessions/{self._remote_id}/wait",
             {"selector": selector, "timeout": timeout},
         )
 
@@ -61,19 +65,22 @@ class RemotePageHandle(BrowserPageHandle):
         direction = "down" if delta_y >= 0 else "up"
         amount = abs(delta_y) if delta_y != 0 else abs(delta_x)
         await self._backend._request(
-            "POST", f"/sessions/{self._remote_id}/scroll",
+            "POST",
+            f"/sessions/{self._remote_id}/scroll",
             {"direction": direction, "amount": amount},
         )
 
     async def mouse_move(self, x: float, y: float) -> None:
         await self._backend._request(
-            "POST", f"/sessions/{self._remote_id}/mouse/move",
+            "POST",
+            f"/sessions/{self._remote_id}/mouse/move",
             {"x": x, "y": y},
         )
 
     async def keyboard_press(self, key: str) -> None:
         await self._backend._request(
-            "POST", f"/sessions/{self._remote_id}/keyboard/press",
+            "POST",
+            f"/sessions/{self._remote_id}/keyboard/press",
             {"key": key},
         )
 
@@ -86,9 +93,7 @@ class RemotePageHandle(BrowserPageHandle):
         return result.get("url", "")
 
     async def on(self, event: str, handler: Callable) -> None:
-        raise NotImplementedError(
-            "Event listeners not supported in remote mode. Use local mode for explore/cascade."
-        )
+        raise NotImplementedError("Event listeners not supported in remote mode. Use local mode for explore/cascade.")
 
     def remove_listener(self, event: str, handler: Callable) -> None:
         pass  # No-op for remote
@@ -119,11 +124,12 @@ class RemoteAPIBackend(BrowserBackend):
         """Ensure aiohttp session has been created."""
         if self._http_session is None:
             import aiohttp
+
             self._http_session = aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=120),
             )
 
-    async def _request(self, method: str, path: str, json_data: dict = None) -> dict:
+    async def _request(self, method: str, path: str, json_data: dict | None = None) -> dict:
         """Send an HTTP request."""
         await self._ensure_http()
         headers = {}
@@ -133,7 +139,10 @@ class RemoteAPIBackend(BrowserBackend):
         url = f"{self._api_url}{path}"
         try:
             async with self._http_session.request(
-                method, url, json=json_data, headers=headers,
+                method,
+                url,
+                json=json_data,
+                headers=headers,
             ) as resp:
                 if resp.status >= 400:
                     text = await resp.text()
@@ -177,7 +186,8 @@ class RemoteAPIBackend(BrowserBackend):
     async def create_session(self, session_id: str) -> RemotePageHandle:
         """Create a session on the remote FastAPI server."""
         result = await self._request(
-            "POST", "/sessions/create",
+            "POST",
+            "/sessions/create",
             {"user_id": session_id, "browser_mode": self._config.browser_mode},
         )
         remote_id = result.get("session_id", result.get("id", session_id))
@@ -227,7 +237,8 @@ class RemoteAPIBackend(BrowserBackend):
 
         # Submit task
         result = await self._request(
-            "POST", f"/sessions/{remote_id}/task",
+            "POST",
+            f"/sessions/{remote_id}/task",
             {"task": task, "max_steps": max_steps, **kwargs},
         )
         task_id = result.get("task_id")
@@ -236,11 +247,13 @@ class RemoteAPIBackend(BrowserBackend):
 
         # Poll for result
         import time
+
         start = time.time()
         while time.time() - start < poll_timeout:
             await asyncio.sleep(poll_interval)
             status = await self._request(
-                "GET", f"/sessions/{remote_id}/tasks/{task_id}",
+                "GET",
+                f"/sessions/{remote_id}/tasks/{task_id}",
             )
             state = status.get("status", "running")
             if state in ("completed", "failed"):
@@ -260,6 +273,7 @@ class RemoteAPIBackend(BrowserBackend):
         if not remote_id:
             raise ValueError(f"Session {session_id} not found")
         return await self._request(
-            "POST", f"/sessions/{remote_id}/snapshot",
+            "POST",
+            f"/sessions/{remote_id}/snapshot",
             {"interactive_only": interactive_only},
         )

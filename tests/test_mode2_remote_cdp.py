@@ -1,4 +1,5 @@
 """模式2测试：远程CDP连接"""
+
 import pytest
 
 from agent_browser.main import create_session, open_page, snapshot

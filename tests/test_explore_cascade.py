@@ -1,4 +1,5 @@
 """Cascade 测试 — DOM 级联探索与策略探测"""
+
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -62,6 +63,7 @@ class TestCascadeIntegration:
     async def test_public_success_short_circuits(self):
         """When public strategy succeeds, should not try cookie/header."""
         from types import SimpleNamespace
+
         ep = SimpleNamespace(is_json=True, url="https://api.example.com/data")
 
         with patch("agent_browser.explore.cascade._get_handle") as mock_handle:
@@ -77,10 +79,8 @@ class TestCascadeIntegration:
                 "fields": {"title": "title"},
                 "notes": "",
             }
-            with patch("agent_browser.explore.cascade._try_public",
-                       return_value=public_result):
-                result = await cascade("s1", "https://example.com",
-                                       endpoints=[ep])
+            with patch("agent_browser.explore.cascade._try_public", return_value=public_result):
+                result = await cascade("s1", "https://example.com", endpoints=[ep])
 
         # Should short-circuit: only 1 result (public succeeded)
         assert len(result) == 1
@@ -94,6 +94,7 @@ class TestPrivateHelpers:
     def test_extract_items_from_list(self):
         """List data passes through."""
         from agent_browser.explore.cascade import _extract_items
+
         data = [{"title": "A"}, {"title": "B"}]
         result = _extract_items(data)
         assert result == data
@@ -101,17 +102,20 @@ class TestPrivateHelpers:
     def test_extract_items_from_dict_with_data_key(self):
         """Dict with 'data' key unwraps it."""
         from agent_browser.explore.cascade import _extract_items
+
         data = {"data": [{"x": 1}, {"y": 2}]}
         result = _extract_items(data)
         assert result == [{"x": 1}, {"y": 2}]
 
     def test_extract_items_none_input(self):
         from agent_browser.explore.cascade import _extract_items
+
         result = _extract_items(None)
         assert result == []
 
     def test_infer_fields_maps_keys(self):
         from agent_browser.explore.cascade import _infer_fields
+
         item = {"job_title": "Engineer", "salary": "100k"}
         fields = _infer_fields(item)
         assert isinstance(fields, dict)
@@ -119,6 +123,7 @@ class TestPrivateHelpers:
 
     def test_infer_fields_empty_item(self):
         from agent_browser.explore.cascade import _infer_fields
+
         fields = _infer_fields({})
         assert isinstance(fields, dict)
 
@@ -126,6 +131,7 @@ class TestPrivateHelpers:
         from types import SimpleNamespace
 
         from agent_browser.explore.cascade import _get_test_urls
+
         eps = [
             SimpleNamespace(is_json=True, url="https://api.example.com/a"),
             SimpleNamespace(is_json=False, url="https://example.com/page"),  # not JSON
@@ -142,4 +148,5 @@ class TestPrivateHelpers:
 
     def test_get_test_urls_empty(self):
         from agent_browser.explore.cascade import _get_test_urls
+
         assert _get_test_urls([], "https://example.com") == []

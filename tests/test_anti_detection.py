@@ -1,18 +1,26 @@
 """
-快速验证脚本 — 不需要 CloakBrowser，测试其他组件是否正常工作。
+Anti-detection verification script.
 
-用法：
-    cd /Users/galen/OpenSource/browser-controller/agent-browser
-    python tests/test_anti_detection.py
+Tests that stealth patches correctly suppress automation signals.
+Requires patchright (optional [cloak] dependency).
 """
+
 import asyncio
 import logging
 import os
 
-# 激活 rebrowser Runtime.Enable addBinding 修复（环境变量方式）
-os.environ.setdefault("REBROWSER_PATCHES_RUNTIME_FIX_MODE", "addBinding")
+import pytest
 
-from patchright.async_api import async_playwright
+try:
+    from patchright.async_api import async_playwright
+except ImportError:
+    pytest.skip(
+        reason="patchright not installed (install with: pip install agent-browser[cloak])",
+        allow_module_level=True,
+    )
+
+# Activate rebrowser Runtime.Enable addBinding fix (via env var)
+os.environ.setdefault("REBROWSER_PATCHES_RUNTIME_FIX_MODE", "addBinding")
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)

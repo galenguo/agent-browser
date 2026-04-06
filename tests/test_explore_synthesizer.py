@@ -1,4 +1,5 @@
 """Synthesizer 测试 — YAML pipeline 生成"""
+
 from unittest.mock import MagicMock
 
 from agent_browser.explore.synthesizer import (
@@ -69,6 +70,7 @@ class TestDetectStrategy:
 
     def test_public_endpoint(self):
         from types import SimpleNamespace
+
         cap = SimpleNamespace(strategy_guess="public")
         exploration = SimpleNamespace(
             endpoints=[SimpleNamespace(is_json=True, status=200)],
@@ -79,6 +81,7 @@ class TestDetectStrategy:
 
     def test_intercept_strategy(self):
         from types import SimpleNamespace
+
         cap = SimpleNamespace(strategy_guess="intercept")
         exploration = SimpleNamespace(
             endpoints=[
@@ -92,14 +95,13 @@ class TestDetectStrategy:
 
     def test_store_action_detected(self):
         from types import SimpleNamespace
+
         cap = SimpleNamespace(strategy_guess="store-action")
         exploration = SimpleNamespace(
             endpoints=[SimpleNamespace(is_json=False, status=200)],
             capabilities=[cap],
         )
-        result = detect_strategy(
-            [{"action": [{"type": "tap", "store": "pinia"}]}], exploration
-        )
+        result = detect_strategy([{"action": [{"type": "tap", "store": "pinia"}]}], exploration)
         assert result in ("store-action", "ui")
 
 
@@ -125,19 +127,23 @@ class TestBuildAdapter:
     def test_pipeline_has_navigate_for_ui(self):
         nav = {"action": "navigate", "params": {"url": "https://x.com"}}
         adapter = build_adapter(
-            site="test", name="t", strategy="ui",
+            site="test",
+            name="t",
+            strategy="ui",
             actions=[nav],
             extraction_js="return []",
         )
         first_step = adapter["pipeline"][0]
         # UI strategy pipeline starts with navigate
-        step_key = list(first_step.keys())[0]
+        step_key = next(iter(first_step.keys()))
         assert "navigate" in step_key or "goto" in step_key
 
     def test_cookie_strategy_sets_browser_true(self):
         nav = {"action": "navigate", "params": {"url": "https://x.com"}}
         adapter = build_adapter(
-            site="test", name="t", strategy="cookie",
+            site="test",
+            name="t",
+            strategy="cookie",
             actions=[nav],
             extraction_js="return [];",
         )
@@ -146,7 +152,9 @@ class TestBuildAdapter:
 
     def test_empty_actions_minimal_pipeline(self):
         adapter = build_adapter(
-            site="test", name="t", strategy="ui",
+            site="test",
+            name="t",
+            strategy="ui",
             actions=[],
             extraction_js="return [];",
         )

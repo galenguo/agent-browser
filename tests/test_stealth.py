@@ -8,6 +8,7 @@ Phase 1: StealthEnhancer 单元测试
 - A2.4 human_scroll 行为（非均匀滚动，20% 回滚概率）
 - A2.5 inject_timing_noise（JS 注入成功，偏移量随机）
 """
+
 import asyncio
 from unittest import mock
 
@@ -193,7 +194,6 @@ class TestHumanType:
                 call_args[1].get("delay", 0)
                 # 如果触发了长停顿，delay 应该 >= 600
                 # 但由于 mock 逻辑，这里只验证调用成功
-                pass
 
 
 class TestRandomMouseMove:
@@ -211,6 +211,7 @@ class TestRandomMouseMove:
         # 使用真正的 async 方法
 
         move_calls = []
+
         async def track_move(page, sx, sy, ex, ey, steps=20):
             # 验证步数
             assert steps == 20

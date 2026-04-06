@@ -7,6 +7,7 @@ Core features:
 3. Periodic cleanup of expired profiles (30 days inactive)
 4. Profile statistics and monitoring
 """
+
 import hashlib
 import json
 import logging
@@ -21,12 +22,13 @@ logger = logging.getLogger(__name__)
 @dataclass
 class UserProfile:
     """User persistent profile."""
-    profile_id: str          # user_a1b2c3
-    api_key_hash: str        # SHA256 hash
-    profile_dir: str         # /data/profiles/user_a1b2c3/
+
+    profile_id: str  # user_a1b2c3
+    api_key_hash: str  # SHA256 hash
+    profile_dir: str  # /data/profiles/user_a1b2c3/
     created_at: float = field(default_factory=time.time)
     last_activity: float = field(default_factory=time.time)
-    session_count: int = 0   # Current sessions using this profile
+    session_count: int = 0  # Current sessions using this profile
     total_sessions: int = 0  # Historical total session count
 
 
@@ -36,7 +38,7 @@ class ProfileManager:
     def __init__(
         self,
         storage_dir: str = "/data/profiles",
-        profile_ttl: int = 30 * 24 * 3600  # 30 days
+        profile_ttl: int = 30 * 24 * 3600,  # 30 days
     ):
         self.storage_dir = storage_dir
         self.profile_ttl = profile_ttl
@@ -75,7 +77,7 @@ class ProfileManager:
         """Save profile metadata."""
         try:
             metadata_file = os.path.join(profile.profile_dir, ".metadata.json")
-            with open(metadata_file, 'w') as f:
+            with open(metadata_file, "w") as f:
                 json.dump(asdict(profile), f, indent=2)
         except Exception as e:
             logger.error(f"Failed to save profile metadata: {e}")
@@ -97,11 +99,7 @@ class ProfileManager:
         os.makedirs(profile_dir, mode=0o700, exist_ok=True)
 
         api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-        profile = UserProfile(
-            profile_id=profile_id,
-            api_key_hash=api_key_hash,
-            profile_dir=profile_dir
-        )
+        profile = UserProfile(profile_id=profile_id, api_key_hash=api_key_hash, profile_dir=profile_dir)
 
         self.profiles[profile_id] = profile
         self._save_metadata(profile)
@@ -140,7 +138,7 @@ class ProfileManager:
                         shutil.rmtree(profile.profile_dir, ignore_errors=True)
                         del self.profiles[profile_id]
                         cleaned.append(profile_id)
-                        logger.info(f"Cleaned up expired profile: {profile_id} (idle for {idle_time/86400:.1f} days)")
+                        logger.info(f"Cleaned up expired profile: {profile_id} (idle for {idle_time / 86400:.1f} days)")
                     except Exception as e:
                         logger.error(f"Failed to cleanup profile {profile_id}: {e}")
 
@@ -165,21 +163,23 @@ class ProfileManager:
 
             total_disk_usage += disk_usage
 
-            profile_list.append({
-                "profile_id": profile_id,
-                "created_at": profile.created_at,
-                "last_activity": profile.last_activity,
-                "session_count": profile.session_count,
-                "total_sessions": profile.total_sessions,
-                "disk_usage_mb": disk_usage / (1024 * 1024),
-                "idle_days": (time.time() - profile.last_activity) / 86400
-            })
+            profile_list.append(
+                {
+                    "profile_id": profile_id,
+                    "created_at": profile.created_at,
+                    "last_activity": profile.last_activity,
+                    "session_count": profile.session_count,
+                    "total_sessions": profile.total_sessions,
+                    "disk_usage_mb": disk_usage / (1024 * 1024),
+                    "idle_days": (time.time() - profile.last_activity) / 86400,
+                }
+            )
 
         return {
             "total_profiles": len(self.profiles),
             "active_profiles": sum(1 for p in self.profiles.values() if p.session_count > 0),
             "total_disk_usage_mb": total_disk_usage / (1024 * 1024),
-            "profiles": sorted(profile_list, key=lambda x: x["last_activity"], reverse=True)
+            "profiles": sorted(profile_list, key=lambda x: x["last_activity"], reverse=True),
         }
 
     def delete_profile(self, profile_id: str) -> bool:

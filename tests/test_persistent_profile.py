@@ -8,6 +8,7 @@
 4. 验证 profile 目录存在
 5. 验证登录状态保留
 """
+
 import time
 
 import requests
@@ -20,10 +21,7 @@ def test_create_session_first_time():
     """测试首次创建 session"""
     print("\n=== 测试1：首次创建 Session ===")
 
-    response = requests.post(
-        f"{BASE_URL}/session/create",
-        headers={"X-API-Key": API_KEY}
-    )
+    response = requests.post(f"{BASE_URL}/session/create", headers={"X-API-Key": API_KEY})
 
     print(f"状态码: {response.status_code}")
     data = response.json()
@@ -46,10 +44,7 @@ def test_destroy_session(session_id):
     """测试销毁 session"""
     print(f"\n=== 测试2：销毁 Session {session_id} ===")
 
-    response = requests.delete(
-        f"{BASE_URL}/session/{session_id}",
-        headers={"X-API-Key": API_KEY}
-    )
+    response = requests.delete(f"{BASE_URL}/session/{session_id}", headers={"X-API-Key": API_KEY})
 
     print(f"状态码: {response.status_code}")
     print(f"响应: {response.json()}")
@@ -62,10 +57,7 @@ def test_create_session_second_time(expected_profile_id):
     """测试第二次创建 session（应该复用 profile）"""
     print("\n=== 测试3：第二次创建 Session（复用 Profile）===")
 
-    response = requests.post(
-        f"{BASE_URL}/session/create",
-        headers={"X-API-Key": API_KEY}
-    )
+    response = requests.post(f"{BASE_URL}/session/create", headers={"X-API-Key": API_KEY})
 
     print(f"状态码: {response.status_code}")
     data = response.json()
@@ -88,10 +80,7 @@ def test_profile_stats():
     """测试 profile 统计"""
     print("\n=== 测试4：Profile 统计 ===")
 
-    response = requests.get(
-        f"{BASE_URL}/profiles/stats",
-        headers={"X-API-Key": API_KEY}
-    )
+    response = requests.get(f"{BASE_URL}/profiles/stats", headers={"X-API-Key": API_KEY})
 
     print(f"状态码: {response.status_code}")
     data = response.json()
@@ -99,9 +88,9 @@ def test_profile_stats():
     print(f"活跃 Profile 数: {data['active_profiles']}")
     print(f"总磁盘使用: {data['total_disk_usage_mb']:.2f} MB")
 
-    if data['profiles']:
+    if data["profiles"]:
         print("\nProfile 详情:")
-        for profile in data['profiles']:
+        for profile in data["profiles"]:
             print(f"  - {profile['profile_id']}")
             print(f"    Session 数: {profile['session_count']}")
             print(f"    磁盘使用: {profile['disk_usage_mb']:.2f} MB")
@@ -133,10 +122,7 @@ def test_execute_task(session_id):
     response = requests.post(
         f"{BASE_URL}/session/{session_id}/task",
         headers={"X-API-Key": API_KEY},
-        json={
-            "task": "打开百度首页",
-            "max_steps": 10
-        }
+        json={"task": "打开百度首页", "max_steps": 10},
     )
 
     print(f"状态码: {response.status_code}")
@@ -153,11 +139,10 @@ def test_execute_task(session_id):
     for i in range(30):
         time.sleep(2)
         status_response = requests.get(
-            f"{BASE_URL}/session/{session_id}/task/{task_id}",
-            headers={"X-API-Key": API_KEY}
+            f"{BASE_URL}/session/{session_id}/task/{task_id}", headers={"X-API-Key": API_KEY}
         )
         status_data = status_response.json()
-        print(f"  [{i*2}s] 状态: {status_data['status']}")
+        print(f"  [{i * 2}s] 状态: {status_data['status']}")
 
         if status_data["status"] in ["completed", "failed"]:
             if status_data["status"] == "completed":
@@ -219,6 +204,7 @@ def main():
     except Exception as e:
         print(f"\n❌ 错误: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

@@ -1,4 +1,5 @@
 """Tests for deploy_config.py — DeployConfig dataclass, validation, I/O."""
+
 import os
 from unittest import mock
 
@@ -203,7 +204,7 @@ class TestGenerateConfig:
     def test_atomic_write_preserves_existing(self, tmp_path):
         """Writing should preserve existing unrelated keys."""
         existing = tmp_path / "config.yaml"
-        existing.write_text('custom_key: preserved\n')
+        existing.write_text("custom_key: preserved\n")
         cfg = DeployConfig(mode="local")
         generate_config(cfg, path=existing)
 

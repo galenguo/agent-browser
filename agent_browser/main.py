@@ -3,6 +3,7 @@
 Phase 0: First-Session Recovery -- auto-detect missing deps, auto-fix, retry.
 When something fails, return structured dict so Claude Code can present options.
 """
+
 import asyncio
 import json
 import logging
@@ -15,7 +16,7 @@ from typing import Any
 from .config import SkillConfig, detect_mode, load_config
 
 logger = logging.getLogger(__name__)
-_REF_PATTERN = re.compile(r'^@e\d+$')
+_REF_PATTERN = re.compile(r"^@e\d+$")
 
 _config: SkillConfig | None = None
 _middleware = None
@@ -24,9 +25,11 @@ _middleware_lock = asyncio.Lock()
 
 # ── Phase 0: Structured Recovery Types ──────────────────────
 
+
 @dataclass
 class DepStatus:
     """Single dependency check result."""
+
     name: str
     available: bool
     fixable: bool = False
@@ -40,6 +43,7 @@ class RecoveryReport:
 
     Claude Code receives this and presents options via AskUserQuestion.
     """
+
     missing_deps: list[DepStatus] = field(default_factory=list)
     fixable: list[DepStatus] = field(default_factory=list)
     needs_human: list[DepStatus] = field(default_factory=list)
@@ -74,60 +78,65 @@ async def detect_missing_deps(config: SkillConfig = None) -> RecoveryReport:
     try:
         import cloakbrowser  # noqa: F401
     except ImportError:
-        report.missing_deps.append(DepStatus(
-            name="cloakbrowser",
-            available=False,
-            fixable=True,
-            fix_command="pip install cloakbrowser==0.3.18",
-            message="CloakBrowser package not installed (anti-detection browser)",
-        ))
+        report.missing_deps.append(
+            DepStatus(
+                name="cloakbrowser",
+                available=False,
+                fixable=True,
+                fix_command="pip install cloakbrowser==0.3.18",
+                message="CloakBrowser package not installed (anti-detection browser)",
+            )
+        )
 
     # 2. CDP reachability
     cdp_ok = False
     try:
         import aiohttp
+
         async with (
             aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as s,
             s.get(f"{config.cdp_url}/json/version") as r,
         ):
-                cdp_ok = r.status == 200
+            cdp_ok = r.status == 200
     except Exception:
         pass
 
     if not cdp_ok:
-        report.missing_deps.append(DepStatus(
-            name="cdp",
-            available=False,
-            fixable=True,
-            fix_command="auto-launch on connect",
-            message=f"CDP endpoint not reachable at {config.cdp_url}",
-        ))
+        report.missing_deps.append(
+            DepStatus(
+                name="cdp",
+                available=False,
+                fixable=True,
+                fix_command="auto-launch on connect",
+                message=f"CDP endpoint not reachable at {config.cdp_url}",
+            )
+        )
 
     # 3. LLM API key (only for agent mode)
-    has_key = bool(
-        os.getenv("OPENAI_API_KEY")
-        or os.getenv("ANTHROPIC_API_KEY")
-        or os.getenv("GLM_API_KEY")
-    )
+    has_key = bool(os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("GLM_API_KEY"))
     if not has_key:
-        report.needs_human.append(DepStatus(
-            name="llm_api_key",
-            available=False,
-            fixable=False,
-            message="No LLM API key found (needed for Agent mode; LLM mode works without)",
-        ))
+        report.needs_human.append(
+            DepStatus(
+                name="llm_api_key",
+                available=False,
+                fixable=False,
+                message="No LLM API key found (needed for Agent mode; LLM mode works without)",
+            )
+        )
 
     # 4. Playwright browsers installed
     try:
         import playwright  # noqa: F401 — just verify package is installed
     except ImportError:
-        report.missing_deps.append(DepStatus(
-            name="playwright",
-            available=False,
-            fixable=True,
-            fix_command="pip install playwright && playwright install chromium",
-            message="Playwright not installed",
-        ))
+        report.missing_deps.append(
+            DepStatus(
+                name="playwright",
+                available=False,
+                fixable=True,
+                fix_command="pip install playwright && playwright install chromium",
+                message="Playwright not installed",
+            )
+        )
 
     return report
 
@@ -137,7 +146,9 @@ def _format_recovery_for_claude(report: RecoveryReport) -> dict[str, Any]:
     return {
         "ready": report.ready,
         "missing": [d.name for d in report.missing_deps],
-        "fixable": [{"name": d.name, "command": d.fix_command} for d in report.fixable or report.missing_deps if d.fixable],
+        "fixable": [
+            {"name": d.name, "command": d.fix_command} for d in report.fixable or report.missing_deps if d.fixable
+        ],
         "needs_human": [d.name for d in report.needs_human],
         "suggestion": report.suggestion,
     }
@@ -167,6 +178,7 @@ async def _ensure_middleware(config: SkillConfig = None):
     raw_backend = await _select_backend(_config)
 
     from agent_browser.stealth.middleware import StealthMiddleware
+
     _middleware = StealthMiddleware(raw_backend, _config)
 
     # Connect with recovery: if it fails, diagnose and return structured info
@@ -194,7 +206,7 @@ class FirstSessionError(Exception):
     Carries a 'recovery' dict that Claude Code can use to present options.
     """
 
-    def __init__(self, message: str, recovery: dict[str, Any], original_error: Exception = None):
+    def __init__(self, message: str, recovery: dict[str, Any], original_error: Exception | None = None):
         super().__init__(message)
         self.recovery = recovery
         self.original_error = original_error
@@ -213,6 +225,7 @@ async def _select_backend(config: SkillConfig):
     if await _try_extension_connection(config):
         try:
             from agent_browser.browser.extension import ExtensionBackend
+
             logger.info("Using Extension backend (real Chrome via Chrome Extension)")
             return ExtensionBackend(config)
         except Exception as e:
@@ -221,16 +234,20 @@ async def _select_backend(config: SkillConfig):
     # Priority 2-4: Existing logic (Local / API / fallback)
     if config.calling_mode == "cli":
         from agent_browser.browser.local import LocalCDPBackend
+
         return LocalCDPBackend(config)
-    elif config.calling_mode == "api":
+    if config.calling_mode == "api":
         try:
             from agent_browser.browser.remote import RemoteAPIBackend
+
             return RemoteAPIBackend(config)
         except ImportError:
             from agent_browser.browser.local import LocalCDPBackend
+
             return LocalCDPBackend(config)
     else:
         from agent_browser.browser.local import LocalCDPBackend
+
         return LocalCDPBackend(config)
 
 
@@ -242,11 +259,11 @@ async def _try_extension_connection(config: SkillConfig) -> bool:
     Does not actually create a backend -- just a lightweight probe.
     """
     # Quick check: skip if config explicitly disables Extension
-    if getattr(config, 'extension_enabled', True) is False:
+    if getattr(config, "extension_enabled", True) is False:
         return False
 
     try:
-        from agent_browser.browser.daemon import BrowserDaemon  # noqa: F401 — ExtensionBridge used later in file
+        from agent_browser.browser.daemon import BrowserDaemon
 
         daemon = BrowserDaemon.get(config)
         await daemon.ensure_connected()
@@ -354,6 +371,7 @@ async def setup(**kwargs) -> dict[str, Any]:
 
 # ── Internal utilities ──
 
+
 def _validate_ref(ref: str):
     if not _REF_PATTERN.match(ref):
         raise ValueError(f"Invalid ref: {ref}. Expected @e<digits>")
@@ -383,6 +401,7 @@ async def _ref_op(session_id: str, ref: str, js_body: str):
 
 # ── Facade API ──
 
+
 async def create_session(cdp_url=None, mode=None, api_url=None, **kwargs) -> str:
     cfg = {}
     if mode:
@@ -405,6 +424,7 @@ async def delete_session(session_id: str):
 
 async def open_page(session_id: str, url: str):
     from agent_browser.pipeline.steps import _validate_url
+
     url = _validate_url(url)
     page = await _get_page(session_id)
     await page.goto(url)
@@ -423,8 +443,9 @@ async def click(session_id: str, ref: str):
 
 async def fill(session_id: str, ref: str, text: str):
     v = json.dumps(text)
-    await _ref_op(session_id, ref,
-        f"el.focus(); el.value = {v}; el.dispatchEvent(new Event('input', {{bubbles: true}}));")
+    await _ref_op(
+        session_id, ref, f"el.focus(); el.value = {v}; el.dispatchEvent(new Event('input', {{bubbles: true}}));"
+    )
 
 
 async def scroll(session_id: str, direction: str = "down", amount: int = 500):
@@ -440,8 +461,7 @@ async def evaluate(session_id: str, expression: str):
 
 async def select_option(session_id: str, ref: str, value: str):
     v = json.dumps(value)
-    await _ref_op(session_id, ref,
-        f"el.value = {v}; el.dispatchEvent(new Event('change', {{bubbles: true}}));")
+    await _ref_op(session_id, ref, f"el.value = {v}; el.dispatchEvent(new Event('change', {{bubbles: true}}));")
 
 
 async def hover(session_id: str, ref: str):
@@ -477,17 +497,21 @@ async def go_back(session_id: str):
 
 
 async def run_task(
-    session_id: str, task: str,
+    session_id: str,
+    task: str,
     intelligence: str = "agent",
-    llm_config: dict = None,
+    llm_config: dict | None = None,
     max_steps: int = 6,
     total_timeout: float = 300.0,
 ) -> dict:
     mw = await _ensure_middleware()
     return await mw.run_task(
-        session_id, task,
-        intelligence=intelligence, llm_config=llm_config,
-        max_steps=max_steps, total_timeout=total_timeout,
+        session_id,
+        task,
+        intelligence=intelligence,
+        llm_config=llm_config,
+        max_steps=max_steps,
+        total_timeout=total_timeout,
     )
 
 
@@ -495,8 +519,8 @@ async def debug_pipeline(
     session_id: str,
     site: str,
     command: str,
-    args: dict = None,
-    breakpoints: list = None,
+    args: dict | None = None,
+    breakpoints: list | None = None,
     cdp_url: str = "http://127.0.0.1:19222",
     **kwargs,
 ) -> Any:

@@ -14,6 +14,7 @@ Phase 3: E2E Local 模式测试
 运行方式：
 通过 skill API 进行端到端测试，验证完整工作流。
 """
+
 import asyncio
 import os
 from pathlib import Path
@@ -227,7 +228,7 @@ class TestE2ELocalAgentMode:
     @pytest.mark.asyncio
     @pytest.mark.skipif(
         not os.getenv("OPENAI_API_KEY") and not os.getenv("ANTHROPIC_API_KEY"),
-        reason="需要 OPENAI_API_KEY 或 ANTHROPIC_API_KEY"
+        reason="需要 OPENAI_API_KEY 或 ANTHROPIC_API_KEY",
     )
     async def test_agent_simple_navigation(self):
         """Agent 执行简单导航任务"""
@@ -253,7 +254,7 @@ class TestE2ELocalAgentMode:
     @pytest.mark.asyncio
     @pytest.mark.skipif(
         not os.getenv("OPENAI_API_KEY") and not os.getenv("ANTHROPIC_API_KEY"),
-        reason="需要 OPENAI_API_KEY 或 ANTHROPIC_API_KEY"
+        reason="需要 OPENAI_API_KEY 或 ANTHROPIC_API_KEY",
     )
     async def test_agent_extract_content(self):
         """Agent 提取页面内容"""
@@ -486,12 +487,9 @@ class TestE2ESessionPersistence:
             await page.goto("https://example.com")
 
             # 设置一个 cookie
-            await context.add_cookies([{
-                "name": "test_cookie",
-                "value": "test_value",
-                "domain": "example.com",
-                "path": "/"
-            }])
+            await context.add_cookies(
+                [{"name": "test_cookie", "value": "test_value", "domain": "example.com", "path": "/"}]
+            )
 
             # 验证 cookie 存在
             cookies = await context.cookies()

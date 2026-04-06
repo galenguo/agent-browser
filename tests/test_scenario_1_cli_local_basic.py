@@ -14,6 +14,7 @@
   4. interact click/input → {"status":"success","data":{...,"trace":{...}}}
   5. session destroy → {"status":"destroyed"}
 """
+
 import contextlib
 
 import pytest

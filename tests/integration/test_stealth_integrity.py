@@ -9,6 +9,7 @@ Two tiers:
   Tier 2 (Tests 13-15): Behavioral — actual delay ranges, timing distributions.
           Use mocked StealthEnhancer (no real browser needed).
 """
+
 from unittest import mock
 
 import pytest
@@ -16,6 +17,7 @@ import pytest
 # ══════════════════════════════════════════════
 #  Helpers
 # ════════════════════════════════════════════
+
 
 @pytest.fixture
 def mock_backend_for_stealth():
@@ -31,6 +33,7 @@ def mock_backend_for_stealth():
 def _make_config(stealth_enabled=False):
     """Create SkillConfig with specified stealth setting."""
     from agent_browser.config import SkillConfig
+
     return SkillConfig(
         calling_mode="cli",
         browser_mode="local",
@@ -42,6 +45,7 @@ def _make_config(stealth_enabled=False):
 # ══════════════════════════════════════════════
 #  Tests 1-3: Middleware Initialization
 # ══════════════════════════════════════════════
+
 
 class TestMiddlewareInit:
     """StealthMiddleware initializes correctly based on config."""
@@ -80,6 +84,7 @@ class TestMiddlewareInit:
 #  Test 4: CDP Leak Check (structural)
 # ══════════════════════════════════════════════
 
+
 class TestCDPLeakCheck:
     """Verify __playwright__ binding is not exposed in stealth mode."""
 
@@ -99,6 +104,7 @@ class TestCDPLeakCheck:
 #  Test 5: Fingerprint Plausibility (structural)
 # ══════════════════════════════════════════════
 
+
 class TestFingerprintRanges:
     """Fingerprint values are within human-plausible ranges."""
 
@@ -109,13 +115,14 @@ class TestFingerprintRanges:
 
         cfg = SkillConfig()
         # No explicit viewport in config, but we check the concept exists
-        assert hasattr(cfg, 'headless')
+        assert hasattr(cfg, "headless")
         assert isinstance(cfg.headless, bool)
 
 
 # ══════════════════════════════════════════════
 #  Test 6: Timing Noise Injection Graceful
 # ══════════════════════════════════════════════
+
 
 class TestTimingNoiseGraceful:
     """inject_timing_noise handles missing raw_page gracefully."""
@@ -130,6 +137,7 @@ class TestTimingNoiseGraceful:
 
         # Should not raise when called with None
         import contextlib
+
         with contextlib.suppress(Exception):
             await StealthEnhancer.inject_timing_noise(None)  # May raise if not implemented for None; acceptable
 
@@ -137,6 +145,7 @@ class TestTimingNoiseGraceful:
 # ══════════════════════════════════════════════
 #  Tests 8-10: Circuit Breaker
 # ══════════════════════════════════════════════
+
 
 class TestCircuitBreaker:
     """Per-session circuit breaker degrades gracefully on failures."""
@@ -220,6 +229,7 @@ class TestCircuitBreaker:
 #  Tests 11-12: StealthPageHandle Wrapping
 # ══════════════════════════════════════════════
 
+
 class TestStealthPageHandleWrapping:
     """Verify StealthPageHandle wraps BrowserPageHandle correctly."""
 
@@ -228,9 +238,18 @@ class TestStealthPageHandleWrapping:
         from agent_browser.stealth.middleware import StealthPageHandle
 
         expected_methods = [
-            "goto", "go_back", "evaluate", "wait_for_selector",
-            "mouse_wheel", "mouse_move", "keyboard_press",
-            "title", "url", "on", "remove_listener", "close",
+            "goto",
+            "go_back",
+            "evaluate",
+            "wait_for_selector",
+            "mouse_wheel",
+            "mouse_move",
+            "keyboard_press",
+            "title",
+            "url",
+            "on",
+            "remove_listener",
+            "close",
         ]
         for method in expected_methods:
             assert hasattr(StealthPageHandle, method), f"Missing method: {method}"
@@ -321,6 +340,7 @@ class TestStealthPageHandlePreAction:
 #  Tests 13-15: Behavioral (mocked StealthEnhancer)
 # ══════════════════════════════════════════════
 
+
 class TestStealthEnhancerBehavioral:
     """Actual anti-detection behavior via mocked StealthEnhancer."""
 
@@ -366,6 +386,7 @@ class TestStealthEnhancerBehavioral:
 
         # Call static method directly
         import contextlib
+
         with contextlib.suppress(TypeError, AttributeError):
             await StealthEnhancer.inject_timing_noise(None)  # Acceptable if implementation doesn't handle None
 
@@ -373,6 +394,7 @@ class TestStealthEnhancerBehavioral:
 # ══════════════════════════════════════════════
 #  Session Lifecycle with Stealth Off
 # ══════════════════════════════════════════════
+
 
 class TestStealthOffSessionLifecycle:
     """When stealth is disabled, sessions get raw (unwrapped) handles."""
@@ -389,6 +411,7 @@ class TestStealthOffSessionLifecycle:
         handle = await mw.create_session("session-test")
         # Should be the raw handle from backend, NOT a StealthPageHandle
         from agent_browser.stealth.middleware import StealthPageHandle
+
         assert not isinstance(handle, StealthPageHandle)
 
         await mw.disconnect()

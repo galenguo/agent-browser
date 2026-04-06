@@ -43,38 +43,38 @@ from .main import (
 __all__ = [
     # OOP interface
     "AgentBrowser",
+    "FirstSessionError",
+    # LLM
+    "LLMFactory",
+    "SkillConfig",
+    "cascade",
+    "click",
+    # Configuration
+    "configure",
     # Facade API
     "create_session",
     "delete_session",
-    "open_page",
-    "snapshot",
-    "click",
-    "fill",
-    "scroll",
-    "evaluate",
-    "select_option",
-    "hover",
-    "press_key",
-    "wait_for_selector",
-    "go_back",
-    "run_task",
-    "reset",
-    # Configuration
-    "configure",
-    "SkillConfig",
-    "load_config",
-    "detect_mode",
-    # Setup / recovery
-    "setup",
-    "FirstSessionError",
     "detect_missing_deps",
-    # Adapters
-    "list_adapters",
-    "run_adapter",
+    "detect_mode",
+    "evaluate",
     # Explore
     "explore",
+    "fill",
+    "go_back",
+    "hover",
+    # Adapters
+    "list_adapters",
+    "load_config",
+    "open_page",
+    "press_key",
+    "reset",
+    "run_adapter",
+    "run_task",
+    "scroll",
+    "select_option",
+    # Setup / recovery
+    "setup",
+    "snapshot",
     "synthesize",
-    "cascade",
-    # LLM
-    "LLMFactory",
+    "wait_for_selector",
 ]

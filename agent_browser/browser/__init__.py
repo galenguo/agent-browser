@@ -3,6 +3,7 @@
 Defines BrowserBackend and BrowserPageHandle ABCs that all backend
 implementations must follow.
 """
+
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any

@@ -13,6 +13,7 @@
   4. session destroy → Gateway 释放资源（验证 /release 调用）
   5. 无效 API Key → 返回错误（401）
 """
+
 import contextlib
 import os
 from unittest.mock import AsyncMock, patch
@@ -53,11 +54,15 @@ class TestScenario4CLIRemoteGateway:
         mock_post.return_value = mock_response
 
         # 创建远程会话
-        result = self.cli.run([
-            "session", "create",
-            "--name", self.session_name,
-            "--use-gateway",
-        ])
+        result = self.cli.run(
+            [
+                "session",
+                "create",
+                "--name",
+                self.session_name,
+                "--use-gateway",
+            ]
+        )
 
         assert result["status"] == "success"
         assert "cdp_url" in result["data"]
@@ -94,11 +99,15 @@ class TestScenario4CLIRemoteGateway:
         os.environ["BROWSER_GATEWAY_KEY"] = "invalid-key"
 
         # 尝试创建会话（应失败）
-        result = self.cli.run([
-            "session", "create",
-            "--name", self.session_name,
-            "--use-gateway",
-        ])
+        result = self.cli.run(
+            [
+                "session",
+                "create",
+                "--name",
+                self.session_name,
+                "--use-gateway",
+            ]
+        )
 
         # 应返回错误
         assert result["status"] == "error"
@@ -110,11 +119,15 @@ class TestScenario4CLIRemoteGateway:
         os.environ.pop("BROWSER_GATEWAY_URL", None)
 
         # 尝试创建会话（应失败）
-        result = self.cli.run([
-            "session", "create",
-            "--name", self.session_name,
-            "--use-gateway",
-        ])
+        result = self.cli.run(
+            [
+                "session",
+                "create",
+                "--name",
+                self.session_name,
+                "--use-gateway",
+            ]
+        )
 
         assert result["status"] == "error"
         assert "BROWSER_GATEWAY_URL" in result["error"]

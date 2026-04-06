@@ -16,6 +16,7 @@
   7. 持久化会话：多次操作不重新创建 CDP 连接
   8. CLI 和 API 模式反侦测等同性验证
 """
+
 import asyncio
 import contextlib
 import time
@@ -56,7 +57,6 @@ class TestScenario6AntiDetection:
         # assert result["data"]["value"] is None or result["data"]["value"] == "undefined"
 
         # 临时：通过日志验证（实际应通过 JS 执行）
-        pass
 
     def test_cdp_port_non_standard(self):
         """验证 CDP 端口使用 19222（非默认 9222）"""

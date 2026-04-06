@@ -2,6 +2,7 @@
 
 Bridges browser-use's BrowserSession with CLI/API atomic operations.
 """
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -9,6 +10,7 @@ from typing import Any
 @dataclass
 class ActionResult:
     """Result of an atomic operation."""
+
     status: str = "ok"
     error: str | None = None
     data: dict[str, Any] | None = None

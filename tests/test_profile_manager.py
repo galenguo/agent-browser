@@ -1,6 +1,7 @@
 """
 测试 ProfileManager 核心功能（单元测试）
 """
+
 import os
 import shutil
 import tempfile
@@ -65,7 +66,7 @@ def test_profile_manager():
         print(f"总 Profile 数: {stats['total_profiles']}")
         print(f"活跃 Profile 数: {stats['active_profiles']}")
         print(f"总磁盘使用: {stats['total_disk_usage_mb']:.2f} MB")
-        assert stats['total_profiles'] == 2, "应该有 2 个 profile"
+        assert stats["total_profiles"] == 2, "应该有 2 个 profile"
         print("✅ Profile 统计功能正常")
 
         # 测试6：删除 profile
@@ -74,7 +75,7 @@ def test_profile_manager():
         assert success, "删除应该成功"
         assert not os.path.exists(profile_2.profile_dir), "Profile 目录应该被删除"
         stats = manager.get_profile_stats()
-        assert stats['total_profiles'] == 1, "应该只剩 1 个 profile"
+        assert stats["total_profiles"] == 1, "应该只剩 1 个 profile"
         print(f"剩余 Profile 数: {stats['total_profiles']}")
         print("✅ Profile 删除功能正常")
 

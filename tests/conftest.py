@@ -15,6 +15,7 @@ Real browser fixtures (headed CloakBrowser):
 - browser_page: Per-test page (real CDP)
 - docker_api_url: FastAPI gateway URL (if Docker running)
 """
+
 import asyncio
 import contextlib
 import json
@@ -28,7 +29,7 @@ from unittest import mock
 import pytest
 
 # pytest-asyncio 配置
-pytest_plugins = ('pytest_asyncio',)
+pytest_plugins = ("pytest_asyncio",)
 
 
 # ── 输出目录 ──
@@ -49,6 +50,7 @@ def event_loop():
 def skill_config():
     """默认 SkillConfig"""
     from agent_browser.config import SkillConfig
+
     return SkillConfig()
 
 
@@ -101,6 +103,7 @@ def temp_state_path():
 def reset_daemon():
     """每个测试后重置 BrowserDaemon singleton"""
     from agent_browser.daemon import BrowserDaemon
+
     yield
     BrowserDaemon.reset()
 
@@ -168,9 +171,7 @@ def cdp_url(request):
 
         loop = asyncio.new_event_loop()
         try:
-            pw, browser, url = loop.run_until_complete(
-                launch_stealth_browser(headless=False, cdp_port=_CDP_PORT)
-            )
+            pw, browser, url = loop.run_until_complete(launch_stealth_browser(headless=False, cdp_port=_CDP_PORT))
         finally:
             loop.close()
 
@@ -186,12 +187,11 @@ def cdp_url(request):
             print("\n[CloakBrowser] Closing browser (session teardown)...")
             loop = asyncio.new_event_loop()
             try:
+
                 async def _force_close():
                     with contextlib.suppress(TimeoutError, Exception):
-                        await asyncio.wait_for(
-                            close_browser(_session_pw, _session_browser),
-                            timeout=15
-                        )
+                        await asyncio.wait_for(close_browser(_session_pw, _session_browser), timeout=15)
+
                 loop.run_until_complete(_force_close())
             except Exception as e:
                 print(f"[CloakBrowser] Warning during close: {e}")
@@ -199,9 +199,9 @@ def cdp_url(request):
                 loop.close()
             # 确保进程被杀（有头模式可能阻塞 browser.close()）
             import subprocess
+
             subprocess.run(
-                ["pkill", "-f", f"Chromium.*remote-debugging-port={_CDP_PORT}"],
-                capture_output=True, timeout=5
+                ["pkill", "-f", f"Chromium.*remote-debugging-port={_CDP_PORT}"], capture_output=True, timeout=5
             )
             _session_pw = None
             _session_browser = None
@@ -323,10 +323,13 @@ async def docker_api_url():
     import aiohttp
 
     try:
-        async with aiohttp.ClientSession() as session, session.get(
-            "http://localhost:8000/health",
-            timeout=aiohttp.ClientTimeout(total=3),
-        ) as resp:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(
+                "http://localhost:8000/health",
+                timeout=aiohttp.ClientTimeout(total=3),
+            ) as resp,
+        ):
             if resp.status == 200:
                 return "http://localhost:8000"
     except Exception:
@@ -358,12 +361,8 @@ _collected_skips: list[str] = []
 
 def pytest_configure(config):
     """注册自定义 marker"""
-    config.addinivalue_line(
-        "markers", "requires_browser: mark test as needing real CloakBrowser"
-    )
-    config.addinivalue_line(
-        "markers", "manual: mark test as manual (e.g., Boss Zhipin - high flake risk)"
-    )
+    config.addinivalue_line("markers", "requires_browser: mark test as needing real CloakBrowser")
+    config.addinivalue_line("markers", "manual: mark test as manual (e.g., Boss Zhipin - high flake risk)")
 
 
 def pytest_runtest_logreport(report):
@@ -372,13 +371,9 @@ def pytest_runtest_logreport(report):
     if report.when == "call" and report.skipped:
         reason = str(report.longrepr) if report.longrepr else ""
         if hasattr(report, "wasxfail"):
-            _collected_skips.append(
-                f"  XFAIL {report.nodeid}: {reason[:120]}"
-            )
+            _collected_skips.append(f"  XFAIL {report.nodeid}: {reason[:120]}")
         else:
-            _collected_skips.append(
-                f"  SKIP  {report.nodeid}: {reason}"
-            )
+            _collected_skips.append(f"  SKIP  {report.nodeid}: {reason}")
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
@@ -388,16 +383,12 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         terminalreporter.write_sep("=", f"Skip Summary ({len(_collected_skips)} skipped)")
         for line in _collected_skips:
             terminalreporter.write_line(line)
-        anti_det_skips = [
-            entry for entry in _collected_skips
-            if "anti_detection" in entry or "zhipin" in entry.lower()
-        ]
+        anti_det_skips = [entry for entry in _collected_skips if "anti_detection" in entry or "zhipin" in entry.lower()]
         if anti_det_skips:
             terminalreporter.write_sep("=", "WARNING: Anti-detection tests were skipped!")
             for line in anti_det_skips:
                 terminalreporter.write_line(line)
             terminalreporter.write_line(
-                "  These tests validate the core product claim. "
-                "Install CloakBrowser to enable them."
+                "  These tests validate the core product claim. Install CloakBrowser to enable them."
             )
         _collected_skips.clear()

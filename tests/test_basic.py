@@ -4,6 +4,7 @@
 
 测试多用户 Session Pool API 的基本功能
 """
+
 import asyncio
 
 import httpx
@@ -31,8 +32,7 @@ async def test_basic_functionality():
         print("\n2. 测试创建会话...")
         try:
             resp = await client.post(
-                f"{base_url}/sessions/create",
-                json={"user_id": "test_user_1", "browser_type": "local"}
+                f"{base_url}/sessions/create", json={"user_id": "test_user_1", "browser_type": "local"}
             )
             session_data = resp.json()
             session_id = session_data["session_id"]
@@ -64,11 +64,7 @@ async def test_basic_functionality():
         try:
             resp = await client.post(
                 f"{base_url}/sessions/{session_id}/task",
-                json={
-                    "task": "访问 https://example.com 并获取页面标题",
-                    "model": "glm-5-turbo",
-                    "max_steps": 3
-                }
+                json={"task": "访问 https://example.com 并获取页面标题", "model": "glm-5-turbo", "max_steps": 3},
             )
             task_data = resp.json()
             task_id = task_data["task_id"]
@@ -82,9 +78,7 @@ async def test_basic_functionality():
             print("\n6. 测试查询任务状态...")
             try:
                 await asyncio.sleep(5)  # 等待任务开始执行
-                resp = await client.get(
-                    f"{base_url}/sessions/{session_id}/tasks/{task_id}"
-                )
+                resp = await client.get(f"{base_url}/sessions/{session_id}/tasks/{task_id}")
                 print(f"   ✅ 任务状态: {resp.json()}")
             except Exception as e:
                 print(f"   ❌ 查询任务失败: {e}")

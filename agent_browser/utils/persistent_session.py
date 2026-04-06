@@ -11,13 +11,16 @@ Strategy:
   - Operate on the same page throughout, never create new context/page
   - Only execute a single context.close() at task end
 """
+
 import logging
 
 try:
     from patchright.async_api import Browser, BrowserContext, Page
+
     _HAS_PATCHRIGHT = True
 except ImportError:
     from playwright.async_api import Browser, BrowserContext, Page
+
     _HAS_PATCHRIGHT = False
 
 logger = logging.getLogger(__name__)
@@ -76,8 +79,10 @@ class PersistentCDPSession:
         self._page = await self._context.new_page()
         self._initialized = True
 
-        logger.info(f"PersistentCDPSession initialized: viewport={viewport_width}x{viewport_height}, "
-                    f"locale={locale}, tz={timezone_id}")
+        logger.info(
+            f"PersistentCDPSession initialized: viewport={viewport_width}x{viewport_height}, "
+            f"locale={locale}, tz={timezone_id}"
+        )
         return self._page
 
     async def get_page(self) -> Page:

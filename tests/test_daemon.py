@@ -9,6 +9,7 @@ Phase 1: BrowserDaemon 单元测试
 
 注意：Playwright 连接相关测试在集成测试 (test_local_backend.py) 中进行
 """
+
 import json
 import tempfile
 from pathlib import Path
@@ -289,9 +290,7 @@ class TestShutdown:
         daemon._browser = mock_browser
         daemon._playwright = mock_playwright
         daemon._connected = True
-        daemon._sessions = {
-            "s1": {"page": mock.AsyncMock(), "context": mock.AsyncMock(), "created_at": 1234567890}
-        }
+        daemon._sessions = {"s1": {"page": mock.AsyncMock(), "context": mock.AsyncMock(), "created_at": 1234567890}}
 
         await daemon.shutdown()
 

@@ -14,6 +14,7 @@ Run:
 Prerequisites:
   - CloakBrowser 运行在 127.0.0.1:19222（conftest 自动管理）
 """
+
 import json
 from datetime import datetime
 
@@ -27,6 +28,7 @@ from agent_browser.pipeline.executor import execute_pipeline
 # ════════════════════════════════════════════
 #  Tier 2A: Basic Pipeline Operations on Real Pages
 # ════════════════════════════════════════════
+
 
 @pytest.mark.requires_browser
 class TestPipelineBasicNavigation:
@@ -100,6 +102,7 @@ class TestPipelineBasicNavigation:
 
         async def _fake_get_handle(sid=None):
             return real_handle
+
         monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
         data = await execute_pipeline(
             pipeline,
@@ -115,12 +118,14 @@ class TestPipelineBasicNavigation:
         assert len(title) > 0, "页面无标题"
         await save_screenshot(browser_page, "pipeline-after-navigate")
 
-        scorecard_writer.record({
-            "test": "navigate_snapshot",
-            "status": "PASS",
-            "has_data": data is not None,
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "test": "navigate_snapshot",
+                "status": "PASS",
+                "has_data": data is not None,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
 
 @pytest.mark.requires_browser
@@ -142,7 +147,9 @@ class TestPipelineFormInteraction:
             # fill 步骤：填充搜索框
             {"fill": {"selector": "input[name='q']", "text": "playwright automation test", "clear_first": True}},
             # 提交：按回车
-            {"evaluate": "document.querySelector('input[name=\"q\"]').form?.submit() || document.querySelector('input[name=\"q\"]')?.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', code:'Enter', keyCode:13}))"},
+            {
+                "evaluate": "document.querySelector('input[name=\"q\"]').form?.submit() || document.querySelector('input[name=\"q\"]')?.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', code:'Enter', keyCode:13}))"
+            },
             {"wait": {"seconds": 2}},
             {"snapshot": "url"},
         ]
@@ -216,6 +223,7 @@ class TestPipelineFormInteraction:
 
         async def _fake_get_handle(sid=None):
             return real_handle
+
         monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
         try:
             await execute_pipeline(
@@ -226,24 +234,28 @@ class TestPipelineFormInteraction:
             )
         except Exception as e:
             # 表单交互可能因页面结构变化而失败，记录但不硬失败
-            scorecard_writer.record({
-                "test": "form_fill_submit",
-                "status": "FAIL",
-                "error": str(e)[:200],
-                "timestamp": datetime.now().isoformat(),
-            })
+            scorecard_writer.record(
+                {
+                    "test": "form_fill_submit",
+                    "status": "FAIL",
+                    "error": str(e)[:200],
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
             pytest.xfail(reason=f"Form interaction failed (page structure may have changed): {e}")
 
         final_url = browser_page.url
         has_query = "playwright" in final_url or "q=" in final_url
 
-        scorecard_writer.record({
-            "test": "form_fill_submit",
-            "status": "PASS" if has_query else "PARTIAL",
-            "final_url": final_url,
-            "has_search_query": has_query,
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "test": "form_fill_submit",
+                "status": "PASS" if has_query else "PARTIAL",
+                "final_url": final_url,
+                "has_search_query": has_query,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         # 宽松断言：只要没抛异常就算通过（页面结构可能变化）
         assert browser_page is not None
@@ -267,7 +279,6 @@ class TestPipelineScrollAndExtract:
 
         import agent_browser.pipeline.steps as steps_module
 
-
         class RealPageHandle:
             def __init__(self, page):
                 self._page = page
@@ -280,13 +291,12 @@ class TestPipelineScrollAndExtract:
                 result = await self._page.evaluate(expr, **kw)
                 # 拦截链接提取
                 if "querySelectorAll" in expr and "a[href]" in expr:
-                    links = await self._page.evaluate("""
+                    return await self._page.evaluate("""
                         () => Array.from(document.querySelectorAll('a[href]))
                             .filter(a => a.href && a.textContent.trim())
                             .slice(0, 20)
                             .map(a => ({ text: a.textContent.trim().substring(0, 50), href: a.href }))
                     """)
-                    return links
                 return result
 
             async def mouse_wheel(self, dx, dy):
@@ -325,6 +335,7 @@ class TestPipelineScrollAndExtract:
 
         async def _fake_get_handle(sid=None):
             return real_handle
+
         monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
         try:
             await execute_pipeline(
@@ -334,29 +345,34 @@ class TestPipelineScrollAndExtract:
                 fail_fast=False,  # 即使中间步骤失败也继续
             )
         except Exception as e:
-            scorecard_writer.record({
-                "test": "scroll_extract",
-                "status": "FAIL",
-                "error": str(e)[:200],
-                "timestamp": datetime.now().isoformat(),
-            })
+            scorecard_writer.record(
+                {
+                    "test": "scroll_extract",
+                    "status": "FAIL",
+                    "error": str(e)[:200],
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
             pytest.xfail(reason=f"Scroll/extract failed: {e}")
 
         # 基本验证：页面已加载
         title = await browser_page.title()
         assert len(title) > 0, "页面应有标题"
 
-        scorecard_writer.record({
-            "test": "scroll_extract",
-            "status": "PASS",
-            "title": title,
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "test": "scroll_extract",
+                "status": "PASS",
+                "title": title,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
 
 # ════════════════════════════════════════════
 #  Tier 2B: Error Handling — Fail-Fast vs Fail-Slow
 # ════════════════════════════════════════════
+
 
 @pytest.mark.requires_browser
 class TestPipelineErrorHandling:
@@ -441,6 +457,7 @@ class TestPipelineErrorHandling:
 
         async def _fake_get_handle(sid=None):
             return real_handle
+
         monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
         # fail_fast: executor 捕获异常并停止，不 re-raise
         # 验证：pipeline 执行了 navigate 但在 click 处停止（未执行 snapshot）
@@ -459,12 +476,14 @@ class TestPipelineErrorHandling:
         # pipeline 有 4 步但只执行了 3 步（navigate→wait→click，snapshot 未执行）
         # executor 日志确认：1 error, fail_fast 停止
 
-        scorecard_writer.record({
-            "test": "fail_fast",
-            "status": "PASS",
-            "note": "Correctly stopped on nonexistent element",
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "test": "fail_fast",
+                "status": "PASS",
+                "note": "Correctly stopped on nonexistent element",
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
     @pytest.mark.asyncio
     async def test_fail_slow_continues_despite_errors(self, browser_page, scorecard_writer, monkeypatch):
@@ -545,9 +564,11 @@ class TestPipelineErrorHandling:
 
         async def _fake_get_handle(sid=None):
             return real_handle
+
         monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
         # fail_fast=False 应该不抛异常（或返回部分数据）
         import contextlib
+
         with contextlib.suppress(Exception):
             await execute_pipeline(
                 pipeline,
@@ -558,12 +579,14 @@ class TestPipelineErrorHandling:
 
         # 关键断言：即使 click 失败，snapshot 步骤仍执行了
         status = "PASS" if snapshot_executed else "FAIL"
-        scorecard_writer.record({
-            "test": "fail_slow",
-            "status": status,
-            "snapshot_executed_after_error": snapshot_executed,
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "test": "fail_slow",
+                "status": status,
+                "snapshot_executed_after_error": snapshot_executed,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         assert snapshot_executed, "fail_slow 模式下错误后的 snapshot 步骤未执行"
 
@@ -571,6 +594,7 @@ class TestPipelineErrorHandling:
 # ════════════════════════════════════════════
 #  Tier 2C: Template Variables + Multi-step Workflow
 # ════════════════════════════════════════════
+
 
 @pytest.mark.requires_browser
 class TestPipelineTemplates:
@@ -590,13 +614,15 @@ class TestPipelineTemplates:
         title = await browser_page.title()
         assert len(title) > 0
 
-        scorecard_writer.record({
-            "test": "template_variable",
-            "status": "PASS",
-            "rendered_url": rendered,
-            "page_title": title,
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "test": "template_variable",
+                "status": "PASS",
+                "rendered_url": rendered,
+                "page_title": title,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
     @pytest.mark.asyncio
     async def test_multi_step_workflow(self, browser_page, scorecard_writer, monkeypatch):
@@ -673,28 +699,32 @@ class TestPipelineTemplates:
 
         async def _fake_get_handle(sid=None):
             return real_handle
+
         monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
         await execute_pipeline(
-                pipeline,
-                session_id="pipe_multi",
-                args={},
-                fail_fast=True,
-            )
+            pipeline,
+            session_id="pipe_multi",
+            args={},
+            fail_fast=True,
+        )
 
         assert len(results_log) >= 5, f"多步骤工作流只执行了 {len(results_log)} 步: {[r[0] for r in results_log]}"
 
-        scorecard_writer.record({
-            "test": "multi_step_workflow",
-            "status": "PASS",
-            "steps_executed": len(results_log),
-            "step_names": [r[0] for r in results_log],
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "test": "multi_step_workflow",
+                "status": "PASS",
+                "steps_executed": len(results_log),
+                "step_names": [r[0] for r in results_log],
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
 
 # ════════════════════════════════════════════
 #  Tier 2D: Telemetry Verification
 # ════════════════════════════════════════════
+
 
 @pytest.mark.requires_browser
 class TestPipelineTelemetry:
@@ -760,6 +790,7 @@ class TestPipelineTelemetry:
 
             async def _fake_get_handle(sid=None):
                 return real_handle
+
             monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
             await execute_pipeline(pipeline, session_id="pipe_tel", args={}, fail_fast=True)
 
@@ -774,13 +805,15 @@ class TestPipelineTelemetry:
                 entry = json.loads(telemetry_content)
                 assert entry.get("success") is True, f"Telemetry entry shows failure: {entry}"
 
-            scorecard_writer.record({
-                "test": "telemetry",
-                "status": "PASS" if has_entry else "FAIL",
-                "telemetry_file_exists": telemetry_exists,
-                "telemetry_has_entry": has_entry,
-                "timestamp": datetime.now().isoformat(),
-            })
+            scorecard_writer.record(
+                {
+                    "test": "telemetry",
+                    "status": "PASS" if has_entry else "FAIL",
+                    "telemetry_file_exists": telemetry_exists,
+                    "telemetry_has_entry": has_entry,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
 
             assert has_entry, "Pipeline 执行后 telemetry.jsonl 应有记录"
         finally:

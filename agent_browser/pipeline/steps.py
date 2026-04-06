@@ -21,6 +21,7 @@ Steps Registry:
     sort         — Sort array by field
     limit        — Truncate array
 """
+
 import asyncio
 import json
 import logging
@@ -41,9 +42,11 @@ _CSS_SELECTOR_RE = re.compile(r'^[a-zA-Z0-9_\-#\.\[\]\(\)=*~^$|:\',"+> ]+$')
 
 def register(name: str):
     """Register step handler decorator"""
+
     def decorator(fn: Callable) -> Callable:
         STEPS[name] = fn
         return fn
+
     return decorator
 
 
@@ -80,26 +83,29 @@ def _validate_url(url: str) -> str:
             raise ValueError(f"Blocked URL scheme: {blocked}")
 
     # SSRF: block private IP ranges in hostname
-    hostname_match = re.match(r'^https?://([^/:]+)', url)
+    hostname_match = re.match(r"^https?://([^/:]+)", url)
     if hostname_match:
         hostname = hostname_match.group(1).lower()
         _PRIVATE_HOSTS = (
-            'localhost', 'localhost.localdomain',
+            "localhost",
+            "localhost.localdomain",
             # IPv4 private ranges
-            '0.0.0.0',
+            "0.0.0.0",
         )
         if hostname in _PRIVATE_HOSTS:
             raise ValueError(f"Blocked hostname (private): {hostname}")
         # Check for numeric IP
-        ip_pattern = r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$'
+        ip_pattern = r"^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$"
         ip_match = re.match(ip_pattern, hostname)
         if ip_match:
             parts = [int(g) for g in ip_match.groups()]
-            if (parts[0] == 10 or
-                (parts[0] == 172 and 16 <= parts[1] <= 31) or
-                (parts[0] == 192 and parts[1] == 168) or
-                (parts[0] == 127) or
-                (parts[0] == 169 and 254 <= parts[1] <= 255)):
+            if (
+                parts[0] == 10
+                or (parts[0] == 172 and 16 <= parts[1] <= 31)
+                or (parts[0] == 192 and parts[1] == 168)
+                or (parts[0] == 127)
+                or (parts[0] == 169 and 254 <= parts[1] <= 255)
+            ):
                 raise ValueError(f"Blocked IP address (private network): {hostname}")
 
     return url
@@ -108,6 +114,7 @@ def _validate_url(url: str) -> str:
 async def _get_handle(session_id: str):
     """Get BrowserPageHandle via StealthMiddleware (auto stealth wrapping)"""
     from agent_browser.main import _ensure_middleware
+
     mw = await _ensure_middleware()
     return await mw.get_page(session_id)
 
@@ -167,7 +174,7 @@ def _adapt_select(params: Any) -> Any:
     """
     if isinstance(params, str):
         # Heuristic: contains dot-path indicators → data path; else → CSS selector
-        if any(c in params for c in ('.', '[')):
+        if any(c in params for c in (".", "[")):
             return {"path": params}
         # Legacy behavior: string = CSS selector (pass through for JS eval)
         return params
@@ -270,8 +277,7 @@ def _adapt_navigate(params: Any) -> Any:
 
 
 @register("navigate")
-async def step_navigate(session_id: str, params: Any, data: Any,
-                        context: dict, stealth: dict) -> Any:
+async def step_navigate(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """Navigate to URL. Returns data unchanged."""
     params = _adapt_navigate(params)
     # Extract URL: handle both string and dict formats from _adapt_navigate
@@ -291,8 +297,7 @@ async def step_navigate(session_id: str, params: Any, data: Any,
 
 
 @register("click")
-async def step_click(session_id: str, params: Any, data: Any,
-                     context: dict, stealth: dict) -> Any:
+async def step_click(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """Click element by CSS selector. Returns data unchanged."""
     selector = _escape_selector(resolve(str(params), **context))
     page = await _get_handle(session_id)
@@ -313,8 +318,7 @@ async def step_click(session_id: str, params: Any, data: Any,
 
 
 @register("type")
-async def step_type(session_id: str, params: Any, data: Any,
-                    context: dict, stealth: dict) -> Any:
+async def step_type(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """Type text into element. Returns data unchanged."""
     params = _adapt_type(params)
 
@@ -346,8 +350,7 @@ async def step_type(session_id: str, params: Any, data: Any,
 
 
 @register("wait")
-async def step_wait(session_id: str, params: Any, data: Any,
-                    context: dict, stealth: dict) -> Any:
+async def step_wait(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """Wait seconds / for text / for selector. Returns data unchanged."""
     page = await _get_handle(session_id)
     params = _adapt_wait(params)
@@ -391,8 +394,7 @@ async def step_wait(session_id: str, params: Any, data: Any,
 
 
 @register("press")
-async def step_press(session_id: str, params: Any, data: Any,
-                     context: dict, stealth: dict) -> Any:
+async def step_press(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """Press keyboard key. Returns data unchanged."""
     key = resolve(str(params), **context)
     page = await _get_handle(session_id)
@@ -401,8 +403,7 @@ async def step_press(session_id: str, params: Any, data: Any,
 
 
 @register("snapshot")
-async def step_snapshot(session_id: str, params: Any, data: Any,
-                        context: dict, stealth: dict) -> Any:
+async def step_snapshot(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """
     Extract DOM tree as structured data.
 
@@ -413,6 +414,7 @@ async def step_snapshot(session_id: str, params: Any, data: Any,
     Returns: list of dicts (DOM elements as data)
     """
     from agent_browser.main import _ensure_middleware
+
     mw = await _ensure_middleware()
 
     if isinstance(params, str):
@@ -435,10 +437,9 @@ async def step_snapshot(session_id: str, params: Any, data: Any,
             }})).slice(0, 200);
         }})()
         """
-        result = await page.evaluate(js)
-        return result
+        return await page.evaluate(js)
 
-    elif isinstance(params, dict):
+    if isinstance(params, dict):
         selector = params.get("selector", "*")
         params.get("fields", [])
         page = await _get_handle(session_id)
@@ -457,33 +458,41 @@ async def step_snapshot(session_id: str, params: Any, data: Any,
             }}).slice(0, 100);
         }})()
         """
-        result = await page.evaluate(js)
-        return result
+        return await page.evaluate(js)
 
     # No params: full page snapshot via middleware
     return await mw.snapshot(session_id, interactive_only=False)
 
 
 @register("evaluate")
-async def step_evaluate(session_id: str, params: Any, data: Any,
-                        context: dict, stealth: dict) -> Any:
+async def step_evaluate(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """Execute JavaScript in page context (sandboxed). Returns JS result as data."""
     js_code = resolve(str(params), **context)
 
     # Pipeline JS security check (consistent with API endpoint)
     _dangerous_js = (
-        'fetch(', 'XMLHttpRequest', 'WebSocket', 'eval(', 'Function(',
-        'document.write', 'document.cookie', 'localStorage',
-        'sessionStorage', 'indexedDB', '.src=', 'location.assign',
-        'location.replace', 'window.open', '<script', 'import(',
-        'require(',
+        "fetch(",
+        "XMLHttpRequest",
+        "WebSocket",
+        "eval(",
+        "Function(",
+        "document.write",
+        "document.cookie",
+        "localStorage",
+        "sessionStorage",
+        "indexedDB",
+        ".src=",
+        "location.assign",
+        "location.replace",
+        "window.open",
+        "<script",
+        "import(",
+        "require(",
     )
     lowered = js_code.lower()
     for pat in _dangerous_js:
         if pat.lower() in lowered:
-            raise ValueError(
-                f"Blocked JavaScript in evaluate: {pat!r}"
-            )
+            raise ValueError(f"Blocked JavaScript in evaluate: {pat!r}")
 
     page = await _get_handle(session_id)
 
@@ -499,16 +508,14 @@ async def step_evaluate(session_id: str, params: Any, data: Any,
         )
     except TimeoutError:
         raise ValueError(
-            f"JavaScript execution timed out after {eval_timeout}s. "
-            "Use _timeout param to increase limit."
+            f"JavaScript execution timed out after {eval_timeout}s. Use _timeout param to increase limit."
         ) from None
 
     return result
 
 
 @register("intercept")
-async def step_intercept(session_id: str, params: Any, data: Any,
-                          context: dict, stealth: dict) -> Any:
+async def step_intercept(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """
     Install network interceptor for XHR/Fetch matching a pattern.
 
@@ -600,8 +607,7 @@ async def step_intercept(session_id: str, params: Any, data: Any,
 
 
 @register("tap")
-async def step_tap(session_id: str, params: Any, data: Any,
-                   context: dict, stealth: dict) -> Any:
+async def step_tap(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """
     Store Action Bridge — call Vue/Pinia/Vuex store action + intercept network response.
 
@@ -634,10 +640,7 @@ async def step_tap(session_id: str, params: Any, data: Any,
 
     # Validate required fields
     if not store_name or not action_name:
-        raise ValueError(
-            "tap: 'store' and 'action' are required. "
-            f"Got: store={store_name!r}, action={action_name!r}"
-        )
+        raise ValueError(f"tap: 'store' and 'action' are required. Got: store={store_name!r}, action={action_name!r}")
 
     page = await _get_handle(session_id)
 
@@ -652,7 +655,7 @@ async def step_tap(session_id: str, params: Any, data: Any,
     # Build select chain for captured response sub-selection
     if select_path:
         select_parts = select_path.split(".")
-        select_chain = "".join(f'?.[{json.dumps(p)}]' for p in select_parts)
+        select_chain = "".join(f"?.[{json.dumps(p)}]" for p in select_parts)
     else:
         select_chain = ""
 
@@ -820,13 +823,11 @@ async def step_tap(session_id: str, params: Any, data: Any,
         }})()
         """
 
-    result = await page.evaluate(js)
-    return result
+    return await page.evaluate(js)
 
 
 @register("download")
-async def step_download(session_id: str, params: Any, data: Any,
-                        context: dict, stealth: dict) -> Any:
+async def step_download(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """
     Download file to disk via browser fetch.
 
@@ -867,11 +868,12 @@ async def step_download(session_id: str, params: Any, data: Any,
         raise RuntimeError(f"Download failed for URL: {url}")
 
     # Decode base64 and save
-    header, b64_data = data_url.split(",", 1)
+    _header, b64_data = data_url.split(",", 1)
     file_bytes = __import__("base64").b64decode(b64_data)
 
     if not filename:
         from urllib.parse import urlparse
+
         filename = urlparse(url).path.rsplit("/", 1)[-1] or "download"
 
     filepath = os.path.join(save_dir, filename)
@@ -889,8 +891,7 @@ async def step_download(session_id: str, params: Any, data: Any,
 
 
 @register("fetch")
-async def step_fetch(session_id: str, params: Any, data: Any,
-                     context: dict, stealth: dict) -> Any:
+async def step_fetch(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """
     HTTP request (serial, auto-stealth delayed).
 
@@ -908,27 +909,36 @@ async def step_fetch(session_id: str, params: Any, data: Any,
     query_params = params.get("_query_params")
     if query_params:
         from urllib.parse import parse_qs, urlencode, urlparse
+
         parsed = urlparse(url)
         existing = parse_qs(parsed.query)
         if isinstance(query_params, dict):
-            existing.update({k: v for k, v in query_params.items()})
+            existing.update(dict(query_params.items()))
         new_query = urlencode(existing, doseq=True)
         url = parsed._replace(query=new_query).geturl()
 
     # SSRF protection: block private/internal IP ranges
     from urllib.parse import urlparse
+
     parsed = urlparse(url)
     hostname = parsed.hostname or ""
     blocked_prefixes = (
-        "127.", "0.", "169.254.", "10.", "192.168.",
-        "fc00:", "fe80:", "::1", "::ffff", "[::",
-        "localhost", "metadata.google.internal",
+        "127.",
+        "0.",
+        "169.254.",
+        "10.",
+        "192.168.",
+        "fc00:",
+        "fe80:",
+        "::1",
+        "::ffff",
+        "[::",
+        "localhost",
+        "metadata.google.internal",
     )
     for prefix in blocked_prefixes:
         if hostname == prefix or hostname.startswith(prefix):
-            raise ValueError(
-                f"SSRF blocked: cannot fetch internal/private address: {hostname}"
-            )
+            raise ValueError(f"SSRF blocked: cannot fetch internal/private address: {hostname}")
 
     method = str(params.get("method", "GET")).upper()
     _ALLOWED_METHODS = ("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS")
@@ -963,6 +973,7 @@ async def step_fetch(session_id: str, params: Any, data: Any,
         result = await page.evaluate(js)
     else:
         import aiohttp
+
         async with aiohttp.ClientSession() as http, http.request(method, url, headers=headers) as resp:
             text = await resp.text()
             try:
@@ -974,8 +985,7 @@ async def step_fetch(session_id: str, params: Any, data: Any,
 
 
 @register("select")
-async def step_select(session_id: str, params: Any, data: Any,
-                      context: dict, stealth: dict) -> Any:
+async def step_select(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """Extract sub-field by path from data."""
     params = _adapt_select(params)
 
@@ -1023,8 +1033,7 @@ async def step_select(session_id: str, params: Any, data: Any,
 
 
 @register("map")
-async def step_map(session_id: str, params: Any, data: Any,
-                   context: dict, stealth: dict) -> Any:
+async def step_map(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """Transform array items using template expressions."""
     if not isinstance(data, list):
         if isinstance(data, dict):
@@ -1045,8 +1054,7 @@ async def step_map(session_id: str, params: Any, data: Any,
 
 
 @register("filter")
-async def step_filter(session_id: str, params: Any, data: Any,
-                      context: dict, stealth: dict) -> Any:
+async def step_filter(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """Filter array by expression or dict criteria."""
     if not isinstance(data, list):
         return data
@@ -1054,11 +1062,11 @@ async def step_filter(session_id: str, params: Any, data: Any,
     if isinstance(params, str):
         expr = params.strip()
         _FILTER_EXPR_RE = re.compile(
-            r'^('
+            r"^("
             r'(?:item\.[a-zA-Z_]\w*(?:\.\w+)*\s*(?:==|!=)\s*["\'][^"\']*["\'])'
-            r'(?:\s*(?:&&|\|\|)\s*'
+            r"(?:\s*(?:&&|\|\|)\s*"
             r'(?:item\.[a-zA-Z_]\w*(?:\.\w+)*\s*(?:==|!=)\s*["\'][^"\']*["\']))*'
-            r')$'
+            r")$"
         )
         if not _FILTER_EXPR_RE.match(expr):
             raise ValueError(
@@ -1109,8 +1117,7 @@ async def step_filter(session_id: str, params: Any, data: Any,
 
 
 @register("sort")
-async def step_sort(session_id: str, params: Any, data: Any,
-                    context: dict, stealth: dict) -> Any:
+async def step_sort(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """Sort array by field."""
     if not isinstance(data, list):
         return data
@@ -1152,8 +1159,7 @@ async def step_sort(session_id: str, params: Any, data: Any,
 
 
 @register("limit")
-async def step_limit(session_id: str, params: Any, data: Any,
-                     context: dict, stealth: dict) -> Any:
+async def step_limit(session_id: str, params: Any, data: Any, context: dict, stealth: dict) -> Any:
     """Truncate array to N items."""
     n = int(resolve(params, **context)) if isinstance(params, str) else int(params)
 

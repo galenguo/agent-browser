@@ -1,4 +1,5 @@
 """Tests for setup() function, First-Session Recovery, and Phase 0 integration."""
+
 import os
 from unittest import mock
 
@@ -100,11 +101,13 @@ class TestDetectMissingDeps:
             mock_session_cls = mock.MagicMock()
             mock_session_cls.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_resp
 
-            with mock.patch("aiohttp.ClientSession", return_value=mock_session_cls), \
-                 mock.patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
-                    report = await detect_missing_deps()
-                    # Should be ready (or at least have no blocking deps)
-                    assert isinstance(report, RecoveryReport)
+            with (
+                mock.patch("aiohttp.ClientSession", return_value=mock_session_cls),
+                mock.patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}),
+            ):
+                report = await detect_missing_deps()
+                # Should be ready (or at least have no blocking deps)
+                assert isinstance(report, RecoveryReport)
 
 
 class TestSetupFunction:

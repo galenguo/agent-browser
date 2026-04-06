@@ -65,4 +65,5 @@ def load_skill_module(module_name: str):
         The imported module
     """
     import importlib
+
     return importlib.import_module(f"agent_browser.{module_name}")

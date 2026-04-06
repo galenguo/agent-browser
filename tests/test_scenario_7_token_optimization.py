@@ -15,6 +15,7 @@
   4. max_input_tokens=8000 配置已应用
   5. ActionTracer 的 trace 信息不包含完整 HTML（节省 token）
 """
+
 import asyncio
 import contextlib
 
@@ -49,20 +50,28 @@ class TestScenario7TokenOptimization:
         self.cli.navigate_goto(self.session_name, "https://example.com")
 
         # 提取完整 HTML
-        full_result = self.cli.run([
-            "extract", "html",
-            "--session", self.session_name,
-            "--full",
-        ])
+        full_result = self.cli.run(
+            [
+                "extract",
+                "html",
+                "--session",
+                self.session_name,
+                "--full",
+            ]
+        )
         full_html = full_result.get("data", {}).get("html", "")
         full_size = len(full_html)
 
         # 提取简化 DOM
-        simplified_result = self.cli.run([
-            "extract", "dom",
-            "--session", self.session_name,
-            "--simplified",
-        ])
+        simplified_result = self.cli.run(
+            [
+                "extract",
+                "dom",
+                "--session",
+                self.session_name,
+                "--simplified",
+            ]
+        )
         simplified_dom = simplified_result.get("data", {}).get("dom", "")
         simplified_size = len(simplified_dom)
 
@@ -78,11 +87,16 @@ class TestScenario7TokenOptimization:
         self.cli.navigate_goto(self.session_name, "https://example.com")
 
         # 提取交互元素
-        elements_result = self.cli.run([
-            "extract", "elements",
-            "--session", self.session_name,
-            "--selector", "a, button, input",
-        ])
+        elements_result = self.cli.run(
+            [
+                "extract",
+                "elements",
+                "--session",
+                self.session_name,
+                "--selector",
+                "a, button, input",
+            ]
+        )
 
         elements_text = str(elements_result.get("data", {}))
         elements_size = len(elements_text)
@@ -145,19 +159,27 @@ class TestScenario7TokenOptimization:
         self.cli.navigate_goto(self.session_name, "https://example.com")
 
         # 提取完整 HTML
-        full_result = self.cli.run([
-            "extract", "html",
-            "--session", self.session_name,
-            "--full",
-        ])
+        full_result = self.cli.run(
+            [
+                "extract",
+                "html",
+                "--session",
+                self.session_name,
+                "--full",
+            ]
+        )
         full_html = full_result.get("data", {}).get("html", "")
 
         # 提取简化 DOM
-        simplified_result = self.cli.run([
-            "extract", "dom",
-            "--session", self.session_name,
-            "--simplified",
-        ])
+        simplified_result = self.cli.run(
+            [
+                "extract",
+                "dom",
+                "--session",
+                self.session_name,
+                "--simplified",
+            ]
+        )
         simplified_dom = simplified_result.get("data", {}).get("dom", "")
 
         # 估算 token 数量（1 token ≈ 4 字符）

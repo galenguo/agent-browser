@@ -7,6 +7,7 @@
 - 资源使用监控
 - 响应时间统计
 """
+
 import asyncio
 import time
 
@@ -42,7 +43,7 @@ class PerformanceTest:
 
             print(f"总耗时: {elapsed:.2f}s")
             print(f"成功: {success_count}, 失败: {error_count}")
-            print(f"平均每个会话: {elapsed/num_sessions:.2f}s")
+            print(f"平均每个会话: {elapsed / num_sessions:.2f}s")
 
             return {
                 "test": "concurrent_sessions",
@@ -50,22 +51,19 @@ class PerformanceTest:
                 "elapsed": elapsed,
                 "success": success_count,
                 "error": error_count,
-                "avg_per_session": elapsed/num_sessions
+                "avg_per_session": elapsed / num_sessions,
             }
 
     async def _create_session(self, client: httpx.AsyncClient, user_id: str):
         """创建单个会话"""
         response = await client.post(
-            f"{self.base_url}/sessions/create",
-            json={"user_id": user_id, "browser_type": "local"}
+            f"{self.base_url}/sessions/create", json={"user_id": user_id, "browser_type": "local"}
         )
         response.raise_for_status()
         return response.json()
 
     async def test_concurrent_tasks(
-        self,
-        num_tasks: int = 10,
-        task_description: str = "访问 https://example.com 并获取页面标题"
+        self, num_tasks: int = 10, task_description: str = "访问 https://example.com 并获取页面标题"
     ):
         """测试并发任务执行"""
         print(f"\n=== 测试并发执行 {num_tasks} 个任务 ===")
@@ -82,11 +80,7 @@ class PerformanceTest:
 
             tasks = []
             for i in range(num_tasks):
-                task = self._submit_task(
-                    client,
-                    session_id,
-                    f"{task_description} (任务 {i+1})"
-                )
+                task = self._submit_task(client, session_id, f"{task_description} (任务 {i + 1})")
                 tasks.append(task)
 
             task_results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -105,15 +99,11 @@ class PerformanceTest:
                 await asyncio.sleep(5)
 
                 # 检查任务状态
-                status_tasks = [
-                    self._get_task_status(client, session_id, task_id)
-                    for task_id in task_ids
-                ]
+                status_tasks = [self._get_task_status(client, session_id, task_id) for task_id in task_ids]
                 statuses = await asyncio.gather(*status_tasks, return_exceptions=True)
 
                 completed = sum(
-                    1 for s in statuses
-                    if not isinstance(s, Exception) and s.get("status") in ["completed", "failed"]
+                    1 for s in statuses if not isinstance(s, Exception) and s.get("status") in ["completed", "failed"]
                 )
 
                 print(f"已完成: {completed}/{len(task_ids)}")
@@ -133,37 +123,20 @@ class PerformanceTest:
                 "submit_elapsed": submit_elapsed,
                 "total_elapsed": total_elapsed,
                 "completed": completed,
-                "success_rate": completed / len(task_ids) if task_ids else 0
+                "success_rate": completed / len(task_ids) if task_ids else 0,
             }
 
-    async def _submit_task(
-        self,
-        client: httpx.AsyncClient,
-        session_id: str,
-        task: str
-    ):
+    async def _submit_task(self, client: httpx.AsyncClient, session_id: str, task: str):
         """提交单个任务"""
         response = await client.post(
-            f"{self.base_url}/sessions/{session_id}/task",
-            json={
-                "task": task,
-                "model": "glm-5-turbo",
-                "max_steps": 3
-            }
+            f"{self.base_url}/sessions/{session_id}/task", json={"task": task, "model": "glm-5-turbo", "max_steps": 3}
         )
         response.raise_for_status()
         return response.json()
 
-    async def _get_task_status(
-        self,
-        client: httpx.AsyncClient,
-        session_id: str,
-        task_id: str
-    ):
+    async def _get_task_status(self, client: httpx.AsyncClient, session_id: str, task_id: str):
         """获取任务状态"""
-        response = await client.get(
-            f"{self.base_url}/sessions/{session_id}/tasks/{task_id}"
-        )
+        response = await client.get(f"{self.base_url}/sessions/{session_id}/tasks/{task_id}")
         response.raise_for_status()
         return response.json()
 
@@ -183,18 +156,14 @@ class PerformanceTest:
                     ["docker", "stats", "agent-browser", "--no-stream", "--format", "{{.CPUPerc}},{{.MemUsage}}"],
                     capture_output=True,
                     text=True,
-                    timeout=5
+                    timeout=5,
                 )
 
                 if result.returncode == 0:
                     output = result.stdout.strip()
                     if output:
-                        cpu, mem = output.split(',')
-                        samples.append({
-                            "timestamp": time.time(),
-                            "cpu": cpu,
-                            "memory": mem
-                        })
+                        cpu, mem = output.split(",")
+                        samples.append({"timestamp": time.time(), "cpu": cpu, "memory": mem})
 
             except Exception as e:
                 print(f"监控错误: {e}")
@@ -203,11 +172,7 @@ class PerformanceTest:
 
         print(f"采集了 {len(samples)} 个样本")
 
-        return {
-            "test": "resource_usage",
-            "duration": duration,
-            "samples": samples
-        }
+        return {"test": "resource_usage", "duration": duration, "samples": samples}
 
     async def run_all_tests(self):
         """运行所有测试"""
@@ -258,7 +223,7 @@ async def main():
     for result in results:
         print(f"\n{result.get('test', 'unknown')}:")
         for key, value in result.items():
-            if key != 'test' and key != 'samples':
+            if key != "test" and key != "samples":
                 print(f"  {key}: {value}")
 
 

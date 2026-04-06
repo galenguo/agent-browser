@@ -49,11 +49,11 @@ class BrowserInstancePool:
         self.instances = {}
         self.port_allocator = PortAllocator(start=19222, end=19300)
         self.novnc_port_allocator = PortAllocator(
-            start=int(os.getenv('NOVNC_PORT_START', '6080')),
-            end=int(os.getenv('NOVNC_PORT_END', '6200')),
+            start=int(os.getenv("NOVNC_PORT_START", "6080")),
+            end=int(os.getenv("NOVNC_PORT_END", "6200")),
         )
         self._docker_client = None  # Lazy init, reused
-        self._debug_mode = os.getenv('DEBUG_CONTAINERS', 'false').lower() == 'true'
+        self._debug_mode = os.getenv("DEBUG_CONTAINERS", "false").lower() == "true"
         logger.info(f"BrowserInstancePool initialized in {mode} mode")
 
     async def allocate(
@@ -65,8 +65,7 @@ class BrowserInstancePool:
         """Allocate a browser instance."""
         if self.mode == "local":
             return await self._allocate_local(session_id, profile_dir)
-        else:
-            return await self._allocate_docker(session_id, profile_dir)
+        return await self._allocate_docker(session_id, profile_dir)
 
     async def _allocate_local(
         self,
@@ -105,6 +104,7 @@ class BrowserInstancePool:
         """Get or create Docker client (reuse connection)."""
         if self._docker_client is None:
             import docker
+
             self._docker_client = docker.from_env()
         return self._docker_client
 
@@ -125,17 +125,16 @@ class BrowserInstancePool:
         auto_remove = not self._debug_mode
 
         # Check if running inside a Docker container (API container)
-        in_docker = os.path.exists('/.dockerenv')
+        in_docker = os.path.exists("/.dockerenv")
 
         if in_docker:
             # Mode D: API container -> browser container (via Docker network)
             # Container path -> host path conversion
             # HOST_PROFILE_PATH is the absolute path of profile directory on host
-            host_profile_base = os.getenv('HOST_PROFILE_PATH')
+            host_profile_base = os.getenv("HOST_PROFILE_PATH")
             if not host_profile_base:
                 raise RuntimeError(
-                    "HOST_PROFILE_PATH must be set in Docker mode "
-                    "(host path that maps to PROFILE_STORAGE)"
+                    "HOST_PROFILE_PATH must be set in Docker mode (host path that maps to PROFILE_STORAGE)"
                 )
             # profile_dir is container-internal path /data/profiles/{session_id}
             # Extract session subdirectory name and append to host path
@@ -146,41 +145,38 @@ class BrowserInstancePool:
                 "agent-browser-browser:latest",
                 name=container_name,
                 detach=True,
-                shm_size='128mb',
-                mem_limit='2g',
+                shm_size="128mb",
+                mem_limit="2g",
                 environment={
-                    'CDP_PORT': '19222',
-                    'HEADLESS': 'false',
-                    'PROFILE_STORAGE': '/data/profiles',
+                    "CDP_PORT": "19222",
+                    "HEADLESS": "false",
+                    "PROFILE_STORAGE": "/data/profiles",
                 },
                 ports={
-                    '6080/tcp': None,  # noVNC (host dynamic port)
-                    '5900/tcp': None,  # VNC direct (host dynamic port)
+                    "6080/tcp": None,  # noVNC (host dynamic port)
+                    "5900/tcp": None,  # VNC direct (host dynamic port)
                 },
-                volumes={
-                    host_profile_dir: {
-                        'bind': '/data/profiles',
-                        'mode': 'rw'
-                    }
-                },
-                network='agent-browser-network',  # Shared network
+                volumes={host_profile_dir: {"bind": "/data/profiles", "mode": "rw"}},
+                network="agent-browser-network",  # Shared network
                 auto_remove=auto_remove,
             )
 
             # CDP URL uses IP address (Chrome rejects non-IP/localhost Host headers)
             import socket
+
             try:
                 container_ip = socket.gethostbyname(container_name)
             except Exception:
                 # DNS may not be registered right after container start; retry after wait
                 import asyncio
+
                 await asyncio.sleep(3)
                 container_ip = socket.gethostbyname(container_name)
             cdp_url = f"http://{container_ip}:19222"
 
             # Read public access config (for informing users about browser node address)
-            public_host = os.getenv('BROWSER_PUBLIC_HOST', 'www.aiecho.site')
-            port_offset = int(os.getenv('BROWSER_PORT_OFFSET', '0'))
+            public_host = os.getenv("BROWSER_PUBLIC_HOST", "www.aiecho.site")
+            port_offset = int(os.getenv("BROWSER_PORT_OFFSET", "0"))
 
             public_cdp_port = None  # Mode D: CDP not exposed externally (internal network)
             public_novnc_port = None
@@ -188,9 +184,9 @@ class BrowserInstancePool:
             if public_host:
                 container.reload()
                 ports = container.ports or {}
-                novnc_mapping = ports.get('6080/tcp')
+                novnc_mapping = ports.get("6080/tcp")
                 if novnc_mapping:
-                    host_port = int(novnc_mapping[0]['HostPort'])
+                    host_port = int(novnc_mapping[0]["HostPort"])
                     public_novnc_port = host_port + port_offset
                     novnc_url = f"http://{public_host}:{public_novnc_port}/vnc.html"
 
@@ -201,23 +197,18 @@ class BrowserInstancePool:
                 "agent-browser-browser:latest",
                 name=container_name,
                 detach=True,
-                shm_size='128mb',
-                mem_limit='1g',
+                shm_size="128mb",
+                mem_limit="1g",
                 ports={
-                    '19222/tcp': cdp_port,   # Map to host dynamic port
-                    '6080/tcp': novnc_port,  # noVNC (fixed port range)
+                    "19222/tcp": cdp_port,  # Map to host dynamic port
+                    "6080/tcp": novnc_port,  # noVNC (fixed port range)
                 },
                 environment={
-                    'CDP_PORT': '19222',
-                    'HEADLESS': 'false',
-                    'PROFILE_STORAGE': '/data/profiles',
+                    "CDP_PORT": "19222",
+                    "HEADLESS": "false",
+                    "PROFILE_STORAGE": "/data/profiles",
                 },
-                volumes={
-                    profile_dir: {
-                        'bind': '/data/profiles',
-                        'mode': 'rw'
-                    }
-                },
+                volumes={profile_dir: {"bind": "/data/profiles", "mode": "rw"}},
                 auto_remove=auto_remove,
             )
 
@@ -225,8 +216,8 @@ class BrowserInstancePool:
             cdp_url = f"http://localhost:{cdp_port}"
 
             # Read public access config (for informing users about browser node address)
-            public_host = os.getenv('BROWSER_PUBLIC_HOST', 'www.aiecho.site')
-            port_offset = int(os.getenv('BROWSER_PORT_OFFSET', '0'))
+            public_host = os.getenv("BROWSER_PUBLIC_HOST", "www.aiecho.site")
+            port_offset = int(os.getenv("BROWSER_PORT_OFFSET", "0"))
 
             public_novnc_port = novnc_port + port_offset
             novnc_url = f"http://{public_host}:{public_novnc_port}/vnc.html" if public_host else None
@@ -268,6 +259,7 @@ class BrowserInstancePool:
         check_url = cdp_url
         try:
             import socket
+
             ip = socket.gethostbyname(host)
             check_url = f"http://{ip}:{port}"
         except Exception:
@@ -276,10 +268,13 @@ class BrowserInstancePool:
         start = asyncio.get_event_loop().time()
         while asyncio.get_event_loop().time() - start < timeout:
             try:
-                async with aiohttp.ClientSession() as session, session.get(
-                    f"{check_url}/json/version",
-                    timeout=aiohttp.ClientTimeout(total=2),
-                ) as resp:
+                async with (
+                    aiohttp.ClientSession() as session,
+                    session.get(
+                        f"{check_url}/json/version",
+                        timeout=aiohttp.ClientTimeout(total=2),
+                    ) as resp,
+                ):
                     if resp.status == 200:
                         logger.info(f"CDP ready at {cdp_url}")
                         return

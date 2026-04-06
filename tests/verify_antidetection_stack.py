@@ -11,6 +11,7 @@ Phase 5: 5层反检测栈验证测试
 
 前置条件：CloakBrowser 运行在 127.0.0.1:19222
 """
+
 import asyncio
 
 import pytest
@@ -169,7 +170,7 @@ class TestLayer3RebrowserPatches:
             # 只应该有 webdriver 相关变量（但 navigator.webdriver 应该是 false）
             # 实际的 webdriver 变量不应该作为 window 属性存在
             for var in selenium_vars:
-                if var != 'webdriver':  # navigator.webdriver 是标准属性
+                if var != "webdriver":  # navigator.webdriver 是标准属性
                     pytest.fail(f"Found Selenium var: {var}")
 
             await context.close()
@@ -184,14 +185,13 @@ class TestLayer4NonStandardPort:
         """CDP 端口应该是 19222"""
         import aiohttp
 
-        async with aiohttp.ClientSession() as session, \
-                session.get(
-                "http://127.0.0.1:19222/json/version",
-                timeout=aiohttp.ClientTimeout(total=5)
-            ) as resp:
-                assert resp.status == 200
-                data = await resp.json()
-                assert "webSocketDebuggerUrl" in data
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get("http://127.0.0.1:19222/json/version", timeout=aiohttp.ClientTimeout(total=5)) as resp,
+        ):
+            assert resp.status == 200
+            data = await resp.json()
+            assert "webSocketDebuggerUrl" in data
 
     @pytest.mark.asyncio
     async def test_standard_port_not_exposed(self):
@@ -200,9 +200,9 @@ class TestLayer4NonStandardPort:
 
         # 检查 9222 端口（可能同时运行普通 Chrome）
         try:
-            async with aiohttp.ClientSession() as session, session.get(
-                "http://127.0.0.1:9222/json/version",
-                timeout=aiohttp.ClientTimeout(total=2)
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get("http://127.0.0.1:9222/json/version", timeout=aiohttp.ClientTimeout(total=2)),
             ):
                 # 如果 9222 存在，确保它与 19222 是不同的浏览器
                 # 这个测试主要是信息性的
@@ -427,7 +427,7 @@ class TestExternalDetectionServices:
 
             assert webgl["supported"] is True, "WebGL not supported"
             # GPU 信息应该是合理的（不是 SwiftShader 或其他软件渲染器）
-            if webgl["renderer"] != 'unknown':
+            if webgl["renderer"] != "unknown":
                 assert "SwiftShader" not in webgl["renderer"]
 
             await context.close()

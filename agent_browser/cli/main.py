@@ -9,6 +9,7 @@ CLI cross-process session persistence:
   - session create: create browser instance + write to file
   - other commands: read cdp_url from file, reuse existing CDP connection
 """
+
 import asyncio
 import json
 import logging
@@ -51,9 +52,7 @@ async def _get_or_reconnect_session(session_id: str) -> SessionContext:
         raise Exception(f"Session not found: {session_id}")
 
     # Reconnect to existing CDP endpoint (don't restart browser)
-    browser_session = BrowserSession(
-        browser_profile=BrowserProfile(cdp_url=cli_session.cdp_url, is_local=True)
-    )
+    browser_session = BrowserSession(browser_profile=BrowserProfile(cdp_url=cli_session.cdp_url, is_local=True))
     await browser_session.start()
 
     # Build lightweight SessionContext
@@ -89,17 +88,16 @@ def output_json(result: ActionResult):
 @click.group()
 def cli():
     """Agent-Browser CLI -- atomic command mode"""
-    pass
 
 
 # ──────────────────────────────────────────
 # Session commands
 # ──────────────────────────────────────────
 
+
 @cli.group()
 def session():
     """Session management"""
-    pass
 
 
 @session.command("create")
@@ -128,13 +126,12 @@ async def _session_create(name, browser, use_gateway, cdp_url):
             session_id=ctx.session_id,
             cdp_url=ctx.browser_instance.cdp_url,
             mode=browser,
-            profile_path=os.getenv('PROFILE_STORAGE', '/data/profiles') + f"/{name}",
+            profile_path=os.getenv("PROFILE_STORAGE", "/data/profiles") + f"/{name}",
         )
 
-        output_json(ActionResult(
-            status="success",
-            data={"session_id": ctx.session_id, "cdp_url": ctx.browser_instance.cdp_url}
-        ))
+        output_json(
+            ActionResult(status="success", data={"session_id": ctx.session_id, "cdp_url": ctx.browser_instance.cdp_url})
+        )
     except Exception as e:
         output_json(ActionResult(status="error", error=str(e)))
 
@@ -172,17 +169,19 @@ async def _session_info(session_id):
             output_json(ActionResult(status="error", error=f"Session not found: {session_id}"))
             return
 
-        output_json(ActionResult(
-            status="success",
-            data={
-                "session_id": cli_session.session_id,
-                "browser_mode": cli_session.mode,
-                "cdp_url": cli_session.cdp_url,
-                "created_at": cli_session.created_at,
-                "last_used": cli_session.last_used,
-                "task_count": cli_session.task_count,
-            }
-        ))
+        output_json(
+            ActionResult(
+                status="success",
+                data={
+                    "session_id": cli_session.session_id,
+                    "browser_mode": cli_session.mode,
+                    "cdp_url": cli_session.cdp_url,
+                    "created_at": cli_session.created_at,
+                    "last_used": cli_session.last_used,
+                    "task_count": cli_session.task_count,
+                },
+            )
+        )
     except Exception as e:
         output_json(ActionResult(status="error", error=str(e)))
 
@@ -214,10 +213,10 @@ async def _session_destroy(session_id):
 # Navigate commands
 # ──────────────────────────────────────────
 
+
 @cli.group()
 def navigate():
     """Navigation operations"""
-    pass
 
 
 @navigate.command("goto")
@@ -286,10 +285,10 @@ async def _navigate_refresh(session_id):
 # Interact commands
 # ──────────────────────────────────────────
 
+
 @cli.group()
 def interact():
     """Interaction operations"""
-    pass
 
 
 @interact.command("click")
@@ -347,10 +346,10 @@ async def _interact_scroll(session_id, direction, amount):
 # Extract commands
 # ──────────────────────────────────────────
 
+
 @cli.group()
 def extract():
     """Content extraction"""
-    pass
 
 
 @extract.command("text")
@@ -437,10 +436,10 @@ async def _extract_screenshot(session_id, full_page):
 # Page commands
 # ──────────────────────────────────────────
 
+
 @cli.group()
 def page():
     """Tab management"""
-    pass
 
 
 @page.command("new")
@@ -510,6 +509,7 @@ async def _page_close(session_id, index):
 # Run command (Agent mode)
 # ──────────────────────────────────────────
 
+
 @cli.command()
 @click.option("--task", required=True, help="Task description")
 @click.option("--session", help="Reuse existing session")
@@ -573,10 +573,15 @@ async def _run_task(task, session_name, url, max_steps, headed, llm_provider, ll
             result = await agent.run(max_steps=max_steps)
 
             await browser_session.close()
-            click.echo(json.dumps({
-                "status": "success",
-                "data": {"result": str(result)},
-            }, ensure_ascii=False))
+            click.echo(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "data": {"result": str(result)},
+                    },
+                    ensure_ascii=False,
+                )
+            )
         else:
             # Create temporary session
             ctx = await session_mgr.create_session(browser_mode="local")
@@ -605,10 +610,15 @@ async def _run_task(task, session_name, url, max_steps, headed, llm_provider, ll
             await browser_session.close()
             await session_mgr.destroy_session(ctx.session_id)
 
-            click.echo(json.dumps({
-                "status": "success",
-                "data": {"result": str(result)},
-            }, ensure_ascii=False))
+            click.echo(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "data": {"result": str(result)},
+                    },
+                    ensure_ascii=False,
+                )
+            )
 
     except Exception as e:
         click.echo(json.dumps({"status": "error", "error": str(e)}, ensure_ascii=False))

@@ -15,9 +15,11 @@ async def run_task(
     Automatically gets total_timeout protection and stealth wrapping.
     """
     from agent_browser.main import _ensure_middleware
+
     mw = await _ensure_middleware()
     return await mw.run_task(
-        session_id, task,
+        session_id,
+        task,
         intelligence=intelligence,
         llm_config=llm_config,
         max_steps=max_steps,

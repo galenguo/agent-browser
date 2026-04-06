@@ -6,6 +6,7 @@ IDOR prevention, constant-time comparison). The FastAPI server module has not ye
 been migrated to agent_browser/ package. These tests will be re-enabled once
 the API server is added.
 """
+
 import pytest
 
 # FastAPI server (api.py) is an optional component not yet migrated.

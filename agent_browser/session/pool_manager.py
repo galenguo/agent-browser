@@ -21,7 +21,6 @@ from browser_use import Agent, BrowserProfile, BrowserSession
 from playwright.async_api import Page, async_playwright
 
 from agent_browser.browser.instance_pool import BrowserInstancePool
-from agent_browser.core.stealth_enhancer import StealthEnhancer
 from agent_browser.models import (
     ClickRequest,
     DockerBrowserInstance,
@@ -36,6 +35,7 @@ from agent_browser.models import (
     UserSession,
     WaitRequest,
 )
+from agent_browser.stealth.enhancer import StealthEnhancer
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +58,10 @@ class SessionPoolManager:
         if browser_mode == "docker":
             try:
                 import socket
+
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(1)
-                result = sock.connect_ex(('127.0.0.1', 19222))
+                result = sock.connect_ex(("127.0.0.1", 19222))
                 sock.close()
                 if result == 0:
                     effective_mode = "local"
@@ -99,15 +100,13 @@ class SessionPoolManager:
         # Check quota and reserve session_id under lock to prevent concurrent over-allocation
         async with self._create_lock:
             if len(self.sessions) >= self.max_concurrent:
-                raise ResourceExhaustedError(
-                    f"Max concurrent sessions reached ({self.max_concurrent})"
-                )
+                raise ResourceExhaustedError(f"Max concurrent sessions reached ({self.max_concurrent})")
             session_id = f"{user_id}_{uuid4().hex[:8]}"
             # Reserve slot upfront to prevent concurrent requests from bypassing quota check
             self.sessions[session_id] = None  # type: ignore[assignment]
 
         # Create independent Profile directory
-        profile_base = os.getenv('PROFILE_STORAGE', '/data/profiles')
+        profile_base = os.getenv("PROFILE_STORAGE", "/data/profiles")
         profile_dir = os.path.join(profile_base, session_id)
         os.makedirs(profile_dir, mode=0o700, exist_ok=True)
 
@@ -245,7 +244,7 @@ class SessionPoolManager:
                         if attempt == 0 and isinstance(session.browser_instance, DockerBrowserInstance):
                             await asyncio.sleep(2)
 
-                        logger.info(f"Running agent for task {task_id} (max_steps={max_steps}, attempt={attempt+1})")
+                        logger.info(f"Running agent for task {task_id} (max_steps={max_steps}, attempt={attempt + 1})")
 
                         result = await current_agent.run(max_steps=max_steps)
 
@@ -271,13 +270,19 @@ class SessionPoolManager:
                         # Check if it's a CDP connection error (retryable)
                         # Also check error message and exception name (httpx.ReadError str(e) may be empty)
                         cdp_keywords = [
-                            "read error", "econnreset", "cdp", "websocket",
-                            "connect_over_cdp", "readerror", "connection",
-                            "browserstartevent", "timed out", "timeout",
+                            "read error",
+                            "econnreset",
+                            "cdp",
+                            "websocket",
+                            "connect_over_cdp",
+                            "readerror",
+                            "connection",
+                            "browserstartevent",
+                            "timed out",
+                            "timeout",
                         ]
-                        is_cdp_error = (
-                            any(kw in error_str for kw in cdp_keywords) or
-                            any(kw in error_type for kw in ["readerror", "timeout", "connection"])
+                        is_cdp_error = any(kw in error_str for kw in cdp_keywords) or any(
+                            kw in error_type for kw in ["readerror", "timeout", "connection"]
                         )
 
                         # Close failed browser session
@@ -294,7 +299,7 @@ class SessionPoolManager:
                         # CDP connection error, wait then retry
                         wait_time = 5 * (attempt + 1)
                         logger.warning(
-                            f"[{task_id}] CDP connection error (attempt {attempt+1}/{MAX_CDP_RETRIES}): {e}. "
+                            f"[{task_id}] CDP connection error (attempt {attempt + 1}/{MAX_CDP_RETRIES}): {e}. "
                             f"Retrying in {wait_time}s..."
                         )
                         await asyncio.sleep(wait_time)
@@ -414,9 +419,7 @@ class SessionPoolManager:
                     idle_sessions.append(session_id)
 
             for session_id in idle_sessions:
-                logger.info(
-                    f"Session {session_id} idle for {self.idle_timeout}s, closing..."
-                )
+                logger.info(f"Session {session_id} idle for {self.idle_timeout}s, closing...")
                 await self.close_session(session_id)
 
     async def _health_check_loop(self):
@@ -440,10 +443,7 @@ class SessionPoolManager:
                     status = "unknown"
 
                 if status not in ("running",):
-                    logger.error(
-                        f"Container for session {session_id} is {status}, "
-                        f"recovering..."
-                    )
+                    logger.error(f"Container for session {session_id} is {status}, recovering...")
                     # Clean up dead session, release resources
                     try:
                         await self.close_session(session_id)
@@ -488,25 +488,22 @@ class SessionPoolManager:
 
         # Compatible with Browser and BrowserContext (persistent context returns BrowserContext)
         # Note: patchright and playwright have different types, can't cross isinstance check
-        if hasattr(browser, 'pages') and not hasattr(browser, 'contexts'):
+        if hasattr(browser, "pages") and not hasattr(browser, "contexts"):
             # persistent context / BrowserContext: use pages directly
             pages = browser.pages
             if pages:
                 return pages[0]
-            else:
-                return await browser.new_page()
+            return await browser.new_page()
+        # Normal Browser: get via contexts
+        contexts = browser.contexts
+        if contexts:
+            context = contexts[0]
         else:
-            # Normal Browser: get via contexts
-            contexts = browser.contexts
-            if contexts:
-                context = contexts[0]
-            else:
-                context = await browser.new_context()
-            pages = context.pages
-            if pages:
-                return pages[0]
-            else:
-                return await context.new_page()
+            context = await browser.new_context()
+        pages = context.pages
+        if pages:
+            return pages[0]
+        return await context.new_page()
 
     async def _get_docker_page(self, session_id: str, instance: DockerBrowserInstance) -> Page:
         """Get Page from Docker container via CDP (with retry)."""
@@ -542,7 +539,7 @@ class SessionPoolManager:
                 return await context.new_page()
             except Exception as e:
                 last_error = e
-                logger.warning(f"CDP connect attempt {attempt+1}/3 failed: {e}")
+                logger.warning(f"CDP connect attempt {attempt + 1}/3 failed: {e}")
                 # Clean up failed connection
                 if session_id in self._docker_connections:
                     _, failed_browser = self._docker_connections.pop(session_id, (None, None))
@@ -565,11 +562,7 @@ class SessionPoolManager:
         await self._stealth.pre_action("navigate")
 
         try:
-            await page.goto(
-                request.url,
-                wait_until=request.wait_until,
-                timeout=request.timeout
-            )
+            await page.goto(request.url, wait_until=request.wait_until, timeout=request.timeout)
         except Exception as e:
             error_str = str(e).lower()
             # Mark session as abnormal on CDP disconnection so health_check can clean up
@@ -586,11 +579,7 @@ class SessionPoolManager:
         if session:
             session.mark_activity()
 
-        return {
-            "status": "ok",
-            "url": page.url,
-            "title": await page.title()
-        }
+        return {"status": "ok", "url": page.url, "title": await page.title()}
 
     async def snapshot(self, session_id: str, interactive_only: bool = True) -> SnapshotResponse:
         """Get DOM snapshot."""
@@ -640,9 +629,7 @@ class SessionPoolManager:
             session.mark_activity()
 
         return SnapshotResponse(
-            url=result["url"],
-            title=result["title"],
-            elements=[ElementInfo(**el) for el in result["elements"]]
+            url=result["url"], title=result["title"], elements=[ElementInfo(**el) for el in result["elements"]]
         )
 
     async def click(self, session_id: str, request: ClickRequest) -> dict:
@@ -662,11 +649,7 @@ class SessionPoolManager:
             raise ValueError(f"Element {request.ref} not found. DOM may have changed since snapshot.")
 
         # Execute click
-        await element.click(
-            button=request.button,
-            click_count=request.click_count,
-            delay=request.delay
-        )
+        await element.click(button=request.button, click_count=request.click_count, delay=request.delay)
 
         session = self.sessions.get(session_id)
         if session:
@@ -732,11 +715,7 @@ class SessionPoolManager:
         """Wait for selector."""
         page = await self._get_page(session_id)
 
-        await page.wait_for_selector(
-            request.selector,
-            timeout=request.timeout,
-            state=request.state
-        )
+        await page.wait_for_selector(request.selector, timeout=request.timeout, state=request.state)
 
         session = self.sessions.get(session_id)
         if session:

@@ -19,6 +19,7 @@ Run:
 注意：M6/M7 (Docker Remote) 需要单独的 docker-compose 环境，
       本文件中标记为需要 Docker 才运行。
 """
+
 import asyncio
 import os
 from datetime import datetime
@@ -41,6 +42,7 @@ MODE_IDS = [f"{c}/{b}/{i}" for c, b, i in MODE_MATRIX]
 #  Mode Matrix Core Tests
 # ════════════════════════════════════════════
 
+
 @pytest.mark.requires_browser
 class TestModeMatrixNavigation:
     """
@@ -59,16 +61,10 @@ class TestModeMatrixNavigation:
         # 根据模式选择不同的执行路径
         if calling_mode == "cli":
             # CLI 模式：直接使用 main.py 的函数式 API
-            await self._test_cli_navigation(
-                calling_mode, browser_mode, intelligence,
-                browser_page, scorecard_writer
-            )
+            await self._test_cli_navigation(calling_mode, browser_mode, intelligence, browser_page, scorecard_writer)
         else:
             # API 模式：通过 HTTP 调用 FastAPI（如果可用）
-            await self._test_api_navigation(
-                calling_mode, browser_mode, intelligence,
-                browser_page, scorecard_writer
-            )
+            await self._test_api_navigation(calling_mode, browser_mode, intelligence, browser_page, scorecard_writer)
 
     async def _test_cli_navigation(self, calling_mode, browser_mode, intelligence, page, scorecard_writer):
         """CLI 模式导航测试实现"""
@@ -87,23 +83,27 @@ class TestModeMatrixNavigation:
                 f"Mode {calling_mode}/{browser_mode}/{intelligence}: webdriver 未隐藏"
             )
 
-            scorecard_writer.record({
-                "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
-                "test": "navigate",
-                "status": "PASS",
-                "title": title,
-                "url": url,
-                "webdriver_ok": webdriver in (False, None),
-                "timestamp": datetime.now().isoformat(),
-            })
+            scorecard_writer.record(
+                {
+                    "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
+                    "test": "navigate",
+                    "status": "PASS",
+                    "title": title,
+                    "url": url,
+                    "webdriver_ok": webdriver in (False, None),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
         except Exception as e:
-            scorecard_writer.record({
-                "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
-                "test": "navigate",
-                "status": "FAIL",
-                "error": str(e)[:200],
-                "timestamp": datetime.now().isoformat(),
-            })
+            scorecard_writer.record(
+                {
+                    "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
+                    "test": "navigate",
+                    "status": "FAIL",
+                    "error": str(e)[:200],
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
             raise
 
     async def _test_api_navigation(self, calling_mode, browser_mode, intelligence, page, scorecard_writer):
@@ -114,27 +114,34 @@ class TestModeMatrixNavigation:
 
         # 先检查 FastAPI 是否运行
         try:
-            async with aiohttp.ClientSession() as session, session.get(
-                f"{api_base}/health",
-                timeout=aiohttp.ClientTimeout(total=3),
-            ) as resp:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(
+                    f"{api_base}/health",
+                    timeout=aiohttp.ClientTimeout(total=3),
+                ) as resp,
+            ):
                 if resp.status != 200:
-                    scorecard_writer.record({
-                        "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
-                        "test": "api_navigate",
-                        "status": "BLOCKED",
-                        "reason": f"FastAPI not running (status={resp.status})",
-                        "timestamp": datetime.now().isoformat(),
-                    })
+                    scorecard_writer.record(
+                        {
+                            "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
+                            "test": "api_navigate",
+                            "status": "BLOCKED",
+                            "reason": f"FastAPI not running (status={resp.status})",
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    )
                     pytest.skip("FastAPI 未启动，跳过 API 模式测试")
         except (aiohttp.ClientError, OSError) as e:
-            scorecard_writer.record({
-                "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
-                "test": "api_navigate",
-                "status": "BLOCKED",
-                "reason": f"FastAPI unreachable: {e}",
-                "timestamp": datetime.now().isoformat(),
-            })
+            scorecard_writer.record(
+                {
+                    "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
+                    "test": "api_navigate",
+                    "status": "BLOCKED",
+                    "reason": f"FastAPI unreachable: {e}",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
             pytest.skip("FastAPI 未启动，跳过 API 模式测试")
 
         # FastAPI 运行中：通过 API 创建 session 并导航
@@ -187,16 +194,18 @@ class TestModeMatrixNavigation:
             ) as resp:
                 assert resp.status == 200
 
-            scorecard_writer.record({
-                "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
-                "test": "api_navigate",
-                "status": "PASS",
-                "session_id": session_id,
-                "nav_url": nav_data.get("url"),
-                "title": title_data.get("title"),
-                "webdriver_ok": True,
-                "timestamp": datetime.now().isoformat(),
-            })
+            scorecard_writer.record(
+                {
+                    "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
+                    "test": "api_navigate",
+                    "status": "PASS",
+                    "session_id": session_id,
+                    "nav_url": nav_data.get("url"),
+                    "title": title_data.get("title"),
+                    "webdriver_ok": True,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
 
 
 @pytest.mark.requires_browser
@@ -235,27 +244,28 @@ class TestModeMatrixAntiDetection:
                 issues.append("HeadlessChrome in UA")
 
             status = "PASS" if not issues else "FAIL"
-            scorecard_writer.record({
-                "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
-                "test": "anti_detection",
-                "status": status,
-                "signals": signals,
-                "issues": issues,
-                "timestamp": datetime.now().isoformat(),
-            })
-
-            assert status == "PASS", (
-                f"Mode {calling_mode}/{browser_mode}/{intelligence} "
-                f"反检测信号异常: {issues}"
+            scorecard_writer.record(
+                {
+                    "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
+                    "test": "anti_detection",
+                    "status": status,
+                    "signals": signals,
+                    "issues": issues,
+                    "timestamp": datetime.now().isoformat(),
+                }
             )
+
+            assert status == "PASS", f"Mode {calling_mode}/{browser_mode}/{intelligence} 反检测信号异常: {issues}"
         except Exception as e:
-            scorecard_writer.record({
-                "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
-                "test": "anti_detection",
-                "status": "FAIL",
-                "error": str(e)[:200],
-                "timestamp": datetime.now().isoformat(),
-            })
+            scorecard_writer.record(
+                {
+                    "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
+                    "test": "anti_detection",
+                    "status": "FAIL",
+                    "error": str(e)[:200],
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
             raise
 
 
@@ -279,18 +289,21 @@ class TestModeMatrixCleanup:
         # Verify we can navigate freely (no stuck state)
         assert end_url == "about:blank", "页面状态未正确清理"
 
-        scorecard_writer.record({
-            "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
-            "test": "cleanup",
-            "status": "PASS",
-            "note": "Navigation lifecycle works correctly",
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
+                "test": "cleanup",
+                "status": "PASS",
+                "note": "Navigation lifecycle works correctly",
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
 
 # ════════════════════════════════════════════
 #  Fallback & Edge Case Tests
 # ════════════════════════════════════════════
+
 
 @pytest.mark.requires_browser
 class TestCLIRemoteFallback:
@@ -308,17 +321,17 @@ class TestCLIRemoteFallback:
         )
 
         # CLI + remote 强制回退为 local
-        assert cfg.browser_mode == "local", (
-            f"CLI+Remote 应回退为 Local，实际为: {cfg.browser_mode}"
-        )
+        assert cfg.browser_mode == "local", f"CLI+Remote 应回退为 Local，实际为: {cfg.browser_mode}"
 
-        scorecard_writer.record({
-            "mode": "cli/remote/llm (fallback)",
-            "test": "fallback_behavior",
-            "status": "PASS",
-            "actual_browser_mode": cfg.browser_mode,
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "mode": "cli/remote/llm (fallback)",
+                "test": "fallback_behavior",
+                "status": "PASS",
+                "actual_browser_mode": cfg.browser_mode,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
 
 @pytest.mark.requires_browser
@@ -333,34 +346,41 @@ class TestAPIRemoteWithoutDocker:
 
         if not is_available:
             # 这是预期行为：没有 Docker 就不应该尝试远程连接
-            scorecard_writer.record({
-                "mode": "api/remote/*",
-                "test": "docker_unavailable_handling",
-                "status": "BLOCKED",
-                "reason": "Docker/Gateway 未运行，正确跳过",
-                "docker_api_url": docker_api_url,
-                "timestamp": datetime.now().isoformat(),
-            })
+            scorecard_writer.record(
+                {
+                    "mode": "api/remote/*",
+                    "test": "docker_unavailable_handling",
+                    "status": "BLOCKED",
+                    "reason": "Docker/Gateway 未运行，正确跳过",
+                    "docker_api_url": docker_api_url,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
             # 这个测试本身就是在验证"无 Docker 时的行为"
             pytest.skip("Docker Gateway 未运行 — 正确的降级行为")
         else:
             # Docker 可用：验证远程连接实际工作
             import aiohttp
 
-            async with aiohttp.ClientSession() as session, session.get(
-                f"{docker_api_url}/health",
-                timeout=aiohttp.ClientTimeout(total=5),
-            ) as resp:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(
+                    f"{docker_api_url}/health",
+                    timeout=aiohttp.ClientTimeout(total=5),
+                ) as resp,
+            ):
                 assert resp.status == 200, "Gateway health check failed"
                 await resp.json()
 
-            scorecard_writer.record({
-                "mode": "api/remote/*",
-                "test": "docker_available",
-                "status": "PASS",
-                "gateway_url": docker_api_url,
-                "timestamp": datetime.now().isoformat(),
-            })
+            scorecard_writer.record(
+                {
+                    "mode": "api/remote/*",
+                    "test": "docker_available",
+                    "status": "PASS",
+                    "gateway_url": docker_api_url,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
 
 
 @pytest.mark.requires_browser
@@ -427,18 +447,21 @@ class TestAPIRemoteWithDocker:
             ) as r:
                 assert r.status == 404
 
-        scorecard_writer.record({
-            "mode": "api/remote (docker)",
-            "test": "full_lifecycle",
-            "status": "PASS",
-            "session_id": sid,
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "mode": "api/remote (docker)",
+                "test": "full_lifecycle",
+                "status": "PASS",
+                "session_id": sid,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
 
 # ════════════════════════════════════════════
 #  Scorecard Per-Mode Summary
 # ════════════════════════════════════════════
+
 
 @pytest.mark.requires_browser
 def test_mode_matrix_scorecard_summary(scorecard_writer):

@@ -1,4 +1,5 @@
 """Adapter 回归测试 — 所有 YAML adapter 通过验证器 + 结构检查"""
+
 import pytest
 
 from agent_browser.adapters.loader import get_adapter
@@ -8,13 +9,16 @@ from agent_browser.adapters.validator import validate_adapter
 class TestAllAdaptersLoad:
     """所有现有 adapter 都能被 loader 正确加载"""
 
-    @pytest.mark.parametrize("site,name", [
-        ("boss", "search"),
-        ("baidu", "search"),
-        ("bilibili", "hot"),
-        ("zhihu", "hot"),
-        # desktop adapters use a different format (app/type/detect), not site/name
-    ])
+    @pytest.mark.parametrize(
+        "site,name",
+        [
+            ("boss", "search"),
+            ("baidu", "search"),
+            ("bilibili", "hot"),
+            ("zhihu", "hot"),
+            # desktop adapters use a different format (app/type/detect), not site/name
+        ],
+    )
     def test_adapter_loads(self, site, name):
         adapter = get_adapter(site, name)
         assert adapter is not None, f"Adapter {site}/{name} not found"
@@ -27,12 +31,15 @@ class TestAllAdaptersLoad:
 class TestAdapterValidation:
     """所有现有 adapter 通过结构验证"""
 
-    @pytest.mark.parametrize("site,name", [
-        ("boss", "search"),
-        ("baidu", "search"),
-        ("bilibili", "hot"),
-        ("zhihu", "hot"),
-    ])
+    @pytest.mark.parametrize(
+        "site,name",
+        [
+            ("boss", "search"),
+            ("baidu", "search"),
+            ("bilibili", "hot"),
+            ("zhihu", "hot"),
+        ],
+    )
     def test_adapter_validates(self, site, name):
         adapter = get_adapter(site, name)
         errors = validate_adapter(adapter)
@@ -43,7 +50,7 @@ class TestAdapterValidation:
         for site, name in [("boss", "search"), ("baidu", "search")]:
             adapter = get_adapter(site, name)
             if adapter and adapter.get("browser") is not False:
-                ops = [list(s.keys())[0] for s in adapter["pipeline"]]
+                ops = [next(iter(s.keys())) for s in adapter["pipeline"]]
                 assert "navigate" in ops, f"{site}/{name} missing navigate step"
 
 
@@ -52,6 +59,7 @@ class TestPipelineErrors:
 
     def test_pipeline_error_to_dict(self):
         from agent_browser.pipeline.errors import PipelineError
+
         err = PipelineError(
             message="test error",
             step_index=2,
@@ -67,6 +75,7 @@ class TestPipelineErrors:
 
     def test_user_message_format(self):
         from agent_browser.pipeline.errors import PipelineError
+
         err = PipelineError(
             message="element not found",
             step_index=3,
@@ -86,11 +95,13 @@ class TestPipelineErrors:
             PipelineStepError,
             SelectorNotFoundError,
         )
+
         assert issubclass(SelectorNotFoundError, PipelineStepError)
         assert issubclass(PipelineStepError, PipelineError)
 
     def test_fix_hint_generation(self):
         from agent_browser.pipeline.errors import _generate_fix_hint
+
         hint = _generate_fix_hint("select", "element not found")
         assert hint  # should always return something
         hint = _generate_fix_hint("unknown_step", "something broke")
@@ -107,40 +118,55 @@ class TestValidatorEdgeCases:
         assert len(validate_adapter({"site": "x", "name": "y", "pipeline": []})) > 0
 
     def test_bad_strategy(self):
-        errs = validate_adapter({
-            "site": "x", "name": "y",
-            "strategy": "bad_strategy",
-            "pipeline": [{"navigate": "u"}],
-        })
+        errs = validate_adapter(
+            {
+                "site": "x",
+                "name": "y",
+                "strategy": "bad_strategy",
+                "pipeline": [{"navigate": "u"}],
+            }
+        )
         assert any("Invalid strategy" in e for e in errs)
 
     def test_bad_arg_type(self):
-        errs = validate_adapter({
-            "site": "x", "name": "y",
-            "args": {"q": {"type": "object"}},
-            "pipeline": [{"navigate": "u"}],
-        })
+        errs = validate_adapter(
+            {
+                "site": "x",
+                "name": "y",
+                "args": {"q": {"type": "object"}},
+                "pipeline": [{"navigate": "u"}],
+            }
+        )
         assert any("invalid type" in e for e in errs)
 
     def test_browser_false_with_navigate(self):
-        errs = validate_adapter({
-            "site": "x", "name": "y",
-            "browser": False,
-            "pipeline": [{"navigate": "u"}, {"evaluate": "1"}],
-        })
+        errs = validate_adapter(
+            {
+                "site": "x",
+                "name": "y",
+                "browser": False,
+                "pipeline": [{"navigate": "u"}, {"evaluate": "1"}],
+            }
+        )
         assert any("contradiction" in e for e in errs)
 
     def test_unknown_step_in_pipeline(self):
-        errs = validate_adapter({
-            "site": "x", "name": "y",
-            "pipeline": [{"nonexistent_step": "params"}],
-        })
+        errs = validate_adapter(
+            {
+                "site": "x",
+                "name": "y",
+                "pipeline": [{"nonexistent_step": "params"}],
+            }
+        )
         assert any("unknown step" in e for e in errs)
 
     def test_valid_adapter_passes(self):
-        errs = validate_adapter({
-            "site": "test", "name": "test",
-            "strategy": "cookie",
-            "pipeline": [{"navigate": "https://example.com"}],
-        })
+        errs = validate_adapter(
+            {
+                "site": "test",
+                "name": "test",
+                "strategy": "cookie",
+                "pipeline": [{"navigate": "https://example.com"}],
+            }
+        )
         assert len(errs) == 0

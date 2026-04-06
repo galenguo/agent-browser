@@ -8,6 +8,7 @@ Classification dimensions:
   - NAVIGATION_ERROR: URL invalid, blocked, DNS failure
   - UNKNOWN: Cannot auto-classify
 """
+
 from enum import Enum
 from typing import Any
 
@@ -22,6 +23,7 @@ from .errors import (
 
 class ErrorCategory(Enum):
     """Error category — determines fallback strategy."""
+
     SELECTOR_DRIFT = "selector_drift"
     TIMEOUT = "timeout"
     AUTH_FAILURE = "auth_failure"
@@ -32,19 +34,29 @@ class ErrorCategory(Enum):
 
 # ── Classification rules ──
 
-_STATUS_CODE_RE = r'\b(\d{3})\b'
-TIMEOUT_KEYWORDS = ("timeout", "timed out",)
-AUTH_KEYWORDS = ("401", "403", "unauthorized", "forbidden",
-                 "cookie", "session", "auth")
-SELECTOR_KEYWORDS = ("selector", "not found", "element", "ref@",
-                    "locator", "visible")
-NAVIGATION_KEYWORDS = ("url", "navigate", "dns", "connection refused",
-                     "connection reset", "ssl", "certificate", "blocked")
+_STATUS_CODE_RE = r"\b(\d{3})\b"
+TIMEOUT_KEYWORDS = (
+    "timeout",
+    "timed out",
+)
+AUTH_KEYWORDS = ("401", "403", "unauthorized", "forbidden", "cookie", "session", "auth")
+SELECTOR_KEYWORDS = ("selector", "not found", "element", "ref@", "locator", "visible")
+NAVIGATION_KEYWORDS = (
+    "url",
+    "navigate",
+    "dns",
+    "connection refused",
+    "connection reset",
+    "ssl",
+    "certificate",
+    "blocked",
+)
 
 
 def _extract_status_code(message: str) -> int | None:
     """Extract HTTP status code from error message."""
     import re
+
     match = re.search(_STATUS_CODE_RE, message)
     if match:
         return int(match.group(1))
@@ -106,8 +118,7 @@ def classify(error: PipelineError) -> tuple[ErrorCategory, dict[str, Any]]:
             return ErrorCategory.NAVIGATION_ERROR, {**meta, "hint": "url_or_connection"}
 
         # Data quality: empty results, parse failures
-        if any(kw in msg_lower for kw in ("empty", "no data", "parse", "json",
-                                            "index", "keyerror")):
+        if any(kw in msg_lower for kw in ("empty", "no data", "parse", "json", "index", "keyerror")):
             return ErrorCategory.DATA_QUALITY, {**meta, "hint": "data_format"}
 
     # 3. Fallback

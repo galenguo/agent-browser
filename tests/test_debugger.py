@@ -1,4 +1,5 @@
 """Debugger 测试 — 单步执行和状态检查"""
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -30,8 +31,9 @@ class TestSummarize:
 
 class TestStepRecord:
     def test_to_dict_success(self):
-        r = StepRecord(step_index=0, op="navigate", params={"url": "https://x.com"},
-                        output_type="None", duration_ms=120)
+        r = StepRecord(
+            step_index=0, op="navigate", params={"url": "https://x.com"}, output_type="None", duration_ms=120
+        )
         d = r.to_dict()
         assert d["step_index"] == 0
         assert d["op"] == "navigate"
@@ -39,8 +41,7 @@ class TestStepRecord:
         assert "error" not in d
 
     def test_to_dict_with_error(self):
-        r = StepRecord(step_index=1, op="click", params=None,
-                        error={"type": "ValueError", "message": "bad ref"})
+        r = StepRecord(step_index=1, op="click", params=None, error={"type": "ValueError", "message": "bad ref"})
         d = r.to_dict()
         assert d["error"]["type"] == "ValueError"
 
@@ -115,8 +116,10 @@ class TestDebugSessionRun:
         # nonexistent_step 应有 error 记录
         error_records = [r for r in result["history"] if "error" in r]
         assert len(error_records) >= 1
-        assert "nonexistent" in str(error_records[0]["error"]).lower() or \
-               "unknown" in str(error_records[0]["error"]).lower()
+        assert (
+            "nonexistent" in str(error_records[0]["error"]).lower()
+            or "unknown" in str(error_records[0]["error"]).lower()
+        )
 
     @pytest.mark.asyncio
     async def test_state_after_partial_run(self):
@@ -135,19 +138,18 @@ class TestDebugPipelineFunction:
         """debug_pipeline 在完成时返回数据（与 execute_pipeline 兼容）"""
         with patch("agent_browser.pipeline.debugger.DebugSession") as MockDS:
             mock_instance = MagicMock()
-            mock_instance.run_to_breakpoint = AsyncMock(return_value={
-                "status": "completed",
-                "step": 2,
-                "data": ["result1", "result2"],
-                "history": [],
-                "total_steps": 2,
-            })
+            mock_instance.run_to_breakpoint = AsyncMock(
+                return_value={
+                    "status": "completed",
+                    "step": 2,
+                    "data": ["result1", "result2"],
+                    "history": [],
+                    "total_steps": 2,
+                }
+            )
             MockDS.return_value = mock_instance
 
-            result = await debug_pipeline(
-                [{"navigate": "u"}, {"evaluate": "1+1"}],
-                "s1", {"q": "x"}
-            )
+            result = await debug_pipeline([{"navigate": "u"}, {"evaluate": "1+1"}], "s1", {"q": "x"})
         assert result == ["result1", "result2"]
 
     @pytest.mark.asyncio
@@ -155,19 +157,18 @@ class TestDebugPipelineFunction:
         """debug_pipeline 在断点时返回状态字典"""
         with patch("agent_browser.pipeline.debugger.DebugSession") as MockDS:
             mock_instance = MagicMock()
-            mock_instance.run_to_breakpoint = AsyncMock(return_value={
-                "status": "breakpoint",
-                "step": 1,
-                "data": None,
-                "history": [],
-                "breakpoint_hit": 1,
-                "total_steps": 2,
-            })
+            mock_instance.run_to_breakpoint = AsyncMock(
+                return_value={
+                    "status": "breakpoint",
+                    "step": 1,
+                    "data": None,
+                    "history": [],
+                    "breakpoint_hit": 1,
+                    "total_steps": 2,
+                }
+            )
             MockDS.return_value = mock_instance
 
-            result = await debug_pipeline(
-                [{"navigate": "u"}, {"evaluate": "1+1"}],
-                "s1", {}, breakpoints=[1]
-            )
+            result = await debug_pipeline([{"navigate": "u"}, {"evaluate": "1+1"}], "s1", {}, breakpoints=[1])
         assert result["status"] == "breakpoint"
         assert result["breakpoint_hit"] == 1

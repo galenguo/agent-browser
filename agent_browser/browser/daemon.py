@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 # -- Extension Bridge Types --
 
+
 class ExtensionCommand:
     """Command sent to Chrome Extension."""
 
@@ -385,10 +386,7 @@ class BrowserDaemon:
         state = {
             "cdp_url": self._config.cdp_url,
             "connected": self._connected,
-            "sessions": {
-                sid: {"created_at": info.get("created_at", 0)}
-                for sid, info in self._sessions.items()
-            },
+            "sessions": {sid: {"created_at": info.get("created_at", 0)} for sid, info in self._sessions.items()},
             "last_activity": self._last_activity,
         }
         try:

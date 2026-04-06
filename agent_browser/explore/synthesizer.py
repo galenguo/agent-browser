@@ -27,6 +27,7 @@ Strategy Auto-Detection:
   - intercept  -> evaluate(fetch) in browser (inherits auth)
   - ui/dom     -> DOM scraping (fallback)
 """
+
 import json
 import logging
 import os
@@ -139,10 +140,7 @@ def synthesize(
 
     best = exploration.capabilities[0]
     # Handle both InferredCapability (new) and Dict (legacy) formats
-    strategy = (
-        best.strategy if hasattr(best, 'strategy')
-        else best.get("strategy_guess", "intercept")
-    )
+    strategy = best.strategy if hasattr(best, "strategy") else best.get("strategy_guess", "intercept")
 
     if strategy == "public":
         adapter = _generate_fetch_adapter(site, command_name, best, exploration)
@@ -218,8 +216,7 @@ def distill_trace(trace: list[dict[str, Any]]) -> list[dict[str, Any]]:
             continue
 
         # Rule 5: Deduplicate identical consecutive actions
-        if (prev_action and _actions_equal(step, prev_action)
-                and action_type not in ("click", "scroll")):
+        if prev_action and _actions_equal(step, prev_action) and action_type not in ("click", "scroll"):
             logger.debug(f"Deduplicated consecutive {action_type}")
             continue
 
@@ -292,9 +289,9 @@ def _normalize_action(step: dict) -> dict:
 
 def _actions_equal(a: dict, b: dict) -> bool:
     """Check if two actions are functionally identical."""
-    return (_get_action_type(a) == _get_action_type(b) and
-            json.dumps(_normalize_action(a).get("params", {}), sort_keys=True) ==
-            json.dumps(_normalize_action(b).get("params", {}), sort_keys=True))
+    return _get_action_type(a) == _get_action_type(b) and json.dumps(
+        _normalize_action(a).get("params", {}), sort_keys=True
+    ) == json.dumps(_normalize_action(b).get("params", {}), sort_keys=True)
 
 
 # ══════════════════════════════════════════════
@@ -346,7 +343,7 @@ def _resolve_element_selector(
       - {"text": "Search"} — text-based lookup
     """
     # Already a CSS selector
-    if "selector" in params and params["selector"]:
+    if params.get("selector"):
         sel = params["selector"]
         if sel.startswith(("/", "(")) or "::" in sel:
             # Looks like XPath, try to convert
@@ -354,7 +351,7 @@ def _resolve_element_selector(
         return sel
 
     # Text-based lookup -> generate attribute selector
-    if "text" in params and params["text"]:
+    if params.get("text"):
         params["text"]
         # Note: pure CSS doesn't support :contains(), use data attribute approach
         return None  # Will need JS-based resolution at runtime
@@ -537,16 +534,15 @@ def _guess_container_selector(url: str) -> str:
     url_lower = url.lower()
     if "zhipin.com" in url_lower or "boss" in url_lower:
         return ".job-card-wrapper, [class*='job-card']"
-    elif "taobao.com" in url_lower or "tmall.com" in url_lower:
+    if "taobao.com" in url_lower or "tmall.com" in url_lower:
         return "[class*='item'], [class*='Card']"
-    elif "jd.com" in url_lower:
+    if "jd.com" in url_lower:
         return ".gl-item, [class*='gl-item']"
-    elif "zhihu.com" in url_lower:
+    if "zhihu.com" in url_lower:
         return ".ContentItem, [class*='ContentItem']"
-    elif "weibo.com" in url_lower:
+    if "weibo.com" in url_lower:
         return ".card-wrap, [class*='card']"
-    else:
-        return "article, [class*='item'], [class*='card'], [class*='row']"
+    return "article, [class*='item'], [class*='card'], [class*='row']"
 
 
 # ══════════════════════════════════════════════
@@ -572,9 +568,7 @@ def detect_strategy(
         for c in exploration.capabilities
     )
     needs_auth = any(ep.status == 401 or ep.status == 403 for ep in exploration.endpoints)
-    has_public_endpoint = any(
-        ep.strategy_guess == "public" for ep in exploration.capabilities
-    )
+    has_public_endpoint = any(ep.strategy_guess == "public" for ep in exploration.capabilities)
 
     # Check trace for store access patterns
     accesses_store = any(
@@ -585,13 +579,12 @@ def detect_strategy(
     )
 
     if accesses_store or uses_store:
-        return "store-action"     # Best: zero network requests
-    elif has_json_api and has_public_endpoint and not needs_auth:
-        return "public"           # Good: direct fetch, no browser needed
-    elif has_json_api and needs_auth:
-        return "intercept"        # Browser fetch with credentials
-    else:
-        return "ui"               # Fallback: DOM scraping
+        return "store-action"  # Best: zero network requests
+    if has_json_api and has_public_endpoint and not needs_auth:
+        return "public"  # Good: direct fetch, no browser needed
+    if has_json_api and needs_auth:
+        return "intercept"  # Browser fetch with credentials
+    return "ui"  # Fallback: DOM scraping
 
 
 # ══════════════════════════════════════════════
@@ -619,7 +612,7 @@ def build_adapter(
     # Determine args from actions (e.g., search query parameter)
     args = _infer_args(actions, exploration)
 
-    adapter = {
+    return {
         "site": site,
         "name": name,
         "description": f"Auto-generated: {site}/{name} (strategy: {strategy})",
@@ -629,8 +622,6 @@ def build_adapter(
         "columns": columns,
         "pipeline": pipeline,
     }
-
-    return adapter
 
 
 def _build_pipeline(
@@ -653,7 +644,7 @@ def _build_pipeline(
             {"limit": "${{ args.limit | default(20) }}"},
         ]
 
-    elif strategy == "store-action":
+    if strategy == "store-action":
         store_name = _detect_store_name(exploration)
         action = _detect_action_name(exploration)
         capture = _detect_capture_pattern(exploration)
@@ -675,38 +666,40 @@ def _build_pipeline(
             {"limit": "${{ args.limit | default(20) }}"},
         ]
 
-    elif strategy == "intercept":
+    if strategy == "intercept":
         cap = exploration.capabilities[0] if exploration and exploration.capabilities else {}
         endpoint = cap.get("endpoint", "")
         fields = cap.get("fields", {})
         map_expr = {k: f"${{ item.{v} }}" for k, v in fields.items()} if fields else {}
         return [
             {"navigate": base_url},
-            {"evaluate": f"""
+            {
+                "evaluate": f"""
                 (() => {{
                     const resp = await fetch('{endpoint}', {{credentials: 'include'}});
                     const data = await resp.json();
                     return data.data || data.result || data.items || data.list || [data];
                 }})()
-            """},
+            """
+            },
             {"map": map_expr if map_expr else {"title": "${{ item.title }}", "url": "${{ item.url }}"}},
             {"limit": "${{ args.limit | default(20) }}"},
         ]
 
-    else:  # ui / dom scraping
-        return [
-            {"navigate": base_url},
-            {"wait": {"seconds": 2}},
-            {"evaluate": extraction_js},
-            {"limit": "${{ args.limit | default(20) }}"},
-        ]
+    # ui / dom scraping
+    return [
+        {"navigate": base_url},
+        {"wait": {"seconds": 2}},
+        {"evaluate": extraction_js},
+        {"limit": "${{ args.limit | default(20) }}"},
+    ]
 
 
 def _extract_columns_from_js(js_code: str) -> list[str]:
     """Extract column names from generated extraction JS."""
     columns = []
     # Match pattern: fieldname: el.querySelector...
-    for m in re.finditer(r'(\w+):\s*el\.querySelector', js_code):
+    for m in re.finditer(r"(\w+):\s*el\.querySelector", js_code):
         col = m.group(1)
         if col not in ("_index", "_text", "_html") and col not in columns:
             columns.append(col)
@@ -759,12 +752,13 @@ def _detect_capture_pattern(exploration: ExplorationResult | None) -> str | None
         if ep.is_json and ep.status == 200 and ep.sample:
             # Extract a short identifying pattern from the URL
             from urllib.parse import urlparse
+
             path = urlparse(ep.url).path
             # Use last 2 path segments as pattern
             parts = [p for p in path.split("/") if p]
             if len(parts) >= 2:
                 return "/" + "/".join(parts[-2:])
-            elif len(parts) == 1:
+            if len(parts) == 1:
                 return parts[0]
     return None
 
@@ -805,9 +799,11 @@ def _generate_fetch_adapter(site, name, cap, exploration) -> dict:
     for target, source_key in fields.items():
         map_expr[target] = f"${{ item.{source_key} }}"
     return {
-        "site": site, "name": name,
+        "site": site,
+        "name": name,
         "description": f"Auto-generated: {site} {name} (public API)",
-        "strategy": "public", "browser": False,
+        "strategy": "public",
+        "browser": False,
         "args": {"limit": {"type": "int", "default": 10}},
         "columns": columns,
         "pipeline": [
@@ -827,7 +823,8 @@ def _generate_cookie_adapter(site, name, cap, exploration) -> dict:
     for target, source_key in fields.items():
         map_expr[target] = f"${{ item.{source_key} }}"
     return {
-        "site": site, "name": name,
+        "site": site,
+        "name": name,
         "description": f"Auto-generated: {site} {name} (intercept)",
         "strategy": "intercept",
         "browser": True,
@@ -835,13 +832,15 @@ def _generate_cookie_adapter(site, name, cap, exploration) -> dict:
         "columns": columns,
         "pipeline": [
             {"navigate": exploration.url},
-            {"evaluate": f"""
+            {
+                "evaluate": f"""
                 (() => {{
                     const resp = await fetch('{cap["endpoint"]}', {{credentials: 'include'}});
                     const data = await resp.json();
                     return data.data || data.result || data.items || data.list || [data];
                 }})()
-            """},
+            """
+            },
             {"map": map_expr},
             {"limit": "${{ args.limit }}"},
         ],
@@ -851,17 +850,21 @@ def _generate_cookie_adapter(site, name, cap, exploration) -> dict:
 def _generate_dom_adapter(site, name, exploration) -> dict:
     """DOM scraping strategy: navigate -> wait -> evaluate -> limit"""
     from urllib.parse import urlparse
+
     urlparse(exploration.url)
     return {
-        "site": site, "name": name,
+        "site": site,
+        "name": name,
         "description": f"Auto-generated: {site} {name} (DOM)",
-        "strategy": "ui", "browser": True,
+        "strategy": "ui",
+        "browser": True,
         "args": {"limit": {"type": "int", "default": 10}},
         "columns": ["title", "url", "text"],
         "pipeline": [
             {"navigate": exploration.url},
             {"wait": {"seconds": 3}},
-            {"evaluate": """
+            {
+                "evaluate": """
                 (() => {
                     const items = [];
                     document.querySelectorAll('article, .item, .card, li').forEach(el => {
@@ -875,7 +878,8 @@ def _generate_dom_adapter(site, name, exploration) -> dict:
                     });
                     return items;
                 })()
-            """},
+            """
+            },
             {"limit": "${{ args.limit }}"},
         ],
     }
@@ -916,17 +920,19 @@ def synthesize_from_artifacts(
         with open(capabilities_path) as f:
             raw_caps = json.load(f)
         for rc in raw_caps:
-            capabilities.append(InferredCapability(
-                name=rc.get("name", ""),
-                description=rc.get("description", ""),
-                strategy=rc.get("strategy", "public"),
-                confidence=rc.get("confidence", 0.5),
-                endpoint=rc.get("endpoint"),
-                item_path=rc.get("item_path"),
-                recommended_columns=rc.get("columns"),
-                recommended_args=rc.get("args"),
-                store_hint=rc.get("store_hint"),
-            ))
+            capabilities.append(
+                InferredCapability(
+                    name=rc.get("name", ""),
+                    description=rc.get("description", ""),
+                    strategy=rc.get("strategy", "public"),
+                    confidence=rc.get("confidence", 0.5),
+                    endpoint=rc.get("endpoint"),
+                    item_path=rc.get("item_path"),
+                    recommended_columns=rc.get("columns"),
+                    recommended_args=rc.get("args"),
+                    store_hint=rc.get("store_hint"),
+                )
+            )
 
     result = ExplorationResult(
         url=manifest.get("url", ""),
@@ -941,6 +947,7 @@ def synthesize_from_artifacts(
     )
 
     from .explorer import Endpoint as EpClass
+
     for ed in endpoints:
         ep = EpClass(
             url=ed.get("url", ""),

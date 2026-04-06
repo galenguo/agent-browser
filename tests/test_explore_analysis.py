@@ -1,4 +1,5 @@
 """Analysis 模块测试 — 端点分析、策略推断、URL 处理"""
+
 from types import SimpleNamespace
 
 from agent_browser.explore.analysis import (
@@ -93,16 +94,11 @@ class TestDetectAuthIndicators:
         assert len(inds) > 0
 
     def test_auth_header(self):
-        inds = detect_auth_indicators(
-            "https://api.example.com/data", 200,
-            {"Authorization": "Bearer xyz"}, {}
-        )
+        inds = detect_auth_indicators("https://api.example.com/data", 200, {"Authorization": "Bearer xyz"}, {})
         assert any("authorization" in i.lower() for i in inds)
 
     def test_cookie_header(self):
-        inds = detect_auth_indicators(
-            "https://api.example.com/data", 200, {"Cookie": "session=abc"}, {}
-        )
+        inds = detect_auth_indicators("https://api.example.com/data", 200, {"Cookie": "session=abc"}, {})
         assert any("cookie" in i.lower() for i in inds)
 
     def test_no_auth_needed(self):
@@ -110,25 +106,26 @@ class TestDetectAuthIndicators:
         assert isinstance(inds, list)
 
     def test_token_param(self):
-        inds = detect_auth_indicators(
-            "https://api.example.com/data", 200, {}, {"access_token": "xyz"}
-        )
+        inds = detect_auth_indicators("https://api.example.com/data", 200, {}, {"access_token": "xyz"})
         assert any("token" in i.lower() for i in inds)
 
 
 class TestInferStrategy:
-    def _make_ep(self, is_json=False, status=200, auth=None, framework=None,
-                score=None, sample=None, url="https://x.com"):
-        kwargs = dict(
-            is_json=is_json, status=status, url=url,
-            auth_indicators=auth or [],
-            score=score, sample=sample,
-        )
+    def _make_ep(
+        self, is_json=False, status=200, auth=None, framework=None, score=None, sample=None, url="https://x.com"
+    ):
+        kwargs = {
+            "is_json": is_json,
+            "status": status,
+            "url": url,
+            "auth_indicators": auth or [],
+            "score": score,
+            "sample": sample,
+        }
         if framework is not None:
             kwargs["framework"] = framework
         # Don't set framework at all when None — code does .get('type') which crashes
-        ep = SimpleNamespace(**kwargs)
-        return ep
+        return SimpleNamespace(**kwargs)
 
     def test_public_json_endpoint(self):
         eps = [self._make_ep(is_json=True, status=200)]
@@ -156,8 +153,7 @@ class TestInferStrategy:
 class TestScoreEndpoint:
     def test_perfect_json_dict(self):
         # Dict sample with list data gets +3 array bonus + +2 status = ~6+
-        score = score_endpoint("/api/data", "GET", 200, True,
-                                {"data": [{"title": "test"}]})
+        score = score_endpoint("/api/data", "GET", 200, True, {"data": [{"title": "test"}]})
         assert score >= 5.0
 
     def test_error_status_penalty(self):
@@ -169,9 +165,14 @@ class TestScoreEndpoint:
         assert score < 5.0
 
     def test_clamped_to_ten(self):
-        score = score_endpoint("GET", "/api/data", 200, True,
-                                {"data": [{"title": "x", "url": "y", "id": 1}]},
-                                content_type="application/json")
+        score = score_endpoint(
+            "GET",
+            "/api/data",
+            200,
+            True,
+            {"data": [{"title": "x", "url": "y", "id": 1}]},
+            content_type="application/json",
+        )
         assert score <= 10.0
 
     def test_none_sample_no_crash(self):
@@ -186,24 +187,24 @@ class TestScoreEndpoint:
 
 class TestInferCapabilityName:
     def test_with_goal(self):
-        name, desc = infer_capability_name("boss", "https://api.boss.com/jobs",
-                                         {}, goal="搜索职位")
+        name, _desc = infer_capability_name("boss", "https://api.boss.com/jobs", {}, goal="搜索职位")
         assert len(name) > 0
 
     def test_title_url_fields(self):
         fields = {"title": "Python工程师", "url": "https://job.com/1"}
-        name, desc = infer_capability_name("zhihu", "https://zhihu.com/api", fields)
+        name, _desc = infer_capability_name("zhihu", "https://zhihu.com/api", fields)
         assert isinstance(name, str) and len(name) > 0
 
     def test_generic_fallback(self):
-        name, desc = infer_capability_name("unknown", "https://example.com", {})
+        name, _desc = infer_capability_name("unknown", "https://example.com", {})
         assert isinstance(name, str) and len(name) > 0
 
 
 class TestInferCapabilitiesFromEndpoints:
     def _make_cap(self, score=8.0):
         return SimpleNamespace(
-            is_json=True, score=score,
+            is_json=True,
+            score=score,
             url=f"https://api.example.com/{score}",
             sample={"data": [{"title": f"item{score}", "url": f"https://x.com/{score}"}]},
         )
@@ -249,14 +250,12 @@ class TestDetectSiteName:
 
 class TestDataclasses:
     def test_inferred_capability_defaults(self):
-        cap = InferredCapability(name="test", description="desc", strategy="public",
-                                 confidence=0.8)
+        cap = InferredCapability(name="test", description="desc", strategy="public", confidence=0.8)
         assert cap.endpoint is None
         assert cap.recommended_columns is None
         assert cap.store_hint is None
 
     def test_discovered_store(self):
-        store = DiscoveredStore(store_type="pinia", id="main",
-                               actions=["fetch"], state_keys=["user", "token"])
+        store = DiscoveredStore(store_type="pinia", id="main", actions=["fetch"], state_keys=["user", "token"])
         assert store.store_type == "pinia"
         assert len(store.actions) == 1

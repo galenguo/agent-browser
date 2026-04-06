@@ -23,6 +23,7 @@ Prerequisites:
   - CloakBrowser installed (pip install cloakbrowser)
   - Port 19222 free (or already running CloakBrowser)
 """
+
 import asyncio
 import json
 from datetime import datetime
@@ -39,7 +40,11 @@ CANARY_SITES = {
         "checks": [
             ("navigator.webdriver", "(() => navigator.webdriver)", lambda v: v is False or v is None),
             ("__playwright__binding__", "() => typeof window.__playwright__binding__", lambda v: v == "undefined"),
-            ("chrome.runtime", "() => !!(window.chrome && window.chrome.runtime)", lambda v: v is True or v is False),  # runtime 可能在 patchright 中不可用
+            (
+                "chrome.runtime",
+                "() => !!(window.chrome && window.chrome.runtime)",
+                lambda v: v is True or v is False,
+            ),  # runtime 可能在 patchright 中不可用
         ],
     },
     "fingerprintjs": {
@@ -83,6 +88,7 @@ CANARY_SITES = {
 #  Tier 1A: Bot Detection Canary Sites
 # ════════════════════════════════════════════
 
+
 @pytest.mark.requires_browser
 class TestSannysoftBotDetection:
     """bot.sannysoft.com — JS 属性检测金标准"""
@@ -98,8 +104,7 @@ class TestSannysoftBotDetection:
         await asyncio.sleep(2)  # 等待页面检测完成
         result = await browser_page.evaluate("() => navigator.webdriver")
         assert result is False or result is None, (
-            f"navigator.webdriver = {result} (expected false/undefined). "
-            f"Stealth 第 2-4 层可能失效。"
+            f"navigator.webdriver = {result} (expected false/undefined). Stealth 第 2-4 层可能失效。"
         )
 
     @pytest.mark.asyncio
@@ -113,8 +118,7 @@ class TestSannysoftBotDetection:
         await asyncio.sleep(2)
         result = await browser_page.evaluate("() => typeof window.__playwright__binding__")
         assert result == "undefined", (
-            f"__playwright__binding__ type = {result} (expected 'undefined'). "
-            f"patchright 驱动级修补可能未生效。"
+            f"__playwright__binding__ type = {result} (expected 'undefined'). patchright 驱动级修补可能未生效。"
         )
 
     @pytest.mark.asyncio
@@ -128,10 +132,7 @@ class TestSannysoftBotDetection:
         await asyncio.sleep(2)
         # CloakBrowser/patchright 可能不暴露 chrome.runtime，但 window.chrome 应存在
         has_chrome = await browser_page.evaluate("() => !!window.chrome")
-        assert has_chrome is True, (
-            f"window.chrome exists = {has_chrome} (expected true). "
-            f"正常 Chrome 应有此属性。"
-        )
+        assert has_chrome is True, f"window.chrome exists = {has_chrome} (expected true). 正常 Chrome 应有此属性。"
 
 
 @pytest.mark.requires_browser
@@ -162,9 +163,7 @@ class TestFingerprintConsistency:
             ctx2.fillText('fp-test', 10, 50);
             return fp1 === c2.toDataURL();
         }""")
-        assert consistent is True, (
-            "Canvas fingerprint 不一致！可能被检测到自动化或指纹随机化异常。"
-        )
+        assert consistent is True, "Canvas fingerprint 不一致！可能被检测到自动化或指纹随机化异常。"
 
 
 @pytest.mark.requires_browser
@@ -181,10 +180,7 @@ class TestNowsecureSignals:
         )
         await asyncio.sleep(2)
         ua = await browser_page.evaluate("() => navigator.userAgent")
-        assert "HeadlessChrome" not in ua, (
-            f"UA 包含 HeadlessChrome: {ua[:80]}... "
-            f"第 1-4 层反检测可能未正确配置。"
-        )
+        assert "HeadlessChrome" not in ua, f"UA 包含 HeadlessChrome: {ua[:80]}... 第 1-4 层反检测可能未正确配置。"
 
     @pytest.mark.asyncio
     async def test_webdriver_false_on_nowsecure(self, browser_page):
@@ -238,14 +234,16 @@ class TestBossZhipinAntiDetection:
             )
         except Exception as e:
             # 超时或网络错误 → BLOCKED
-            scorecard_writer.record({
-                "site": "zhipin",
-                "test": "page_render",
-                "status": "BLOCKED",
-                "reason": f"Navigation failed: {e}",
-                "url": browser_page.url if browser_page else "N/A",
-                "timestamp": datetime.now().isoformat(),
-            })
+            scorecard_writer.record(
+                {
+                    "site": "zhipin",
+                    "test": "page_render",
+                    "status": "BLOCKED",
+                    "reason": f"Navigation failed: {e}",
+                    "url": browser_page.url if browser_page else "N/A",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
             pytest.skip(f"Boss Zhipin 无法访问 (可能被封/IP问题): {e}")
 
         # 等待可能的 JS 重定向完成
@@ -270,31 +268,27 @@ class TestBossZhipinAntiDetection:
             )
         elif "verify" in final_url.lower() or "captcha" in final_url.lower():
             status = "DETECTED"
-            reason = (
-                f"被重定向到验证码页面。URL={final_url}, "
-                f"screenshot={screenshot_path}"
-            )
+            reason = f"被重定向到验证码页面。URL={final_url}, screenshot={screenshot_path}"
         elif "zhipin.com" not in final_url and final_url != "about:blank":
             status = "DETECTED"
-            reason = (
-                f"被重定向到非预期域名。URL={final_url}, "
-                f"screenshot={screenshot_path}"
-            )
+            reason = f"被重定向到非预期域名。URL={final_url}, screenshot={screenshot_path}"
         else:
             status = "PASS"
             reason = f"正常渲染。title={title}, content={content_len} chars, screenshot={screenshot_path}"
 
-        scorecard_writer.record({
-            "site": "zhipin",
-            "test": "page_render",
-            "status": status,
-            "reason": reason,
-            "url": final_url,
-            "title": title,
-            "content_length": content_len,
-            "screenshot": str(screenshot_path),
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "site": "zhipin",
+                "test": "page_render",
+                "status": status,
+                "reason": reason,
+                "url": final_url,
+                "title": title,
+                "content_length": content_len,
+                "screenshot": str(screenshot_path),
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         if status == "PASS":
             assert content_len >= 500, reason
@@ -344,14 +338,16 @@ class TestBossZhipinAntiDetection:
             issues.append("HeadlessChrome in UA")
 
         status = "PASS" if not issues else "DETECTED"
-        scorecard_writer.record({
-            "site": "zhipin",
-            "test": "detection_signals",
-            "status": status,
-            "signals": signals,
-            "issues": issues,
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "site": "zhipin",
+                "test": "detection_signals",
+                "status": status,
+                "signals": signals,
+                "issues": issues,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         if issues:
             pytest.xfail(
@@ -376,15 +372,17 @@ class TestBossZhipinAntiDetection:
         path = await save_screenshot(browser_page, "zhipin-screenshot")
         exists = path.exists() and path.stat().st_size > 1000  # 至少 1KB
 
-        scorecard_writer.record({
-            "site": "zhipin",
-            "test": "screenshot",
-            "status": "PASS" if exists else "FAIL",
-            "path": str(path),
-            "exists": exists,
-            "size": path.stat().st_size if exists else 0,
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "site": "zhipin",
+                "test": "screenshot",
+                "status": "PASS" if exists else "FAIL",
+                "path": str(path),
+                "exists": exists,
+                "size": path.stat().st_size if exists else 0,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         assert exists, f"截图文件无效或不存在: {path}"
 
@@ -392,6 +390,7 @@ class TestBossZhipinAntiDetection:
 # ════════════════════════════════════════════
 #  Tier 1C: Differential Test — CloakBrowser vs Plain Chromium
 # ════════════════════════════════════════════
+
 
 @pytest.mark.requires_browser
 class TestDifferentialStealthValue:
@@ -422,7 +421,12 @@ class TestDifferentialStealthValue:
         all_checks = [
             ("webdriver", "() => navigator.webdriver", lambda v: v in (False, None), 15),
             ("playwright_binding", "() => typeof window.__playwright__binding__", lambda v: v == "undefined", 15),
-            ("cdc_variables", "() => Object.keys(window).filter(k => k.startsWith('cdc_')).length", lambda v: v == 0, 10),
+            (
+                "cdc_variables",
+                "() => Object.keys(window).filter(k => k.startsWith('cdc_')).length",
+                lambda v: v == 0,
+                10,
+            ),
             ("headless_ua", "() => /HeadlessChrome/i.test(navigator.userAgent)", lambda v: v is False, 10),
             ("chrome_runtime", "() => !!(window.chrome && window.chrome.runtime)", lambda v: v is True, 10),
             ("permissions_api", "() => !!navigator.permissions", lambda v: v is True, 10),
@@ -450,27 +454,27 @@ class TestDifferentialStealthValue:
         total_score = round(earned_weight / total_weight * 100, 1) if total_weight > 0 else 0
         status = "PASS" if total_score >= 90 else "PARTIAL" if total_score >= 70 else "FAIL"
 
-        scorecard_writer.record({
-            "site": "sannysoft",
-            "test": "differential_score",
-            "status": status,
-            "score": total_score,
-            "earned": earned_weight,
-            "total": total_weight,
-            "details": score_results,
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "site": "sannysoft",
+                "test": "differential_score",
+                "status": status,
+                "score": total_score,
+                "earned": earned_weight,
+                "total": total_weight,
+                "details": score_results,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         # 断言：至少 70 分才算及格（允许某些边缘信号不完全通过）
-        assert total_score >= 70, (
-            f"反检测评分过低: {total_score}/100. "
-            f"详情: {json.dumps(score_results, indent=2)}"
-        )
+        assert total_score >= 70, f"反检测评分过低: {total_score}/100. 详情: {json.dumps(score_results, indent=2)}"
 
 
 # ════════════════════════════════════════════
 #  Tier 1D: Infrastructure — Scorecard + Screenshots
 # ════════════════════════════════════════════
+
 
 @pytest.mark.requires_browser
 class TestScorecardOutput:
@@ -483,13 +487,15 @@ class TestScorecardOutput:
         await browser_page.goto("https://example.com", wait_until="domcontentloaded", timeout=30000)
         title = await browser_page.title()
 
-        scorecard_writer.record({
-            "site": "example.com",
-            "test": "scorecard_format",
-            "status": "PASS",
-            "title": title,
-            "timestamp": datetime.now().isoformat(),
-        })
+        scorecard_writer.record(
+            {
+                "site": "example.com",
+                "test": "scorecard_format",
+                "status": "PASS",
+                "title": title,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         path = scorecard_writer.flush()
         assert path is not None, "scorecard writer.flush() 返回 None"
@@ -531,6 +537,7 @@ class TestScorecardOutput:
 # ════════════════════════════════════════════
 #  Session-level: Flush all scorecards
 # ════════════════════════════════════════════
+
 
 @pytest.fixture(scope="session", autouse=True)
 def _flush_final_scorecard(request):

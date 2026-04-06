@@ -21,20 +21,20 @@ from agent_browser.stealth.patches import (
 )
 
 __all__ = [
-    # Middleware (Layer 7: centralized stealth)
-    "StealthMiddleware",
-    "StealthPageHandle",
-    "CircuitState",
-    "_PerSessionCircuit",
-    # Enhancer (Layer 6: human behavior)
-    "StealthEnhancer",
-    # Actions (browser-use overrides)
-    "register_stealth_actions",
     # Patches (JS runtime property-level)
     "STEALTH_PATCHES_JS",
-    "inject_stealth_patches",
-    "verify_patches",
     # Controller
     "ActionResult",
     "BrowserController",
+    "CircuitState",
+    # Enhancer (Layer 6: human behavior)
+    "StealthEnhancer",
+    # Middleware (Layer 7: centralized stealth)
+    "StealthMiddleware",
+    "StealthPageHandle",
+    "_PerSessionCircuit",
+    "inject_stealth_patches",
+    # Actions (browser-use overrides)
+    "register_stealth_actions",
+    "verify_patches",
 ]

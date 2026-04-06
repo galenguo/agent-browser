@@ -4,6 +4,7 @@ Mode Matrix Tests — all 8 mode combinations + CLI+remote fallback.
 Each test verifies: configure(mode) → create_session() → valid session_id → delete_session().
 Uses parametrize for 8 combos with skipif when infrastructure unavailable.
 """
+
 from unittest import mock
 
 import pytest
@@ -13,14 +14,14 @@ import pytest
 # ══════════════════════════════════════════════
 
 MODE_COMBOS = [
-    ("cli", "local", "llm"),       # 1: baseline, always works
-    ("cli", "local", "agent"),      # 2: needs LLM key
-    ("api", "local", "llm"),        # 3: needs FastAPI
-    ("api", "local", "agent"),       # 4: needs FastAPI + LLM
-    ("cli", "remote", "llm"),       # 5: needs Gateway (auto-corrects to local)
-    ("cli", "remote", "agent"),      # 6: needs Gateway + LLM (auto-corrects)
-    ("api", "remote", "llm"),        # 7: needs FastAPI + Gateway
-    ("api", "remote", "agent"),      # 8: needs FastAPI + Gateway + LLM
+    ("cli", "local", "llm"),  # 1: baseline, always works
+    ("cli", "local", "agent"),  # 2: needs LLM key
+    ("api", "local", "llm"),  # 3: needs FastAPI
+    ("api", "local", "agent"),  # 4: needs FastAPI + LLM
+    ("cli", "remote", "llm"),  # 5: needs Gateway (auto-corrects to local)
+    ("cli", "remote", "agent"),  # 6: needs Gateway + LLM (auto-corrects)
+    ("api", "remote", "llm"),  # 7: needs FastAPI + Gateway
+    ("api", "remote", "agent"),  # 8: needs FastAPI + Gateway + LLM
 ]
 
 
@@ -73,6 +74,7 @@ class TestModeMatrix:
 #  Test 9: CLI+Remote Fallback (config.py:215-217)
 # ══════════════════════════════════════════════
 
+
 class TestCLIRemoteFallback:
     """CLI+remote is auto-corrected to CLI+local by config.py."""
 
@@ -110,6 +112,7 @@ class TestCLIRemoteFallback:
 # ══════════════════════════════════════════════
 #  Config Defaults & Edge Cases
 # ══════════════════════════════════════════════
+
 
 class TestConfigDefaults:
     """SkillConfig has sensible defaults."""

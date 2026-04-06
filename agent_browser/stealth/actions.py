@@ -17,6 +17,7 @@ Usage::
     register_stealth_actions(tools, ctx.stealth)
     agent = Agent(..., controller=tools)
 """
+
 from __future__ import annotations
 
 import logging
@@ -101,14 +102,10 @@ def register_stealth_actions(tools: Tools, stealth: StealthEnhancer) -> None:
             if element is None:
                 raise ValueError(f"Element index {params.index} not found in DOM")
             xpath_selector = f"xpath={element.xpath}"
-            await stealth.human_type(
-                page, xpath_selector, params.text, clear_first=params.clear
-            )
+            await stealth.human_type(page, xpath_selector, params.text, clear_first=params.clear)
             preview = params.text[:30] + ("..." if len(params.text) > 30 else "")
             logger.info(f"Stealth typed '{preview}' into element {params.index}")
-            return ActionResult(
-                extracted_content=f"Typed '{preview}' into element at index {params.index}"
-            )
+            return ActionResult(extracted_content=f"Typed '{preview}' into element at index {params.index}")
         except Exception:
             raise
 
@@ -141,22 +138,13 @@ def register_stealth_actions(tools: Tools, stealth: StealthEnhancer) -> None:
                 await page.locator(xpath_selector).click(timeout=10000)
                 await stealth.post_action("click")
                 logger.info(f"Stealth clicked element {params.index}")
-                return ActionResult(
-                    extracted_content=f"Clicked element at index {params.index}"
-                )
-            elif params.coordinate_x is not None and params.coordinate_y is not None:
+                return ActionResult(extracted_content=f"Clicked element at index {params.index}")
+            if params.coordinate_x is not None and params.coordinate_y is not None:
                 await page.mouse.click(params.coordinate_x, params.coordinate_y)
                 await stealth.post_action("click")
-                logger.info(
-                    f"Stealth clicked at ({params.coordinate_x}, {params.coordinate_y})"
-                )
-                return ActionResult(
-                    extracted_content=(
-                        f"Clicked at ({params.coordinate_x}, {params.coordinate_y})"
-                    )
-                )
-            else:
-                raise ValueError("Either index or coordinates required for click action")
+                logger.info(f"Stealth clicked at ({params.coordinate_x}, {params.coordinate_y})")
+                return ActionResult(extracted_content=(f"Clicked at ({params.coordinate_x}, {params.coordinate_y})"))
+            raise ValueError("Either index or coordinates required for click action")
         except Exception:
             await stealth.post_action("click")
             raise

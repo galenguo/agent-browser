@@ -12,6 +12,7 @@ Managed content:
   - cookies: Persistent cookies (avoid repeated login)
   - Rotation strategy: >300 requests or >24 hours → rotate profile
 """
+
 import json
 import logging
 import os
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from browserforge.fingerprints import FingerprintGenerator
+
     _HAS_BROWSERFORGE = True
 except ImportError:
     _HAS_BROWSERFORGE = False

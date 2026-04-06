@@ -10,6 +10,7 @@ Phase 6: 性能和 Token 测试
 前置条件：
 - CloakBrowser 运行在 127.0.0.1:19222
 """
+
 import asyncio
 import json
 import time
@@ -97,10 +98,10 @@ class TestLatencyBenchmark:
                 latencies.append(elapsed)
 
             avg_latency = sum(latencies) / len(latencies)
-            print(f"\nDOM Snapshot latency: avg={avg_latency*1000:.1f}ms, max={max(latencies)*1000:.1f}ms")
+            print(f"\nDOM Snapshot latency: avg={avg_latency * 1000:.1f}ms, max={max(latencies) * 1000:.1f}ms")
 
             # 目标: 平均 < 500ms
-            assert avg_latency < 0.5, f"Snapshot too slow: {avg_latency*1000:.1f}ms"
+            assert avg_latency < 0.5, f"Snapshot too slow: {avg_latency * 1000:.1f}ms"
 
             await context.close()
             await browser.close()
@@ -123,10 +124,10 @@ class TestLatencyBenchmark:
                 latencies.append(elapsed)
 
             avg_latency = sum(latencies) / len(latencies)
-            print(f"\nClick latency: avg={avg_latency*1000:.1f}ms, max={max(latencies)*1000:.1f}ms")
+            print(f"\nClick latency: avg={avg_latency * 1000:.1f}ms, max={max(latencies) * 1000:.1f}ms")
 
             # 目标: 平均 < 1s
-            assert avg_latency < 1.0, f"Click too slow: {avg_latency*1000:.1f}ms"
+            assert avg_latency < 1.0, f"Click too slow: {avg_latency * 1000:.1f}ms"
 
             await context.close()
             await browser.close()
@@ -179,19 +180,23 @@ class TestConcurrencyBenchmark:
             # 并发执行多个操作 - 使用协程对象（不是调用结果）
             async def op1():
                 return await page.evaluate("1 + 1")
+
             async def op2():
                 return await page.evaluate("2 + 2")
+
             async def op3():
                 return await page.evaluate("3 + 3")
+
             async def op4():
                 return await page.title()
+
             async def op5():
                 return page.url
 
             results = await asyncio.gather(op1(), op2(), op3(), op4(), op5())
 
             elapsed = time.time() - start
-            print(f"\n5 concurrent operations completed in {elapsed*1000:.1f}ms")
+            print(f"\n5 concurrent operations completed in {elapsed * 1000:.1f}ms")
 
             assert results[0] == 2
             assert results[1] == 4
@@ -243,11 +248,13 @@ class TestDOMCompression:
             snap_size = len(json.dumps(snapshot))
 
             compression_ratio = 1 - (snap_size / raw_size)
-            print(f"\nDOM Compression: raw={raw_size} bytes, snapshot={snap_size} bytes, ratio={compression_ratio*100:.1f}%")
+            print(
+                f"\nDOM Compression: raw={raw_size} bytes, snapshot={snap_size} bytes, ratio={compression_ratio * 100:.1f}%"
+            )
 
             # 目标: > 80%
             # 目标: > 50% (实际压缩率取决于页面复杂度)
-            assert compression_ratio > 0.50, f"Compression ratio too low: {compression_ratio*100:.1f}%"
+            assert compression_ratio > 0.50, f"Compression ratio too low: {compression_ratio * 100:.1f}%"
 
             await context.close()
             await browser.close()
@@ -271,7 +278,9 @@ class TestDOMCompression:
             """)
 
             reduction_ratio = 1 - (interactive_count / total_nodes) if total_nodes > 0 else 0
-            print(f"\nElement reduction: total={total_nodes}, interactive={interactive_count}, reduction={reduction_ratio*100:.1f}%")
+            print(
+                f"\nElement reduction: total={total_nodes}, interactive={interactive_count}, reduction={reduction_ratio * 100:.1f}%"
+            )
 
             # 验证元素数量减少（具体比例取决于页面）
             assert interactive_count <= total_nodes

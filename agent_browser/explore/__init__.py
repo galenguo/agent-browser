@@ -3,6 +3,7 @@
 Explores target sites, analyzes DOM structure, generates cascade CSS
 selectors, and synthesizes YAML adapters.
 """
+
 from .analysis import (
     DiscoveredStore,
     InferredCapability,
@@ -15,14 +16,14 @@ from .explorer import Endpoint, ExplorationResult, explore
 from .synthesizer import synthesize
 
 __all__ = [
-    "explore",
+    "DiscoveredStore",
     "Endpoint",
     "ExplorationResult",
-    "DiscoveredStore",
     "InferredCapability",
-    "detect_site_name",
-    "detect_auth_indicators",
-    "infer_capabilities_from_endpoints",
     "cascade_explore",
+    "detect_auth_indicators",
+    "detect_site_name",
+    "explore",
+    "infer_capabilities_from_endpoints",
     "synthesize",
 ]

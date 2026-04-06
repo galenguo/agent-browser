@@ -8,6 +8,7 @@ Validates that:
 
 Covers P0 (critical) + P1 (important) gaps found in CEO/Eng review.
 """
+
 import os
 import threading
 from pathlib import Path
@@ -37,6 +38,7 @@ from agent_browser.main import (
 # A. YAML Path Consistency & Roundtrip [P0-CRITICAL]
 # ════════════════════════════════════════════════════════════════════
 
+
 class TestYamlPathConsistency:
     """Verify generate_config() writes what config.py can read back.
 
@@ -60,10 +62,8 @@ class TestYamlPathConsistency:
         with mock.patch("agent_browser.config.Path.home", return_value=tmp_path):
             loaded = load_config()
 
-        assert loaded.stealth_mode == "vanilla", \
-            f"Expected stealth_mode=vanilla but got {loaded.stealth_mode}"
-        assert loaded.stealth_enabled is False, \
-            f"Expected stealth_enabled=False but got {loaded.stealth_enabled}"
+        assert loaded.stealth_mode == "vanilla", f"Expected stealth_mode=vanilla but got {loaded.stealth_mode}"
+        assert loaded.stealth_enabled is False, f"Expected stealth_enabled=False but got {loaded.stealth_enabled}"
 
     def test_browser_section_roundtrip(self, tmp_path):
         """browser.cdp_url survives write -> load_config() cycle."""
@@ -151,15 +151,16 @@ another_unknown: yes
         generate_config(cfg, path=target)
 
         import yaml
+
         with open(target) as f:
             data = yaml.safe_load(f)
 
         assert "skill" in data, "skill namespace should exist"
         skill = data["skill"]
-        assert skill["stealth"]["mode"] == "vanilla", \
+        assert skill["stealth"]["mode"] == "vanilla", (
             f"skill.stealth.mode should be vanilla, got {skill.get('stealth', {}).get('mode')}"
-        assert skill["browser"]["headless"] is False, \
-            "skill.browser.headless should be False"
+        )
+        assert skill["browser"]["headless"] is False, "skill.browser.headless should be False"
 
     def test_mode_switch_roundtrip(self, tmp_path):
         """local -> docker-aio -> local doesn't orphan docker/k8s sections."""
@@ -178,19 +179,21 @@ another_unknown: yes
         assert dep.mode == "local"
         # Docker section should NOT have been written for local mode (or if written, shouldn't break)
         import yaml
+
         with open(target) as f:
             data = yaml.safe_load(f)
         # k8s should not exist for local mode
-        assert "k8s" not in data or data.get("k8s").get("replicas") == 1, \
+        assert "k8s" not in data or data.get("k8s").get("replicas") == 1, (
             "k8s section should be minimal or absent for local mode"
+        )
 
 
 # ════════════════════════════════════════════════════════════════════
 # B. generate_config() Edge Cases [P0]
 # ════════════════════════════════════════════════════════════════════
 
-class TestGenerateConfigEdgeCases:
 
+class TestGenerateConfigEdgeCases:
     def test_write_to_nonexistent_parent_dir(self, tmp_path):
         """Parent directory created automatically."""
         deep_dir = tmp_path / "nested" / "deep" / "dir"
@@ -205,6 +208,7 @@ class TestGenerateConfigEdgeCases:
         generate_config(cfg, path=target)
 
         import yaml
+
         with open(target) as f:
             data = yaml.safe_load(f)
         assert "llm" not in data, "llm section should be omitted when empty"
@@ -216,11 +220,13 @@ class TestGenerateConfigEdgeCases:
         generate_config(cfg, path=target)
 
         import yaml
+
         with open(target) as f:
             data = yaml.safe_load(f)
         # Local mode without explicit registry should not write docker
-        assert "docker" not in data or data.get("docker").get("registry") is None, \
+        assert "docker" not in data or data.get("docker").get("registry") is None, (
             "docker section should be omitted for local mode without registry"
+        )
 
     def test_conditional_k8s_omitted_for_local(self, tmp_path):
         """No k8s section for local mode (no context)."""
@@ -229,6 +235,7 @@ class TestGenerateConfigEdgeCases:
         generate_config(cfg, path=target)
 
         import yaml
+
         with open(target) as f:
             data = yaml.safe_load(f)
         assert "k8s" not in data or data.get("k8s").get("context") is None
@@ -240,6 +247,7 @@ class TestGenerateConfigEdgeCases:
         generate_config(cfg, path=target)
 
         import yaml
+
         with open(target) as f:
             data = yaml.safe_load(f)
         assert "proxy" not in data or data.get("proxy").get("enabled") is False
@@ -251,6 +259,7 @@ class TestGenerateConfigEdgeCases:
         generate_config(cfg, path=target)
 
         import yaml
+
         with open(target) as f:
             data = yaml.safe_load(f)
         assert "deployment" in data
@@ -287,8 +296,8 @@ class TestGenerateConfigEdgeCases:
         content2 = target.read_text()
 
         # All other content should match (strip timestamps for comparison)
-        lines1 = [entry for entry in content1.split('\n') if 'configured_at' not in entry]
-        lines2 = [entry for entry in content2.split('\n') if 'configured_at' not in entry]
+        lines1 = [entry for entry in content1.split("\n") if "configured_at" not in entry]
+        lines2 = [entry for entry in content2.split("\n") if "configured_at" not in entry]
         assert lines1 == lines2, "non-timestamp content should be identical"
         # Timestamps may be identical if writes happen within same second (CI)
 
@@ -315,6 +324,7 @@ class TestGenerateConfigEdgeCases:
 
         # Result should be valid YAML
         import yaml
+
         with open(target) as f:
             data = yaml.safe_load(f)
         assert data["deployment"]["mode"].startswith("thread-")
@@ -324,8 +334,8 @@ class TestGenerateConfigEdgeCases:
 # C. load_deploy_config() Edge Cases [P1]
 # ══════════════════════════════════════════════════════════════════
 
-class TestLoadDeployConfigEdgeCases:
 
+class TestLoadDeployConfigEdgeCases:
     def test_yaml_is_list_not_dict(self, tmp_path):
         """YAML file containing a list (not dict) returns empty gracefully."""
         bad_file = tmp_path / "list_config.yaml"
@@ -339,7 +349,7 @@ class TestLoadDeployConfigEdgeCases:
     def test_binary_corrupted_file(self, tmp_path):
         """Binary/corrupted file returns defaults without crash."""
         bad_file = tmp_path / "corrupt.yaml"
-        bad_file.write_bytes(b'\x00\x01\x02\xff\xfe')
+        bad_file.write_bytes(b"\x00\x01\x02\xff\xfe")
 
         with mock.patch("agent_browser.deploy_config.CONFIG_PATH", bad_file):
             cfg = load_deploy_config()
@@ -377,8 +387,8 @@ class TestLoadDeployConfigEdgeCases:
 # D. _ensure_middleware() Recovery Path [P0-CRITICAL]
 # ══════════════════════════════════════════════════════════════════
 
-class TestEnsureMiddlewareRecovery:
 
+class TestEnsureMiddlewareRecovery:
     @pytest.mark.asyncio
     async def test_connect_success_returns_middleware(self):
         """Happy path: connect succeeds, middleware returned."""
@@ -397,20 +407,24 @@ class TestEnsureMiddlewareRecovery:
         mock_instance.connect.side_effect = RuntimeError("CDP connection refused")
 
         # Mock detect_missing_deps to return non-ready report (triggers FirstSessionError path)
-        non_ready_report = RecoveryReport(missing_deps=[
-            DepStatus(name="cdp", available=False, fixable=True, message="CDP down")
-        ])
+        non_ready_report = RecoveryReport(
+            missing_deps=[DepStatus(name="cdp", available=False, fixable=True, message="CDP down")]
+        )
 
-        with mock.patch("agent_browser.stealth.middleware.StealthMiddleware", return_value=mock_instance), \
-             mock.patch("agent_browser.main._select_backend") as mock_sb, \
-             mock.patch("agent_browser.main.detect_missing_deps", return_value=non_ready_report):
+        with (
+            mock.patch("agent_browser.stealth.middleware.StealthMiddleware", return_value=mock_instance),
+            mock.patch("agent_browser.main._select_backend") as mock_sb,
+            mock.patch("agent_browser.main.detect_missing_deps", return_value=non_ready_report),
+        ):
             mock_sb.return_value = mock.MagicMock()
 
             with pytest.raises(FirstSessionError) as exc_info:
                 from agent_browser.main import SkillConfig, _ensure_middleware
+
                 config = SkillConfig()
                 # Reset global state
                 import agent_browser.main as main_mod
+
                 main_mod._config = config
                 main_mod._middleware = None
 
@@ -425,8 +439,8 @@ class TestEnsureMiddlewareRecovery:
 # E. setup() Edge Cases [P1]
 # ══════════════════════════════════════════════════════════════════
 
-class TestSetupFunctionEdgeCases:
 
+class TestSetupFunctionEdgeCases:
     @pytest.mark.asyncio
     async def test_ready_false_when_errors_exist(self, tmp_path):
         """Issues present -> ready=False."""
@@ -496,8 +510,8 @@ legacy_top_level_key: preserved
 # F. validate_config() Full Paths [P1]
 # ══════════════════════════════════════════════════════════════════
 
-class TestValidateConfigFullPaths:
 
+class TestValidateConfigFullPaths:
     def test_cdp_unreachable_env_check(self):
         """env_check=True + unreachable CDP produces warning.
 
@@ -588,8 +602,8 @@ class TestValidateConfigFullPaths:
 # G. detect_missing_deps() Complete [P2]
 # ══════════════════════════════════════════════════════════════════
 
-class TestDetectMissingDepsComplete:
 
+class TestDetectMissingDepsComplete:
     @pytest.mark.asyncio
     async def test_playwright_missing_detected(self):
         """Playwright import failure detected."""
@@ -614,8 +628,8 @@ class TestDetectMissingDepsComplete:
 # H. from_deploy_config() Edge Cases [P2]
 # ══════════════════════════════════════════════════════════════════
 
-class TestFromDeployConfigEdgeCases:
 
+class TestFromDeployConfigEdgeCases:
     def test_none_input_graceful(self):
         """None DeployConfig handled gracefully via getattr defaults."""
         # from_deploy_config uses getattr(dep_cfg, 'mode', 'local') which
@@ -647,6 +661,7 @@ class TestFromDeployConfigEdgeCases:
 # I. to_dict() False Filter Bug Documentation [P2]
 # ══════════════════════════════════════════════════════════════════
 
+
 class TestToDictFalseFiltering:
     """Documents the bug where v!=False drops boolean False values from serialization.
 
@@ -657,8 +672,7 @@ class TestToDictFalseFiltering:
     def test_stealth_enabled_false_dropped(self):
         cfg = DeployConfig(stealth_enabled=False)
         d = cfg.to_dict()
-        assert "stealth_enabled" not in d, \
-            "stealth_enabled=False was silently dropped (bug)"
+        assert "stealth_enabled" not in d, "stealth_enabled=False was silently dropped (bug)"
 
     def test_api_enabled_false_dropped(self):
         cfg = DeployConfig(api_enabled=False)
@@ -694,6 +708,7 @@ class TestGoldenMasters:
     @staticmethod
     def _load_fixture(name: str) -> dict:
         import yaml
+
         path = FIXTURES_DIR / name
         with open(path) as f:
             return yaml.safe_load(f)
@@ -713,6 +728,7 @@ class TestGoldenMasters:
         generate_config(DeployConfig(), path=target)
 
         import yaml
+
         with open(target) as f:
             actual = yaml.safe_load(f)
         expected = self._load_fixture("local_default.yaml")
@@ -748,6 +764,7 @@ class TestGoldenMasters:
         generate_config(cfg, path=target)
 
         import yaml
+
         with open(target) as f:
             data = yaml.safe_load(f)
 
@@ -775,6 +792,7 @@ class TestGoldenMasters:
         generate_config(cfg, path=target)
 
         import yaml
+
         with open(target) as f:
             data = yaml.safe_load(f)
 
@@ -790,6 +808,7 @@ class TestGoldenMasters:
         generate_config(cfg, path=target)
 
         import yaml
+
         with open(target) as f:
             data = yaml.safe_load(f)
 
@@ -806,6 +825,7 @@ class TestGoldenMasters:
         """Old v1 format file can be read by current load_config()."""
         fixture = FIXTURES_DIR / "old_format_v1.yaml"
         import shutil
+
         target = TestYamlPathConsistency._target_path(tmp_path)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(fixture, target)

@@ -1,14 +1,44 @@
 """
-测试 Distributed 模式
+Distributed mode integration tests.
 
-测试场景：
-1. 构建浏览器容器镜像
-2. 启动 API 服务器（Distributed 模式）
-3. 创建会话（自动启动浏览器容器）
-4. 提交任务
-5. 验证浏览器容器运行
-6. 删除会话（自动清理浏览器容器）
+Test scenarios:
+1. Build browser container image
+2. Start API server (Distributed mode)
+3. Create session (auto-starts browser container)
+4. Submit task
+5. Verify browser container running
+6. Delete session (auto-cleanup)
+
+Requires Docker + FastAPI server at localhost:8000.
 """
+
+import pytest
+
+
+def _distributed_env_ready():
+    """Check if Docker and agent-browser API server are available."""
+    try:
+        import subprocess
+
+        import httpx
+
+        # Check Docker
+        r = subprocess.run(["docker", "info"], capture_output=True, timeout=5)
+        if r.returncode != 0:
+            return False
+
+        # Check API health endpoint
+        resp = httpx.get("http://localhost:8000/health", timeout=2)
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
+if not _distributed_env_ready():
+    pytest.skip(
+        reason="Distributed environment not ready (requires Docker + API server at localhost:8000)",
+        allow_module_level=True,
+    )
 
 import asyncio
 import subprocess
@@ -32,9 +62,8 @@ def test_browser_image_exists():
     if "agent-browser-browser" in output:
         print("✅ 浏览器镜像已存在")
         return True
-    else:
-        print("❌ 浏览器镜像不存在，请先运行: ./scripts/build-browser-image.sh")
-        return False
+    print("❌ 浏览器镜像不存在，请先运行: ./scripts/build-browser-image.sh")
+    return False
 
 
 def test_api_server_running():
@@ -44,19 +73,15 @@ def test_api_server_running():
     if "agent-browser-api" in output:
         print("✅ API 服务器正在运行")
         return True
-    else:
-        print("❌ API 服务器未运行，请先运行: ./scripts/start-distributed.sh")
-        return False
+    print("❌ API 服务器未运行，请先运行: ./scripts/start-distributed.sh")
+    return False
 
 
 async def test_create_session():
     """测试创建会话"""
     print("\n3. 创建会话...")
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"{BASE_URL}/sessions/create",
-            json={"user_id": "test_distributed_user"}
-        )
+        response = await client.post(f"{BASE_URL}/sessions/create", json={"user_id": "test_distributed_user"})
         assert response.status_code == 200
         data = response.json()
         session_id = data["session_id"]
@@ -73,9 +98,8 @@ def test_browser_container_running(session_id: str):
     if f"browser_{session_id}" in output:
         print(f"✅ 浏览器容器正在运行: browser_{session_id}")
         return True
-    else:
-        print("❌ 浏览器容器未运行")
-        return False
+    print("❌ 浏览器容器未运行")
+    return False
 
 
 async def test_submit_task(session_id: str):
@@ -84,11 +108,7 @@ async def test_submit_task(session_id: str):
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
             f"{BASE_URL}/sessions/{session_id}/task",
-            json={
-                "task": "打开 https://www.example.com",
-                "model": "glm-5-turbo",
-                "max_steps": 5
-            }
+            json={"task": "打开 https://www.example.com", "model": "glm-5-turbo", "max_steps": 5},
         )
         assert response.status_code == 200
         data = response.json()
@@ -104,9 +124,7 @@ async def test_task_status(session_id: str, task_id: str):
         # 等待任务执行
         await asyncio.sleep(10)
 
-        response = await client.get(
-            f"{BASE_URL}/sessions/{session_id}/tasks/{task_id}"
-        )
+        response = await client.get(f"{BASE_URL}/sessions/{session_id}/tasks/{task_id}")
         assert response.status_code == 200
         data = response.json()
         print(f"✅ 任务状态: {data['status']}")
@@ -131,9 +149,8 @@ def test_browser_container_stopped(session_id: str):
     if f"browser_{session_id}" not in output:
         print("✅ 浏览器容器已清理")
         return True
-    else:
-        print("⚠️  浏览器容器仍然存在（可能是 auto_remove 延迟）")
-        return False
+    print("⚠️  浏览器容器仍然存在（可能是 auto_remove 延迟）")
+    return False
 
 
 async def run_all_tests():
@@ -175,6 +192,7 @@ async def run_all_tests():
     except Exception as e:
         print(f"\n❌ 测试失败: {e}")
         import traceback
+
         traceback.print_exc()
 
 

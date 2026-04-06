@@ -1,4 +1,5 @@
 """Tests for extended config.yaml integration — precedence chain, DeployConfig→SkillConfig merge."""
+
 import os
 from unittest import mock
 
@@ -79,10 +80,12 @@ skill:
   calling_mode: cli
 """)
 
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_CALLING_MODE": "api"}), \
-             mock.patch("agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
-                cfg = load_config()
-                assert cfg.calling_mode == "api"
+        with (
+            mock.patch.dict(os.environ, {"AGENT_BROWSER_CALLING_MODE": "api"}),
+            mock.patch("agent_browser.config.Path.home", return_value=cfg_file.parent.parent),
+        ):
+            cfg = load_config()
+            assert cfg.calling_mode == "api"
 
     def test_yaml_overrides_defaults(self, tmp_path):
         """YAML config should override hardcoded defaults."""

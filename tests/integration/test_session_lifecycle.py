@@ -9,6 +9,7 @@ Test 6 uses a real CloakBrowser instance (Tier 2, @slow @requires_browser).
 
 All tests go through main.py facade API — proving the full path works.
 """
+
 import contextlib
 from unittest import mock
 
@@ -17,6 +18,7 @@ import pytest
 # ══════════════════════════════════════════════
 #  Helper: inject mock backend into facade
 # ══════════════════════════════════════════════
+
 
 @pytest.fixture
 def facade_with_mock(mock_backend, skill_config_no_stealth):
@@ -30,9 +32,7 @@ def facade_with_mock(mock_backend, skill_config_no_stealth):
     async def _mock_select_backend(config: SkillConfig):
         return mock_backend
 
-    with mock.patch.object(
-        skill_main, "_select_backend", side_effect=_mock_select_backend
-    ):
+    with mock.patch.object(skill_main, "_select_backend", side_effect=_mock_select_backend):
         # Configure with stealth disabled (avoids CloakBrowser C extension)
         cfg = skill_main.configure(
             calling_mode="cli",
@@ -46,6 +46,7 @@ def facade_with_mock(mock_backend, skill_config_no_stealth):
 # ══════════════════════════════════════════════
 #  Test 1: create_session returns valid ID
 # ══════════════════════════════════════════════
+
 
 class TestCreateSession:
     """Session creation through facade API."""
@@ -76,6 +77,7 @@ class TestCreateSession:
 # ══════════════════════════════════════════════
 #  Test 2-3: Navigation & Snapshot
 # ══════════════════════════════════════════════
+
 
 class TestNavigationAndSnapshot:
     """Page navigation and DOM extraction."""
@@ -125,6 +127,7 @@ class TestNavigationAndSnapshot:
 #  Test 4: Session Deletion
 # ══════════════════════════════════════════════
 
+
 class TestSessionDeletion:
     """Session cleanup verification."""
 
@@ -138,9 +141,7 @@ class TestSessionDeletion:
         mock_backend.delete_session.assert_awaited_once_with(sid)
 
     @pytest.mark.asyncio
-    async def test_delete_nonexistent_session_does_not_crash(
-        self, facade_with_mock, mock_backend
-    ):
+    async def test_delete_nonexistent_session_does_not_crash(self, facade_with_mock, mock_backend):
         """Deleting a session that doesn't exist doesn't raise (backend handles it)."""
         skill_main, _cfg = facade_with_mock
         # Don't create first — just delete a fake ID
@@ -154,13 +155,12 @@ class TestSessionDeletion:
 #  Test 5: Full Cycle (the complete happy path)
 # ══════════════════════════════════════════════
 
+
 class TestFullCycle:
     """Complete scraping pipeline: create → navigate → extract → interact → cleanup."""
 
     @pytest.mark.asyncio
-    async def test_full_cycle_create_navigate_snapshot_delete(
-        self, facade_with_mock, mock_backend, mock_page_handle
-    ):
+    async def test_full_cycle_create_navigate_snapshot_delete(self, facade_with_mock, mock_backend, mock_page_handle):
         """The narrowest wedge: prove the entire cycle works.
 
         This is the "hello world" of the scraping pipeline.
@@ -187,9 +187,7 @@ class TestFullCycle:
         mock_backend.delete_session.assert_awaited_once_with(sid)
 
     @pytest.mark.asyncio
-    async def test_full_cycle_with_interaction(
-        self, facade_with_mock, mock_page_handle
-    ):
+    async def test_full_cycle_with_interaction(self, facade_with_mock, mock_page_handle):
         """Extended cycle including click + fill interactions."""
         skill_main, _cfg = facade_with_mock
         sid = await skill_main.create_session()
@@ -217,6 +215,7 @@ class TestFullCycle:
 # ══════════════════════════════════════════════
 #  Test 6: Real Browser Cycle (@slow)
 # ══════════════════════════════════════════════
+
 
 class TestRealBrowserCycle:
     """Tests against actual CloakBrowser instance.
@@ -264,13 +263,12 @@ class TestRealBrowserCycle:
 #  Test 7: Session Isolation
 # ══════════════════════════════════════════════
 
+
 class TestSessionIsolation:
     """Two sessions must not share state."""
 
     @pytest.mark.asyncio
-    async def test_two_sessions_independent_handles(
-        self, facade_with_mock, mock_backend
-    ):
+    async def test_two_sessions_independent_handles(self, facade_with_mock, mock_backend):
         """Creating two sessions returns different handles."""
         skill_main, _cfg = facade_with_mock
 
@@ -287,9 +285,7 @@ class TestSessionIsolation:
         assert mock_backend.delete_session.await_count == 2
 
     @pytest.mark.asyncio
-    async def test_session_operations_dont_leak(
-        self, facade_with_mock, mock_page_handle
-    ):
+    async def test_session_operations_dont_leak(self, facade_with_mock, mock_page_handle):
         """Navigating session A doesn't affect session B's handle."""
         skill_main, _cfg = facade_with_mock
 

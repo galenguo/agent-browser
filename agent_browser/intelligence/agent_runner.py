@@ -11,6 +11,7 @@ Key references:
   - browser-use/browser_use/browser/session.py — BrowserSession.connect()
   - browser-use/browser_use/browser/profile.py — cdp_url field
 """
+
 import logging
 import os
 from typing import Any
@@ -44,12 +45,11 @@ async def _ensure_browser_running(proxy: str | None = None) -> str:
         try:
             # Check if browser is still alive (compatible with Browser and BrowserContext)
             # Note: patchright and playwright have different types, use attribute detection not isinstance
-            if hasattr(_browser, 'pages') and not hasattr(_browser, 'contexts'):
+            if hasattr(_browser, "pages") and not hasattr(_browser, "contexts"):
                 _ = _browser.pages  # BrowserContext: use .pages to check
             else:
                 _ = _browser.contexts  # Browser: use .contexts to check
-            cdp_url = f"http://127.0.0.1:{int(os.getenv('CDP_PORT', '19222'))}"
-            return cdp_url
+            return f"http://127.0.0.1:{int(os.getenv('CDP_PORT', '19222'))}"
         except Exception:
             logger.warning("Browser died, relaunching...")
             _pw = None
@@ -112,12 +112,12 @@ async def run_agent_task(
             # Warmup via temporary page (not through browser-use)
             # Note: patchright and playwright have different types, use attribute detection
             if _browser:
-                if hasattr(_browser, 'pages') and not hasattr(_browser, 'contexts'):
+                if hasattr(_browser, "pages") and not hasattr(_browser, "contexts"):
                     # BrowserContext: use pages directly
                     pages = _browser.pages
                     if pages:
                         await sim.warmup_browsing(pages[0])
-                elif hasattr(_browser, 'contexts') and _browser.contexts:
+                elif hasattr(_browser, "contexts") and _browser.contexts:
                     # Browser: get via contexts
                     ctx = _browser.contexts[0]
                     pages = ctx.pages

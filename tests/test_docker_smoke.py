@@ -8,6 +8,7 @@ These tests attempt real Docker operations but SKIP GRACEFULLY if:
 No test should ever fail because Docker isn't available.
 All Docker-unavailable scenarios produce pytest.skip().
 """
+
 import os
 import subprocess
 
@@ -23,7 +24,9 @@ def _docker_available():
     try:
         result = subprocess.run(
             ["docker", "info"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if result.returncode == 0:
             return True, None
@@ -39,7 +42,9 @@ def _docker_compose_available():
     try:
         result = subprocess.run(
             ["docker", "compose", "version"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             return True, None
@@ -49,7 +54,9 @@ def _docker_compose_available():
         try:
             result = subprocess.run(
                 ["docker-compose", "--version"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             return result.returncode == 0, None
         except FileNotFoundError:
@@ -62,8 +69,8 @@ def _docker_compose_available():
 # A. Script Sanity (no Docker required)
 # ════════════════════════════════════════════════════════════════════
 
-class TestDockerScriptSanity:
 
+class TestDockerScriptSanity:
     def test_deploy_script_exists(self):
         """deploy-docker.sh script file exists."""
         assert os.path.isfile(DEPLOY_DOCKER_SH), f"deploy-docker.sh not found at {DEPLOY_DOCKER_SH}"
@@ -72,7 +79,9 @@ class TestDockerScriptSanity:
         """--help exits 0 with usage info."""
         result = subprocess.run(
             ["bash", DEPLOY_DOCKER_SH, "--help"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 0
         assert len(result.stdout.strip()) > 0
@@ -81,7 +90,9 @@ class TestDockerScriptSanity:
         """Unknown flag causes non-zero exit."""
         result = subprocess.run(
             ["bash", DEPLOY_DOCKER_SH, "--nonexistent-flag"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode != 0
 
@@ -90,8 +101,8 @@ class TestDockerScriptSanity:
 # B. Docker Build + Run [requires Docker daemon]
 # ════════════════════════════════════════════════════════════════════
 
-class TestDockerBuild:
 
+class TestDockerBuild:
     def test_docker_info_succeeds(self):
         """Docker info returns successfully (daemon is up)."""
         available, reason = _docker_available()
@@ -99,14 +110,15 @@ class TestDockerBuild:
             pytest.skip(reason)
         result = subprocess.run(
             ["docker", "info", "--format", "{{.ServerVersion}}"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 0
         assert len(result.stdout.strip()) > 0
 
 
 class TestDockerCompose:
-
     def test_compose_file_exists(self):
         """docker-compose.yml exists in docker/ directory."""
         if not os.path.isfile(DOCKER_COMPOSE_YAML):
@@ -121,13 +133,14 @@ class TestDockerCompose:
             pytest.skip("docker-compose.yml not found")
         result = subprocess.run(
             ["docker", "compose", "-f", DOCKER_COMPOSE_YAML, "config"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         assert result.returncode == 0 or "image" in result.stderr.lower()
 
 
 class TestDockerHealthCheck:
-
     def test_container_can_be_listed(self):
         """`docker ps` runs without error (may return empty list)."""
         available, reason = _docker_available()
@@ -135,7 +148,9 @@ class TestDockerHealthCheck:
             pytest.skip(reason)
         result = subprocess.run(
             ["docker", "ps", "--format", "{{.Names}}"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 0
 
@@ -144,8 +159,8 @@ class TestDockerHealthCheck:
 # C. Install Script Docker Integration
 # ════════════════════════════════════════════════════════════════════
 
-class TestInstallScriptDockerMode:
 
+class TestInstallScriptDockerMode:
     def test_install_sh_exists(self):
         """install.sh script exists."""
         install_sh = os.path.join(PROJECT_ROOT, "scripts", "install.sh")
@@ -156,6 +171,8 @@ class TestInstallScriptDockerMode:
         install_sh = os.path.join(PROJECT_ROOT, "scripts", "install.sh")
         result = subprocess.run(
             ["bash", install_sh, "--help"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 0

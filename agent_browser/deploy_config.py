@@ -28,6 +28,7 @@ CONFIG_PATH = CONFIG_DIR / "config.yaml"
 
 # ── Data Model ──────────────────────────────────────────────
 
+
 @dataclass
 class DeployConfig:
     """Extended deployment configuration. Superset of SkillConfig concepts."""
@@ -82,16 +83,16 @@ class DeployConfig:
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dict, excluding empty/None values for clean YAML."""
         raw = asdict(self)
-        return {k: v for k, v in raw.items()
-               if v is not None and v != "" and v != [] and v}
+        return {k: v for k, v in raw.items() if v is not None and v != "" and v != [] and v}
 
 
 # ── Validation ──────────────────────────────────────────────
 
+
 @dataclass
 class ConfigIssue:
     severity: str  # error | warning | info
-    section: str   # browser | docker | k8s | llm | api | general
+    section: str  # browser | docker | k8s | llm | api | general
     message: str
     fix_hint: str = ""
     auto_fixable: bool = False
@@ -104,27 +105,34 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> list[ConfigIss
     # Mode validation
     valid_modes = {"local", "docker-aio", "docker-distributed", "k8s-aio", "k8s-distributed"}
     if cfg.mode not in valid_modes:
-        issues.append(ConfigIssue(
-            severity="error", section="general",
-            message=f"Invalid deployment mode: '{cfg.mode}'. Must be one of {valid_modes}",
-            fix_hint="Set deployment.mode to 'local' for first-time setup",
-        ))
+        issues.append(
+            ConfigIssue(
+                severity="error",
+                section="general",
+                message=f"Invalid deployment mode: '{cfg.mode}'. Must be one of {valid_modes}",
+                fix_hint="Set deployment.mode to 'local' for first-time setup",
+            )
+        )
 
     # Browser validation
     if cfg.browser_type == "cloakbrowser" and env_check:
         try:
             import cloakbrowser  # noqa: F401
         except ImportError:
-            issues.append(ConfigIssue(
-                severity="error", section="browser",
-                message="CloakBrowser package not installed",
-                fix_hint="Run: pip install cloakbrowser",
-                auto_fixable=True,
-            ))
+            issues.append(
+                ConfigIssue(
+                    severity="error",
+                    section="browser",
+                    message="CloakBrowser package not installed",
+                    fix_hint="Run: pip install cloakbrowser",
+                    auto_fixable=True,
+                )
+            )
     if cfg.cdp_url and "19222" in cfg.cdp_url and env_check:
         try:
-            import aiohttp
             import asyncio
+
+            import aiohttp
 
             async def _check():
                 async with (
@@ -132,61 +140,80 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> list[ConfigIss
                     s.get(cfg.cdp_url + "/json/version") as r,
                 ):
                     if r.status != 200:
-                        issues.append(ConfigIssue(
-                            severity="warning", section="browser",
-                            message=f"CDP not reachable at {cfg.cdp_url} (status {r.status})",
-                            fix_hint="Start CloakBrowser or verify CDP port",
-                        ))
+                        issues.append(
+                            ConfigIssue(
+                                severity="warning",
+                                section="browser",
+                                message=f"CDP not reachable at {cfg.cdp_url} (status {r.status})",
+                                fix_hint="Start CloakBrowser or verify CDP port",
+                            )
+                        )
 
             asyncio.run(_check())
         except Exception:
-            issues.append(ConfigIssue(
-                severity="warning", section="browser",
-                message=f"Cannot verify CDP at {cfg.cdp_url}",
-                fix_hint="Start CloakBrowser or set headless=true to skip browser check",
-            ))
+            issues.append(
+                ConfigIssue(
+                    severity="warning",
+                    section="browser",
+                    message=f"Cannot verify CDP at {cfg.cdp_url}",
+                    fix_hint="Start CloakBrowser or set headless=true to skip browser check",
+                )
+            )
 
     # Docker validation
     if "docker" in cfg.mode and env_check:
         docker_ok = _command_exists("docker")
         if not docker_ok:
-            issues.append(ConfigIssue(
-                severity="error", section="docker",
-                message="Docker not installed but Docker mode selected",
-                fix_hint="Install Docker: https://docs.docker.com/get-docker/",
-            ))
+            issues.append(
+                ConfigIssue(
+                    severity="error",
+                    section="docker",
+                    message="Docker not installed but Docker mode selected",
+                    fix_hint="Install Docker: https://docs.docker.com/get-docker/",
+                )
+            )
         compose_ok = _command_exists("docker-compose")
         if not compose_ok:
-            issues.append(ConfigIssue(
-                severity="warning", section="docker",
-                message="docker-compose not found (needed for Docker mode)",
-                fix_hint="Install Docker Compose or use local mode instead",
-            ))
+            issues.append(
+                ConfigIssue(
+                    severity="warning",
+                    section="docker",
+                    message="docker-compose not found (needed for Docker mode)",
+                    fix_hint="Install Docker Compose or use local mode instead",
+                )
+            )
 
     # K8s validation
     if "k8s" in cfg.mode and env_check:
         kubectl_ok = _command_exists("kubectl")
         if not kubectl_ok:
-            issues.append(ConfigIssue(
-                severity="error", section="k8s",
-                message="kubectl not installed but K8s mode selected",
-                fix_hint="Install kubectl or use local/Docker mode",
-            ))
+            issues.append(
+                ConfigIssue(
+                    severity="error",
+                    section="k8s",
+                    message="kubectl not installed but K8s mode selected",
+                    fix_hint="Install kubectl or use local/Docker mode",
+                )
+            )
         # Check for cluster access
         if kubectl_ok:
             result = _run_cmd("kubectl config current-context", timeout=5)
             if result.returncode != 0:
-                issues.append(ConfigIssue(
-                    severity="warning", section="k8s",
-                    message="kubectl cannot connect to any cluster",
-                    fix_hint="Run: kubectl config use-context <context>",
-                ))
+                issues.append(
+                    ConfigIssue(
+                        severity="warning",
+                        section="k8s",
+                        message="kubectl cannot connect to any cluster",
+                        fix_hint="Run: kubectl config use-context <context>",
+                    )
+                )
 
     # API port check
     if cfg.api_enabled and env_check:
         try:
-            import aiohttp
             import asyncio
+
+            import aiohttp
 
             async def _check_api():
                 url = f"http://{cfg.api_host}:{cfg.api_port}/health"
@@ -195,11 +222,14 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> list[ConfigIss
                     s.get(url) as r,
                 ):
                     if r.status != 200:
-                        issues.append(ConfigIssue(
-                            severity="info", section="api",
-                            message=f"API not running at {url} (status {r.status})",
-                            fix_hint="Start API server with: uvicorn src.api:app --port {cfg.api_port}",
-                        ))
+                        issues.append(
+                            ConfigIssue(
+                                severity="info",
+                                section="api",
+                                message=f"API not running at {url} (status {r.status})",
+                                fix_hint="Start API server with: uvicorn src.api:app --port {cfg.api_port}",
+                            )
+                        )
 
             asyncio.run(_check_api())
         except Exception:
@@ -209,18 +239,24 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> list[ConfigIss
     if not cfg.llm_api_key_set and env_check:
         has_openai = bool(os.getenv("OPENAI_API_KEY"))
         has_anthropic = bool(os.getenv("ANTHROPIC_API_KEY"))
-        has_glm = bool(os.getenv("GLM_API_KEY")) or bool(os.getenv("OPENAI_BASE_URL", "") and "bigmodel" in os.getenv("OPENAI_BASE_URL", ""))
+        has_glm = bool(os.getenv("GLM_API_KEY")) or bool(
+            os.getenv("OPENAI_BASE_URL", "") and "bigmodel" in os.getenv("OPENAI_BASE_URL", "")
+        )
         if not (has_openai or has_anthropic or has_glm):
-            issues.append(ConfigIssue(
-                severity="info", section="llm",
-                message="No LLM API key found (OPENAI_API_KEY, ANTHROPIC_API_KEY, or GLM_API_KEY)",
-                fix_hint="Set an env var or run setup() interactively to configure",
-            ))
+            issues.append(
+                ConfigIssue(
+                    severity="info",
+                    section="llm",
+                    message="No LLM API key found (OPENAI_API_KEY, ANTHROPIC_API_KEY, or GLM_API_KEY)",
+                    fix_hint="Set an env var or run setup() interactively to configure",
+                )
+            )
 
     return issues
 
 
 # ── Environment Detection ──────────────────────────────────────────
+
 
 def detect_environment() -> dict[str, Any]:
     """Detect OS, arch, and available tools. Returns dict for DeployConfig."""
@@ -245,6 +281,7 @@ def detect_environment() -> dict[str, Any]:
 def _command_exists(cmd: str) -> bool:
     """Check if a command exists on PATH."""
     import shutil
+
     return shutil.which(cmd) is not None
 
 
@@ -260,11 +297,20 @@ def _package_installed(package: str) -> bool:
 def _run_cmd(cmd: str, timeout: int = 10) -> Any:
     """Run a shell command, return result with returncode/output."""
     import subprocess
+
     try:
         result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=timeout,
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
-        return type("result", (), {"returncode": result.returncode, "stdout": result.stdout.strip(), "stderr": result.stderr.strip()})
+        return type(
+            "result",
+            (),
+            {"returncode": result.returncode, "stdout": result.stdout.strip(), "stderr": result.stderr.strip()},
+        )
     except subprocess.TimeoutExpired:
         return type("result", (), {"returncode": -1, "stdout": "", "stderr": f"Timed out after {timeout}s"})
     except Exception as e:
@@ -272,6 +318,7 @@ def _run_cmd(cmd: str, timeout: int = 10) -> Any:
 
 
 # ── Config I/O ────────────────────────────────────────────────────
+
 
 def load_deploy_config() -> DeployConfig:
     """Load deployment config from extended config.yaml.
@@ -448,6 +495,7 @@ def generate_config(cfg: DeployConfig, path: Path | None = None) -> Path:
 
     # Atomic write: temp file → rename
     import tempfile
+
     fd, tmp_path = tempfile.mkstemp(suffix=".yaml", prefix="ab-config-", dir=target.parent)
     try:
         os.write(fd, _dump_yaml(full).encode("utf-8"))
@@ -455,6 +503,7 @@ def generate_config(cfg: DeployConfig, path: Path | None = None) -> Path:
         os.close(fd)
 
     import shutil
+
     shutil.move(tmp_path, target)  # atomic on POSIX
 
     logger.info(f"Configuration written to {target}")
@@ -467,6 +516,7 @@ def _load_yaml_config(path: Path) -> dict | None:
         return None
     try:
         import yaml
+
         with open(path) as f:
             data = yaml.safe_load(f)
         return data if isinstance(data, dict) else {}
@@ -479,10 +529,12 @@ def _dump_yaml(data: dict) -> str:
     """Dump dict to YAML string without external dependencies."""
     try:
         import yaml
+
         return yaml.dump(data, default_flow_style=False, allow_unicode=True)
     except ImportError:
         # Fallback: simple manual YAML dump for common types
         lines = []
+
         def _dump(obj, indent=0):
             prefix = "  " * indent
             if isinstance(obj, dict):
@@ -496,5 +548,6 @@ def _dump_yaml(data: dict) -> str:
                 lines.append(f"{prefix}{str(obj).lower()}")
             else:
                 lines.append(f"{prefix}{obj}")
+
         _dump(data)
         return "\n".join(lines)

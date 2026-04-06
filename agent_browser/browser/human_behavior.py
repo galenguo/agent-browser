@@ -13,6 +13,7 @@ Countermeasures:
   - Warmup browsing (visit Baidu/news sites first to establish normal user baseline)
   - Random long pauses to simulate "reading" behavior
 """
+
 import asyncio
 import logging
 import math
@@ -177,14 +178,8 @@ class HumanBehaviorSimulator:
         for i in range(steps + 1):
             t = i / steps
             # Cubic Bezier formula
-            x = ((1 - t) ** 3 * start_x
-                 + 3 * (1 - t) ** 2 * t * ctrl1_x
-                 + 3 * (1 - t) * t ** 2 * ctrl2_x
-                 + t ** 3 * end_x)
-            y = ((1 - t) ** 3 * start_y
-                 + 3 * (1 - t) ** 2 * t * ctrl1_y
-                 + 3 * (1 - t) * t ** 2 * ctrl2_y
-                 + t ** 3 * end_y)
+            x = (1 - t) ** 3 * start_x + 3 * (1 - t) ** 2 * t * ctrl1_x + 3 * (1 - t) * t**2 * ctrl2_x + t**3 * end_x
+            y = (1 - t) ** 3 * start_y + 3 * (1 - t) ** 2 * t * ctrl1_y + 3 * (1 - t) * t**2 * ctrl2_y + t**3 * end_y
             await page.mouse.move(int(x), int(y))
             # ease-in-out variable speed: slow at start/end, fast in middle
             base_delay = 0.002 + 0.010 * math.sin(math.pi * t)

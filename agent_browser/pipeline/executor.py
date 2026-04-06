@@ -13,6 +13,7 @@ Features:
   - Template rendering for all string parameters
   - Progress logging with step index
 """
+
 import asyncio
 import logging
 import time
@@ -88,10 +89,13 @@ async def execute_pipeline(
     for i, step in enumerate(parsed_steps):
         if step.op not in STEPS:
             logger.warning(f"Unknown step '{step.op}' at position {i}, skipping")
-            result.errors.append({
-                "step": i, "op": step.op,
-                "error": f"Unknown step: {step.op}",
-            })
+            result.errors.append(
+                {
+                    "step": i,
+                    "op": step.op,
+                    "error": f"Unknown step: {step.op}",
+                }
+            )
             if fail_fast:
                 result.success = False
                 break
@@ -133,6 +137,7 @@ async def execute_pipeline(
 
         except TimeoutError as e:
             from .errors import StepTimeoutError
+
             te = StepTimeoutError(
                 message=f"Step '{step.op}' timed out after {step_timeout}s",
                 step_index=i,
@@ -148,6 +153,7 @@ async def execute_pipeline(
             # Fallback: attempt recovery when not fail_fast
             if not fail_fast:
                 from .fallback import attempt_fallback
+
                 recovered = await attempt_fallback(session_id, te, context)
                 if recovered:
                     logger.info(f"Step '{step.op}' recovered after timeout")
@@ -159,6 +165,7 @@ async def execute_pipeline(
 
         except Exception as e:
             from .errors import PipelineStepError, _generate_fix_hint
+
             pe = PipelineStepError(
                 message=str(e),
                 step_index=i,
@@ -175,6 +182,7 @@ async def execute_pipeline(
             # Fallback: attempt recovery when not fail_fast
             if not fail_fast:
                 from .fallback import attempt_fallback
+
                 recovered = await attempt_fallback(session_id, pe, context)
                 if recovered:
                     logger.info(f"Step '{step.op}' recovered after error")
@@ -195,6 +203,7 @@ async def execute_pipeline(
     # Telemetry: record execution (non-blocking, never fails pipeline)
     try:
         from .telemetry import Telemetry
+
         error_cat = None
         if not result.success and result.errors:
             # Use first error's category
@@ -214,10 +223,7 @@ async def execute_pipeline(
         pass  # telemetry must never break pipeline
 
     if result.errors:
-        logger.warning(
-            f"Pipeline completed with {len(result.errors)} errors "
-            f"in {result.duration_ms}ms"
-        )
+        logger.warning(f"Pipeline completed with {len(result.errors)} errors in {result.duration_ms}ms")
     else:
         logger.info(
             f"Pipeline completed successfully: "

@@ -3,6 +3,7 @@
 Uses the actual STEPS registry as the sole data source for step names
 (won't drift). Called from loader.py's _ensure_loaded() for load-time validation.
 """
+
 import logging
 from typing import Any
 
@@ -47,21 +48,19 @@ def validate_adapter(adapter: dict[str, Any]) -> list[str]:
     else:
         # Lazy import to avoid circular dependency
         from agent_browser.pipeline.steps import STEPS
+
         for i, step in enumerate(pipeline):
             if not isinstance(step, dict) or len(step) != 1:
                 errors.append(f"pipeline[{i}]: invalid step format (expected {{op: params}})")
             else:
-                op = list(step.keys())[0]
+                op = next(iter(step.keys()))
                 if op not in STEPS:
                     errors.append(f"pipeline[{i}]: unknown step '{op}'")
 
     # 3. Strategy validation
     strategy = adapter.get("strategy", "")
     if strategy and strategy not in VALID_STRATEGIES:
-        errors.append(
-            f"Invalid strategy: '{strategy}'. "
-            f"Must be one of {sorted(VALID_STRATEGIES)}"
-        )
+        errors.append(f"Invalid strategy: '{strategy}'. Must be one of {sorted(VALID_STRATEGIES)}")
 
     # 4. Args type validation
     args = adapter.get("args", {})
@@ -71,18 +70,15 @@ def validate_adapter(adapter: dict[str, Any]) -> list[str]:
                 arg_type = arg_spec.get("type", "")
                 if arg_type and arg_type not in VALID_ARG_TYPES:
                     errors.append(
-                        f"args.{arg_name}: invalid type '{arg_type}'. "
-                        f"Must be one of {sorted(VALID_ARG_TYPES)}"
+                        f"args.{arg_name}: invalid type '{arg_type}'. Must be one of {sorted(VALID_ARG_TYPES)}"
                     )
 
     # 5. Browser consistency check (browser:false shouldn't have navigate steps)
     browser = adapter.get("browser", True)
     if browser is False and isinstance(pipeline, list):
-        nav_ops = [list(s.keys())[0] for s in pipeline if isinstance(s, dict) and len(s) == 1]
+        nav_ops = [next(iter(s.keys())) for s in pipeline if isinstance(s, dict) and len(s) == 1]
         if "navigate" in nav_ops:
-            errors.append(
-                "browser=false but pipeline contains 'navigate' step (contradiction)"
-            )
+            errors.append("browser=false but pipeline contains 'navigate' step (contradiction)")
 
     return errors
 
@@ -98,6 +94,7 @@ def validate_all_adapters() -> dict[str, list[str]]:
     for adapter_meta in adapters:
         key = f"{adapter_meta['site']}/{adapter_meta['name']}"
         from .loader import get_adapter
+
         adapter = get_adapter(adapter_meta["site"], adapter_meta["name"])
         if adapter:
             results[key] = validate_adapter(adapter)

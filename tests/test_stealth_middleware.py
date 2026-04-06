@@ -9,6 +9,7 @@ StealthMiddleware + StealthPageHandle 单元测试
   - ref 格式验证回归
   - stealth_mode 配置选项
 """
+
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
@@ -153,6 +154,7 @@ class TestStealthMiddleware:
 
         # 应返回 StealthPageHandle（不是原始 handle）
         from agent_browser.stealth.middleware import StealthPageHandle
+
         assert isinstance(result, StealthPageHandle)
         assert result._wrapped is page_handle
         assert result._raw_page is raw_page
@@ -241,9 +243,7 @@ class TestStealthPageHandle:
         await handle.goto("http://example.com")
 
         stealth.pre_action.assert_called_once_with("navigate")
-        wrapped.goto.assert_called_once_with(
-            "http://example.com", wait_until="domcontentloaded", timeout=8000
-        )
+        wrapped.goto.assert_called_once_with("http://example.com", wait_until="domcontentloaded", timeout=8000)
         stealth.post_action.assert_called_once_with("navigate")
 
     @pytest.mark.asyncio

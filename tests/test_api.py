@@ -1,19 +1,40 @@
 """
-测试 v2 多用户会话 API
+Multi-user session API tests (v2).
 
-测试场景：
-1. 创建会话
-2. 提交任务到会话
-3. 查询任务状态
-4. 查询会话状态
-5. 删除会话
-6. 向后兼容测试（旧版 /tasks API）
+Test scenarios:
+1. Create session
+2. Submit task to session
+3. Query task status
+4. Query session status
+5. Delete session
+6. Backward compat test (legacy /tasks API)
+
+Requires FastAPI server at localhost:8000.
 """
+
+import pytest
+
+
+def _api_available():
+    """Check if the agent-browser API server is reachable and healthy."""
+    try:
+        import httpx
+
+        resp = httpx.get("http://localhost:8000/health", timeout=2)
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
+if not _api_available():
+    pytest.skip(
+        reason="API server not available at localhost:8000",
+        allow_module_level=True,
+    )
 
 import asyncio
 
 import httpx
-import pytest
 
 BASE_URL = "http://localhost:8000"
 
@@ -22,10 +43,7 @@ BASE_URL = "http://localhost:8000"
 async def test_create_session():
     """测试创建会话"""
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"{BASE_URL}/sessions/create",
-            json={"user_id": "test_user_001"}
-        )
+        response = await client.post(f"{BASE_URL}/sessions/create", json={"user_id": "test_user_001"})
         assert response.status_code == 200
         data = response.json()
         assert "session_id" in data
@@ -42,11 +60,7 @@ async def test_submit_task():
     async with httpx.AsyncClient() as client:
         response = await client.post(
             f"{BASE_URL}/sessions/{session_id}/task",
-            json={
-                "task": "打开 https://www.baidu.com 并搜索 Python",
-                "model": "glm-5-turbo",
-                "max_steps": 10
-            }
+            json={"task": "打开 https://www.baidu.com 并搜索 Python", "model": "glm-5-turbo", "max_steps": 10},
         )
         assert response.status_code == 200
         data = response.json()
@@ -64,9 +78,7 @@ async def test_get_task_status():
         # 等待任务执行
         await asyncio.sleep(5)
 
-        response = await client.get(
-            f"{BASE_URL}/sessions/{session_id}/tasks/{task_id}"
-        )
+        response = await client.get(f"{BASE_URL}/sessions/{session_id}/tasks/{task_id}")
         assert response.status_code == 200
         data = response.json()
         assert data["task_id"] == task_id
@@ -106,12 +118,7 @@ async def test_legacy_api():
     """测试向后兼容的旧版 API"""
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            f"{BASE_URL}/tasks",
-            json={
-                "task": "打开 https://www.google.com",
-                "model": "glm-5-turbo",
-                "max_steps": 5
-            }
+            f"{BASE_URL}/tasks", json={"task": "打开 https://www.google.com", "model": "glm-5-turbo", "max_steps": 5}
         )
         assert response.status_code == 200
         data = response.json()

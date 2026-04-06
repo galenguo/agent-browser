@@ -13,6 +13,7 @@ Prerequisites:
   - CloakBrowser running on 127.0.0.1:19222 (or any CDP-compatible browser)
   - Tests are auto-skipped if no browser is detected (@pytest.mark.requires_browser)
 """
+
 import pytest
 
 from agent_browser import AgentBrowser, SkillConfig
@@ -45,16 +46,12 @@ class TestE2EWorkflow:
             print(f"[E2E] Snapshot: {len(snap)} elements")
 
             # Step 4: Extract data via JS
-            title = await ab.evaluate(
-                "document.title", session_id=session_id
-            )
+            title = await ab.evaluate("document.title", session_id=session_id)
             assert title, "Page title should be non-empty"
             assert isinstance(title, str), "Title should be a string"
             print(f"[E2E] Page title: {title}")
 
-            url = await ab.evaluate(
-                "window.location.href", session_id=session_id
-            )
+            url = await ab.evaluate("window.location.href", session_id=session_id)
             assert url, "URL should be non-empty"
             assert "example" in url.lower(), f"URL should contain 'example', got {url}"
             print(f"[E2E] URL: {url}")

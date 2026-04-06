@@ -12,6 +12,7 @@ Design constraints:
   - Each step retries at most once (avoid infinite loops)
   - On fallback failure, return original error without losing information
 """
+
 import logging
 from typing import Any
 
@@ -161,17 +162,14 @@ async def attempt_fallback(
         True on successful recovery (caller should continue to next step)
         False on recovery failure (caller should log original error)
     """
-    category, meta = classify(error)
+    category, _meta = classify(error)
     handler = _get_fallback_handler(category)
 
     if not handler:
         logger.debug(f"No fallback handler for category {category}")
         return False
 
-    logger.info(
-        f"Fallback attempt for [{category.value}] "
-        f"at step {error.step_index} '{error.step_name}'"
-    )
+    logger.info(f"Fallback attempt for [{category.value}] at step {error.step_index} '{error.step_name}'")
 
     for attempt in range(1, max_retries + 1):
         try:

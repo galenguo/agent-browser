@@ -24,21 +24,22 @@ if TYPE_CHECKING:
 
 # ============ Enums ============
 
+
 class BrowserType(StrEnum):
     """Browser engine type."""
-    CHROMIUM = "chromium"   # CloakBrowser + patchright (default)
+
+    CHROMIUM = "chromium"  # CloakBrowser + patchright (default)
 
 
 # ============ Exception classes ============
 
+
 class ResourceExhaustedError(Exception):
     """Resource exhausted exception (max concurrency reached)."""
-    pass
 
 
 class SessionNotFoundError(Exception):
     """Session not found exception."""
-    pass
 
 
 from agent_browser.pipeline.errors import (  # noqa: E402
@@ -47,9 +48,11 @@ from agent_browser.pipeline.errors import (  # noqa: E402
 
 # ============ Browser instances ============
 
+
 @dataclass
 class BrowserInstance:
     """Browser instance base class."""
+
     instance_id: str
     cdp_url: str
     cdp_port: int
@@ -64,21 +67,23 @@ class BrowserInstance:
 @dataclass
 class LocalBrowserInstance(BrowserInstance):
     """Local browser instance (process)."""
+
     playwright: Any = None  # playwright.async_api.Playwright
-    browser: Any = None     # playwright.async_api.Browser
+    browser: Any = None  # playwright.async_api.Browser
 
 
 @dataclass
 class DockerBrowserInstance(BrowserInstance):
     """Docker browser instance (container)."""
+
     container: Any = None  # docker.models.containers.Container
     container_name: str = None
-    novnc_host_port: int | None = None   # Allocated host noVNC port (Mode B)
+    novnc_host_port: int | None = None  # Allocated host noVNC port (Mode B)
     # Public access info (requires BROWSER_PUBLIC_HOST env var)
-    public_host: str | None = None       # Public IP or domain name
-    public_cdp_port: int | None = None   # Public CDP port (Mode B has it, Mode D does not)
-    public_novnc_port: int | None = None # Public noVNC port
-    novnc_url: str | None = None         # Full noVNC monitoring URL
+    public_host: str | None = None  # Public IP or domain name
+    public_cdp_port: int | None = None  # Public CDP port (Mode B has it, Mode D does not)
+    public_novnc_port: int | None = None  # Public noVNC port
+    novnc_url: str | None = None  # Full noVNC monitoring URL
 
     def __post_init__(self):
         super().__post_init__()
@@ -88,9 +93,11 @@ class DockerBrowserInstance(BrowserInstance):
 
 # ============ User sessions ============
 
+
 @dataclass
 class UserSession:
     """User session."""
+
     session_id: str
     user_id: str
     browser_instance: BrowserInstance
@@ -115,8 +122,10 @@ class UserSession:
 
 # ============ Atomic operation request models (Pydantic) ============
 
+
 class NavigateRequest(BaseModel):
     """Page navigation request."""
+
     url: str
     wait_until: str = "domcontentloaded"  # load | domcontentloaded | networkidle
     timeout: int = 30000  # ms
@@ -124,6 +133,7 @@ class NavigateRequest(BaseModel):
 
 class ClickRequest(BaseModel):
     """Click element request."""
+
     ref: str  # Element reference, e.g., @e0, @e1
     button: str = "left"  # left | right | middle
     click_count: int = 1
@@ -132,6 +142,7 @@ class ClickRequest(BaseModel):
 
 class FillRequest(BaseModel):
     """Fill input field request."""
+
     ref: str  # Element reference
     text: str
     clear_first: bool = True  # Whether to clear first
@@ -140,12 +151,14 @@ class FillRequest(BaseModel):
 
 class EvaluateRequest(BaseModel):
     """Execute JavaScript request."""
+
     expression: str
     return_by_value: bool = True
 
 
 class ScrollRequest(BaseModel):
     """Scroll request."""
+
     direction: str = "down"  # up | down
     amount: int = 300  # pixels
     smooth: bool = True
@@ -153,6 +166,7 @@ class ScrollRequest(BaseModel):
 
 class WaitRequest(BaseModel):
     """Wait request."""
+
     selector: str | None = None  # CSS selector
     timeout: int = 10000  # ms
     state: str = "visible"  # visible | hidden | attached | detached
@@ -160,8 +174,10 @@ class WaitRequest(BaseModel):
 
 # ============ Atomic operation response models ============
 
+
 class ElementInfo(BaseModel):
     """Element information."""
+
     ref: str  # @e0, @e1...
     tag: str
     text: str | None = None
@@ -176,6 +192,7 @@ class ElementInfo(BaseModel):
 
 class SnapshotResponse(BaseModel):
     """Snapshot response."""
+
     url: str
     title: str
     elements: list[ElementInfo]

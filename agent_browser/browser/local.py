@@ -78,6 +78,7 @@ class PlaywrightPageHandle(BrowserPageHandle):
 @dataclass
 class LocalSession:
     """Local session data container."""
+
     page_handle: PlaywrightPageHandle
     browser_context: Any  # BrowserContext
     dom_indices: list[int]
@@ -106,6 +107,7 @@ class LocalCDPBackend(BrowserBackend):
         if config.daemon_enabled:
             try:
                 from agent_browser.browser.daemon import BrowserDaemon
+
                 self._daemon = BrowserDaemon.get(config)
                 logger.info("BrowserDaemon enabled")
             except Exception as e:
@@ -115,6 +117,7 @@ class LocalCDPBackend(BrowserBackend):
         if config.stealth_enabled:
             try:
                 from agent_browser.stealth.enhancer import StealthEnhancer
+
                 self._stealth = StealthEnhancer()
             except ImportError:
                 logger.debug("StealthEnhancer not available")
@@ -122,6 +125,7 @@ class LocalCDPBackend(BrowserBackend):
     async def _is_cdp_reachable(self) -> bool:
         """Check whether the CDP endpoint is reachable."""
         import aiohttp
+
         cdp_url = self._config.cdp_url
         # Convert to HTTP URL for health check
         if cdp_url.startswith("ws://"):
@@ -134,7 +138,7 @@ class LocalCDPBackend(BrowserBackend):
                 aiohttp.ClientSession() as session,
                 session.get(health_url, timeout=aiohttp.ClientTimeout(total=2)) as resp,
             ):
-                    return resp.status == 200
+                return resp.status == 200
         except Exception:
             return False
 
@@ -145,7 +149,8 @@ class LocalCDPBackend(BrowserBackend):
         Returns True if already installed or installation succeeded.
         """
         try:
-            import cloakbrowser  # noqa: F401
+            import cloakbrowser
+
             logger.debug(f"CloakBrowser found: {getattr(cloakbrowser, '__version__', 'unknown')}")
             return True
         except ImportError:
@@ -156,12 +161,15 @@ class LocalCDPBackend(BrowserBackend):
 
         try:
             result = await asyncio.create_subprocess_exec(
-                sys.executable, "-m", "pip", "install",
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
                 "cloakbrowser==0.3.18",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await result.communicate(timeout=120)
+            _stdout, stderr = await result.communicate(timeout=120)
 
             if result.returncode != 0:
                 logger.error(f"pip install cloakbrowser failed (rc={result.returncode}):")
@@ -185,8 +193,11 @@ class LocalCDPBackend(BrowserBackend):
         # Launch CloakBrowser subprocess
         try:
             self._browser_process = await asyncio.create_subprocess_exec(
-                sys.executable, "-m", "cloakbrowser.launch",
-                "--port", "19222",
+                sys.executable,
+                "-m",
+                "cloakbrowser.launch",
+                "--port",
+                "19222",
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
@@ -230,8 +241,7 @@ class LocalCDPBackend(BrowserBackend):
             # Ensure CloakBrowser is installed first (Phase 1.5: auto-download)
             if not await self.ensure_cloakbrowser_installed():
                 raise RuntimeError(
-                    "CloakBrowser not installed and auto-install failed. "
-                    "Run: pip install cloakbrowser==0.3.18"
+                    "CloakBrowser not installed and auto-install failed. Run: pip install cloakbrowser==0.3.18"
                 )
             await self._launch_browser()
 
@@ -312,6 +322,7 @@ class LocalCDPBackend(BrowserBackend):
             if self._stealth:
                 from agent_browser.stealth.enhancer import StealthEnhancer
                 from agent_browser.stealth.patches import inject_stealth_patches
+
                 await inject_stealth_patches(page)  # JS property-level stealth patches
                 await StealthEnhancer.inject_timing_noise(page)  # Timing noise injection
             page_handle = PlaywrightPageHandle(page)
@@ -331,6 +342,7 @@ class LocalCDPBackend(BrowserBackend):
         if self._stealth:
             from agent_browser.stealth.enhancer import StealthEnhancer
             from agent_browser.stealth.patches import inject_stealth_patches
+
             await inject_stealth_patches(page)  # JS property-level stealth patches
             await StealthEnhancer.inject_timing_noise(page)  # Timing noise injection
 
@@ -517,13 +529,13 @@ class LocalCDPBackend(BrowserBackend):
                             f"Please continue. After completion output TASK_COMPLETE: <result summary>"
                         )
 
-                    agent_kwargs = dict(
-                        task=current_task,
-                        llm=llm,
-                        browser_session=browser_session,
-                        max_actions_per_step=5,
-                        use_vision=False,
-                    )
+                    agent_kwargs = {
+                        "task": current_task,
+                        "llm": llm,
+                        "browser_session": browser_session,
+                        "max_actions_per_step": 5,
+                        "use_vision": False,
+                    }
                     if controller:
                         agent_kwargs["controller"] = controller
 
@@ -584,6 +596,7 @@ class LocalCDPBackend(BrowserBackend):
     def _create_llm(self, llm_config: dict | None = None):
         """Create a browser-use compatible LLM instance."""
         import os
+
         if not llm_config:
             provider = os.getenv("AGENT_BROWSER_LLM_PROVIDER", "openai")
             llm_config = {"provider": provider}
@@ -597,13 +610,20 @@ class LocalCDPBackend(BrowserBackend):
 
         if provider == "anthropic":
             from browser_use.llm.anthropic.chat import ChatAnthropic
+
             return ChatAnthropic(
-                model=model_name, api_key=api_key, base_url=base_url,
-                temperature=temperature, max_tokens=max_tokens,
+                model=model_name,
+                api_key=api_key,
+                base_url=base_url,
+                temperature=temperature,
+                max_tokens=max_tokens,
             )
-        else:
-            from browser_use.llm.openai.chat import ChatOpenAI
-            return ChatOpenAI(
-                model=model_name, api_key=api_key, base_url=base_url,
-                temperature=temperature, max_completion_tokens=max_tokens,
-            )
+        from browser_use.llm.openai.chat import ChatOpenAI
+
+        return ChatOpenAI(
+            model=model_name,
+            api_key=api_key,
+            base_url=base_url,
+            temperature=temperature,
+            max_completion_tokens=max_tokens,
+        )

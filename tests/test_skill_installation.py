@@ -10,6 +10,7 @@ Validates:
 These tests run without any browser, API server, or Docker.
 They catch "the package is broken" class of issues before anything else.
 """
+
 import importlib
 import importlib.metadata
 import os
@@ -21,8 +22,8 @@ import pytest
 # A. Package Metadata [P0-CRITICAL]
 # ════════════════════════════════════════════════════════════════════
 
-class TestPackageMetadata:
 
+class TestPackageMetadata:
     def test_package_name(self):
         """pyproject.toml declares a valid package name."""
         meta = importlib.metadata.metadata("agent-browser")
@@ -31,6 +32,7 @@ class TestPackageMetadata:
     def test_version_defined(self):
         """Version string exists and is non-empty."""
         import agent_browser
+
         assert hasattr(agent_browser, "__version__")
         assert isinstance(agent_browser.__version__, str)
         assert len(agent_browser.__version__) > 0
@@ -38,6 +40,7 @@ class TestPackageMetadata:
     def test_version_matches_pyproject(self):
         """__version__ is consistent with pyproject.toml [project] version."""
         import agent_browser
+
         meta = importlib.metadata.metadata("agent-browser")
         # __init__ may append -dev suffix; both should share the same base version
         assert meta["Version"] in agent_browser.__version__ or agent_browser.__version__.startswith(meta["Version"])
@@ -71,11 +74,12 @@ class TestPackageMetadata:
 # B. Public API Surface [P0-CRITICAL]
 # ════════════════════════════════════════════════════════════════════
 
-class TestPublicImports:
 
+class TestPublicImports:
     def test___all___exists(self):
         """__all__ is defined and non-empty."""
         import agent_browser
+
         assert hasattr(agent_browser, "__all__")
         assert isinstance(agent_browser.__all__, list)
         assert len(agent_browser.__all__) > 0
@@ -83,6 +87,7 @@ class TestPublicImports:
     def test_all_symbols_importable(self):
         """Every symbol in __all__ can be imported from the top level."""
         import agent_browser
+
         for name in agent_browser.__all__:
             assert hasattr(agent_browser, name), f"{name} in __all__ but not on module"
             obj = getattr(agent_browser, name)
@@ -108,6 +113,7 @@ class TestPublicImports:
             snapshot,
             wait_for_selector,
         )
+
         assert callable(create_session)
         assert callable(delete_session)
         assert callable(open_page)
@@ -128,27 +134,32 @@ class TestPublicImports:
     def test_exception_classes_importable(self):
         """FirstSessionError imports correctly."""
         from agent_browser import FirstSessionError
+
         assert issubclass(FirstSessionError, Exception)
 
     def test_config_types_importable(self):
         """SkillConfig, load_config, detect_mode import correctly."""
         from agent_browser import SkillConfig
+
         assert hasattr(SkillConfig, "__dataclass_fields__")
 
     def test_oop_interface_importable(self):
         """AgentBrowser OOP class imports correctly."""
         from agent_browser import AgentBrowser
+
         assert callable(getattr(AgentBrowser, "create_session", None))
 
     def test_adapter_functions_importable(self):
         """list_adapters, run_adapter import correctly."""
         from agent_browser import list_adapters, run_adapter
+
         assert callable(list_adapters)
         assert callable(run_adapter)
 
     def test_explore_functions_importable(self):
         """explore, synthesize, cascade import correctly."""
         from agent_browser import cascade, explore, synthesize
+
         assert callable(explore)
         assert callable(synthesize)
         assert callable(cascade)
@@ -156,6 +167,7 @@ class TestPublicImports:
     def test_llm_factory_importable(self):
         """LLMFactory imports correctly."""
         from agent_browser import LLMFactory
+
         assert LLMFactory is not None
 
 
@@ -208,8 +220,8 @@ def test_submodule_loads(module_path, expected_attrs):
 # D. Code Quality Guards [P1]
 # ════════════════════════════════════════════════════════════════════
 
-class TestCodeQuality:
 
+class TestCodeQuality:
     # Whitelist /opt/ paths (legitimate Linux defaults like /opt/cloakbrowser/chrome)
     _ABS_PATH_PATTERN = re.compile(r'["\'](/(?:Users|home|var|etc)/)', re.IGNORECASE)
     _SOURCE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -218,11 +230,23 @@ class TestCodeQuality:
         """No developer-machine absolute paths in Python source files."""
         violations = []
         for root, dirs, files in os.walk(self._SOURCE_ROOT):
-            dirs[:] = [d for d in dirs if d not in {
-                ".git", "__pycache__", ".venv", "node_modules",
-                ".pytest_cache", ".mypy_cache", "dist", "build",
-                "tests/screenshots", "tests/results",
-            }]
+            dirs[:] = [
+                d
+                for d in dirs
+                if d
+                not in {
+                    ".git",
+                    "__pycache__",
+                    ".venv",
+                    "node_modules",
+                    ".pytest_cache",
+                    ".mypy_cache",
+                    "dist",
+                    "build",
+                    "tests/screenshots",
+                    "tests/results",
+                }
+            ]
             for fname in files:
                 if not fname.endswith(".py"):
                     continue
@@ -236,8 +260,7 @@ class TestCodeQuality:
                                 violations.append(f"{fpath}:{lineno}: {line.strip()}")
                 except Exception:
                     pass
-        assert len(violations) == 0, \
-            f"Found {len(violations)} hardcoded absolute paths:\n" + "\n".join(violations[:20])
+        assert len(violations) == 0, f"Found {len(violations)} hardcoded absolute paths:\n" + "\n".join(violations[:20])
 
     def test_no_sys_path_hacks_in_source(self):
         """No sys.path.insert/appends in library source (ok in tests)."""
@@ -253,6 +276,6 @@ class TestCodeQuality:
                 with open(fpath, encoding="utf-8") as f:
                     for lineno, line in enumerate(f, 1):
                         stripped = line.strip()
-                        if stripped.startswith("sys.path.insert") or stripped.startswith("sys.path.append"):
+                        if stripped.startswith(("sys.path.insert", "sys.path.append")):
                             violations.append(f"{fpath}:{lineno}: {stripped}")
         assert len(violations) == 0, "Found sys.path hacks:\n" + "\n".join(violations)

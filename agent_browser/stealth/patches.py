@@ -190,7 +190,7 @@ async def verify_patches(page) -> dict:
     Verify all 7 patches are active after navigation.
     Returns dict of patch_name -> bool (True = verified).
     """
-    checks = await page.evaluate("""(() => {
+    return await page.evaluate("""(() => {
       return {
         chrome_runtime: !!(window.chrome && window.chrome.runtime),
         plugins_nonempty: navigator.plugins.length > 0,
@@ -204,4 +204,3 @@ async def verify_patches(page) -> dict:
         })(),
       };
     })()""")
-    return checks

@@ -3,6 +3,7 @@
 Lightweight CLI layer that uses ConfigManager for configuration and
 CLISessionManager for cross-process session persistence.
 """
+
 import asyncio
 from pathlib import Path
 
@@ -18,7 +19,6 @@ config_mgr = ConfigManager()
 @click.group()
 def cli():
     """Agent Browser CLI"""
-    pass
 
 
 @cli.command()
@@ -35,23 +35,51 @@ def init():
 
 
 @cli.command()
-@click.option('--task', required=True, help='Task description')
-@click.option('--session', help='Reuse existing session')
-@click.option('--url', help='Starting URL')
-@click.option('--max-steps', type=int, help='Maximum steps')
-@click.option('--headless/--headed', default=None)
-@click.option('--llm-provider', type=click.Choice(['openai', 'anthropic']))
-@click.option('--llm-model', help='LLM model')
-@click.option('--llm-base-url', help='Custom LLM API URL')
-@click.option('--remote-host', help='Remote browser host')
-@click.option('--remote-port', type=int, help='Remote CDP port')
-@click.option('--cdp-url', help='Full CDP URL')
-def run(task, session, url, max_steps, headless, llm_provider, llm_model, llm_base_url, remote_host, remote_port, cdp_url):
+@click.option("--task", required=True, help="Task description")
+@click.option("--session", help="Reuse existing session")
+@click.option("--url", help="Starting URL")
+@click.option("--max-steps", type=int, help="Maximum steps")
+@click.option("--headless/--headed", default=None)
+@click.option("--llm-provider", type=click.Choice(["openai", "anthropic"]))
+@click.option("--llm-model", help="LLM model")
+@click.option("--llm-base-url", help="Custom LLM API URL")
+@click.option("--remote-host", help="Remote browser host")
+@click.option("--remote-port", type=int, help="Remote CDP port")
+@click.option("--cdp-url", help="Full CDP URL")
+def run(
+    task, session, url, max_steps, headless, llm_provider, llm_model, llm_base_url, remote_host, remote_port, cdp_url
+):
     """Execute a browser task"""
-    asyncio.run(_run_task(task, session, url, max_steps, headless, llm_provider, llm_model, llm_base_url, remote_host, remote_port, cdp_url))
+    asyncio.run(
+        _run_task(
+            task,
+            session,
+            url,
+            max_steps,
+            headless,
+            llm_provider,
+            llm_model,
+            llm_base_url,
+            remote_host,
+            remote_port,
+            cdp_url,
+        )
+    )
 
 
-async def _run_task(task, session_name, url, max_steps, headless, llm_provider, llm_model, llm_base_url, remote_host, remote_port, cdp_url):
+async def _run_task(
+    task,
+    session_name,
+    url,
+    max_steps,
+    headless,
+    llm_provider,
+    llm_model,
+    llm_base_url,
+    remote_host,
+    remote_port,
+    cdp_url,
+):
     from agent_browser.agent.runner import run_agent_task
 
     cli_config = config_mgr.get_cli_config()
@@ -67,7 +95,7 @@ async def _run_task(task, session_name, url, max_steps, headless, llm_provider, 
         model=llm_config.model,
         api_key=llm_config.api_key,
         base_url=llm_config.base_url,
-        temperature=llm_config.temperature
+        temperature=llm_config.temperature,
     )
 
     session_mgr = CLISessionManager(storage_path=Path(cli_config.session_storage).expanduser())
@@ -82,6 +110,7 @@ async def _run_task(task, session_name, url, max_steps, headless, llm_provider, 
                 click.echo(f"Session '{session_name}' does not exist", err=True)
                 return
             from playwright.async_api import async_playwright
+
             pw = await async_playwright().start()
             browser = await pw.chromium.connect_over_cdp(session.cdp_url)
             click.echo(f"Reusing session: {session_name}")
@@ -100,11 +129,13 @@ async def _run_task(task, session_name, url, max_steps, headless, llm_provider, 
 
             if target_cdp_url:
                 from playwright.async_api import async_playwright
+
                 pw = await async_playwright().start()
                 browser = await pw.chromium.connect_over_cdp(target_cdp_url)
                 click.echo(f"Connected to remote browser: {target_cdp_url}")
             else:
                 from agent_browser.browser.stealth_launcher import launch_stealth_browser
+
                 browser = await launch_stealth_browser(headless=browser_config.headless)
                 temp_session = True
                 click.echo("Started local browser")
@@ -129,12 +160,11 @@ async def _run_task(task, session_name, url, max_steps, headless, llm_provider, 
 @cli.group()
 def session():
     """Session management commands"""
-    pass
 
 
-@session.command('start')
-@click.option('--name', required=True, help='Session name')
-@click.option('--headless/--headed', default=False)
+@session.command("start")
+@click.option("--name", required=True, help="Session name")
+@click.option("--headless/--headed", default=False)
 def session_start(name, headless):
     """Start a persistent session"""
     asyncio.run(_session_start(name, headless))
@@ -154,12 +184,12 @@ async def _session_start(name, headless):
     cdp_url = "http://localhost:19222"
     profile_path = str(Path.home() / ".agent-browser" / "profiles" / name)
 
-    session_mgr.create(session_id=name, cdp_url=cdp_url, mode='local', profile_path=profile_path)
+    session_mgr.create(session_id=name, cdp_url=cdp_url, mode="local", profile_path=profile_path)
     click.echo(f"Session '{name}' started")
     click.echo(f"   CDP URL: {cdp_url}")
 
 
-@session.command('list')
+@session.command("list")
 def session_list():
     """List all sessions"""
     cli_config = config_mgr.get_cli_config()
@@ -175,8 +205,8 @@ def session_list():
         click.echo(f"{name:<15} {sess.browser_instance_id:<20} {sess.task_count:<8} {sess.last_used}")
 
 
-@session.command('stop')
-@click.option('--name', required=True, help='Session name')
+@session.command("stop")
+@click.option("--name", required=True, help="Session name")
 def session_stop(name):
     """Stop a session"""
     cli_config = config_mgr.get_cli_config()
@@ -191,5 +221,5 @@ def session_stop(name):
     click.echo(f"Session '{name}' stopped")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

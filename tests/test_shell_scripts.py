@@ -8,6 +8,7 @@ Validates:
 These are integration-level tests for shell scripts. They run the actual scripts
 via subprocess but mock/skip parts that require real infrastructure (Docker, etc.).
 """
+
 import re
 import subprocess
 from pathlib import Path
@@ -21,13 +22,15 @@ DEPLOY_DOCKER_SH = PROJECT_ROOT / "scripts" / "deploy-docker.sh"
 # J. install.sh --non-interactive [P1]
 # ════════════════════════════════════════════════════════════════════
 
-class TestInstallShNonInteractive:
 
+class TestInstallShNonInteractive:
     def test_help_flag(self):
         """--help exits 0 with usage text."""
         result = subprocess.run(
             ["bash", str(INSTALL_SH), "--help"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 0
         assert "用法" in result.stdout or "usage" in result.stdout.lower() or "选项" in result.stdout
@@ -36,7 +39,9 @@ class TestInstallShNonInteractive:
         """Unknown flag exits with error."""
         result = subprocess.run(
             ["bash", str(INSTALL_SH), "--nonexistent-flag"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode != 0
 
@@ -120,7 +125,9 @@ deployment:
         try:
             result = subprocess.run(
                 ["grep", "-E", r"^\s*mode:", str(cfg_path)],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode != 0 or not result.stdout.strip():
                 return "local"
@@ -138,13 +145,15 @@ deployment:
 # K. deploy-docker.sh flags [P1]
 # ════════════════════════════════════════════════════════════════════
 
-class TestDeployDockerShFlags:
 
+class TestDeployDockerShFlags:
     def test_help_flag(self):
         """--help exits 0 with usage text."""
         result = subprocess.run(
             ["bash", str(DEPLOY_DOCKER_SH), "--help"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 0
         assert "用法" in result.stdout or "usage" in result.stdout.lower() or "选项" in result.stdout
@@ -153,7 +162,9 @@ class TestDeployDockerShFlags:
         """Unknown flag exits with error."""
         result = subprocess.run(
             ["bash", str(DEPLOY_DOCKER_SH), "--nonexistent-flag"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode != 0
 
@@ -161,7 +172,9 @@ class TestDeployDockerShFlags:
         """Invalid --mode value exits with error."""
         result = subprocess.run(
             ["bash", str(DEPLOY_DOCKER_SH), "--mode", "invalid-mode"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode != 0
         assert "无效" in result.stdout or "invalid" in result.stdout.lower()
@@ -180,7 +193,9 @@ docker:
 """)
         result = subprocess.run(
             ["bash", str(DEPLOY_DOCKER_SH), "--config", str(cfg_file), "--validate"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 0
 
@@ -193,7 +208,9 @@ docker:
         nonexistent = tmp_path / "no_config_here.yaml"
         result = subprocess.run(
             ["bash", str(DEPLOY_DOCKER_SH), "--config", str(nonexistent), "--validate"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 1
 
@@ -294,9 +311,21 @@ docker:
                     in_docker_section = True
                     continue
                 # Reset section tracker when we hit a new top-level key
-                if stripped and not line.startswith(" ") and not line.startswith("\t") and ":" in stripped and in_docker_section \
-                        and not stripped.startswith("registry") and not stripped.startswith("image_tag") and not stripped.startswith("shm_size") and not stripped.startswith("resource_limits") and not stripped.startswith("memory") and not stripped.startswith("cpu") \
-                        and not line.startswith("  ") and not line.startswith("    "):
+                if (
+                    stripped
+                    and not line.startswith(" ")
+                    and not line.startswith("\t")
+                    and ":" in stripped
+                    and in_docker_section
+                    and not stripped.startswith("registry")
+                    and not stripped.startswith("image_tag")
+                    and not stripped.startswith("shm_size")
+                    and not stripped.startswith("resource_limits")
+                    and not stripped.startswith("memory")
+                    and not stripped.startswith("cpu")
+                    and not line.startswith("  ")
+                    and not line.startswith("    ")
+                ):
                     in_docker_section = False
                     continue
 

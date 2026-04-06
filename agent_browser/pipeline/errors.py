@@ -7,6 +7,7 @@ Provides PipelineError base class and subclasses. Each error carries:
   - session_id / page_url: execution context
   - fix_hint: human-readable fix suggestion
 """
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class PipelineError(Exception):
         adapter_name: str = "",
         session_id: str = "",
         page_url: str = "",
-        cause: Exception = None,
+        cause: Exception | None = None,
         fix_hint: str = "",
     ):
         self.message = message
@@ -90,19 +91,19 @@ class URLError(PipelineError):
 # ── Fix Hint rule table ──
 
 _HINTS = {
-    "select":     "Site DOM may have changed. Re-run explore to update selectors.",
-    "click":      "Element not found. Try snapshot(session_id) to inspect current DOM.",
-    "type":       "Input element missing or not interactable. Check selector and page state.",
-    "wait":       "Page loaded slowly. Increase timeout or check network connectivity.",
-    "evaluate":  "JS extraction failed. Site may use newer framework. Check console for errors.",
-    "fetch":      "API endpoint may be down or require auth. Check cookies and headers.",
-    "navigate":   "URL may be invalid or blocked by security policy. Verify site accessibility.",
-    "tap":        "Vue/Pinia store not detected. Strategy may need update to 'intercept'.",
-    "limit":      "Result count issue. Check if data exists before limiting.",
-    "map":        "Data transformation error. Check item field names against actual data shape.",
-    "filter":     "Filter condition matched no items. Relax filter criteria.",
-    "sort":       "Sort key not found in data. Check field names.",
-    "scroll":     "Scroll operation failed. Page may not have scrollable content.",
+    "select": "Site DOM may have changed. Re-run explore to update selectors.",
+    "click": "Element not found. Try snapshot(session_id) to inspect current DOM.",
+    "type": "Input element missing or not interactable. Check selector and page state.",
+    "wait": "Page loaded slowly. Increase timeout or check network connectivity.",
+    "evaluate": "JS extraction failed. Site may use newer framework. Check console for errors.",
+    "fetch": "API endpoint may be down or require auth. Check cookies and headers.",
+    "navigate": "URL may be invalid or blocked by security policy. Verify site accessibility.",
+    "tap": "Vue/Pinia store not detected. Strategy may need update to 'intercept'.",
+    "limit": "Result count issue. Check if data exists before limiting.",
+    "map": "Data transformation error. Check item field names against actual data shape.",
+    "filter": "Filter condition matched no items. Relax filter criteria.",
+    "sort": "Sort key not found in data. Check field names.",
+    "scroll": "Scroll operation failed. Page may not have scrollable content.",
 }
 
 

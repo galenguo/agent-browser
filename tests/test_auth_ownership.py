@@ -6,6 +6,7 @@ session ownership, multi-tenant isolation). The FastAPI server module has
 not yet been migrated to agent_browser/ package. These tests will be
 re-enabled once the API server is added.
 """
+
 import pytest
 
 # FastAPI server (api.py) is an optional component not yet migrated.

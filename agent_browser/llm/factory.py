@@ -6,6 +6,7 @@ and LangChain's ChatAnthropic for Anthropic models.
 All optional dependencies are imported lazily so that ``pip install agent-browser``
 works without ``[full]`` extra.
 """
+
 import os
 
 
@@ -43,7 +44,7 @@ class LLMFactory:
             model_name = model or os.getenv("LLM_MODEL") or "gpt-4"
             is_glm = "glm" in model_name.lower()
 
-            llm = BrowserUseChatOpenAI(
+            return BrowserUseChatOpenAI(
                 model=model_name,
                 api_key=api_key or os.getenv("OPENAI_API_KEY"),
                 base_url=base_url or os.getenv("OPENAI_BASE_URL"),
@@ -51,22 +52,18 @@ class LLMFactory:
                 remove_min_items_from_schema=is_glm,
                 remove_defaults_from_schema=is_glm,
             )
-            return llm
-        elif provider == "anthropic":
+        if provider == "anthropic":
             try:
                 from langchain_anthropic import ChatAnthropic
             except ImportError:
                 raise ImportError(
-                    "anthropic provider requires 'langchain-anthropic'. "
-                    "Install with: pip install agent-browser[full]"
+                    "anthropic provider requires 'langchain-anthropic'. Install with: pip install agent-browser[full]"
                 ) from None
 
-            llm = ChatAnthropic(
+            return ChatAnthropic(
                 model=model or "claude-3-5-sonnet-20241022",
                 api_key=api_key or os.getenv("ANTHROPIC_API_KEY"),
                 base_url=base_url or os.getenv("ANTHROPIC_BASE_URL"),
                 temperature=temperature,
             )
-            return llm
-        else:
-            raise ValueError(f"Unsupported LLM provider: {provider}")
+        raise ValueError(f"Unsupported LLM provider: {provider}")

@@ -9,6 +9,7 @@ Three fixture tiers:
 CRITICAL: autouse reset clears ALL module-level singletons between tests.
 Without this, tests leak state through _config, _middleware, _registry, etc.
 """
+
 from pathlib import Path
 from unittest import mock
 
@@ -18,7 +19,7 @@ import pytest
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Import ABCs from the new package path
-from agent_browser.browser import BrowserBackend, BrowserPageHandle  # noqa: E402
+from agent_browser.browser import BrowserBackend, BrowserPageHandle
 
 # Skip legacy monolithic test (not pytest-compatible, calls sys.exit at import)
 collect_ignore = ["test_skill_scenarios.py"]
@@ -27,6 +28,7 @@ collect_ignore = ["test_skill_scenarios.py"]
 # ════════════════════════════════════════════
 #  GLOBAL STATE RESET (autouse)
 # ══════════════════════════════════════════════
+
 
 @pytest.fixture(autouse=True)
 def reset_global_state():
@@ -41,11 +43,13 @@ def reset_global_state():
     """
     # 1. Reset main module globals
     from agent_browser import main as skill_main
+
     skill_main.reset()
 
     # 2. Reset BrowserDaemon singleton
     try:
         from agent_browser.daemon import BrowserDaemon
+
         BrowserDaemon.reset()
     except ImportError:
         pass
@@ -53,6 +57,7 @@ def reset_global_state():
     # 3. Clear adapter registry
     try:
         from agent_browser.adapters import loader
+
         loader._registry = {}
     except (ImportError, AttributeError):
         pass
@@ -62,6 +67,7 @@ def reset_global_state():
     # Post-test cleanup
     try:
         from agent_browser.daemon import BrowserDaemon
+
         BrowserDaemon.reset()
     except ImportError:
         pass
@@ -71,15 +77,14 @@ def reset_global_state():
 #  TIER 1: Mock Backend (always available)
 # ══════════════════════════════════════════════
 
+
 @pytest.fixture
 def mock_page_handle() -> mock.MagicMock:
     """Mock BrowserPageHandle at ABC interface level."""
     handle = mock.MagicMock(spec=BrowserPageHandle)
     handle.goto = mock.AsyncMock()
     handle.evaluate = mock.AsyncMock(return_value={"elements": [], "title": "test"})
-    handle.snapshot = mock.AsyncMock(
-        return_value={"elements": [{"tag": "div", "text": "hello"}], "title": "Test Page"}
-    )
+    handle.snapshot = mock.AsyncMock(return_value={"elements": [{"tag": "div", "text": "hello"}], "title": "Test Page"})
     handle.click = mock.AsyncMock()
     handle.fill = mock.AsyncMock()
     handle.mouse_wheel = mock.AsyncMock()
@@ -112,9 +117,7 @@ def mock_backend(mock_page_handle) -> mock.MagicMock:
     backend.get_page = mock.AsyncMock(return_value=mock_page_handle)
     # snapshot() is optional on BrowserBackend ABC (hasattr check in middleware)
     # but needed for tests that exercise main.snapshot()
-    backend.snapshot = mock.AsyncMock(
-        return_value={"elements": [{"tag": "div", "text": "hello"}], "title": "Test"}
-    )
+    backend.snapshot = mock.AsyncMock(return_value={"elements": [{"tag": "div", "text": "hello"}], "title": "Test"})
     return backend
 
 
@@ -122,6 +125,7 @@ def mock_backend(mock_page_handle) -> mock.MagicMock:
 def skill_config_no_stealth():
     """SkillConfig with stealth disabled (avoids StealthEnhancer C extension)."""
     from agent_browser.config import SkillConfig
+
     return SkillConfig(
         calling_mode="cli",
         browser_mode="local",
@@ -134,10 +138,12 @@ def skill_config_no_stealth():
 #  TIER 2: Real Browser (requires CloakBrowser :19222)
 # ══════════════════════════════════════════════
 
+
 @pytest.fixture
 def real_cdp_url():
     """CDP URL for CloakBrowser. Skips test if not available."""
     import socket
+
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(1)
@@ -154,10 +160,12 @@ def real_cdp_url():
 #  TIER 3: API Server (requires FastAPI :8000)
 # ══════════════════════════════════════════════
 
+
 @pytest.fixture
 def api_server_url():
     """FastAPI server URL. Skips test if not available."""
     import socket
+
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(1)
@@ -173,6 +181,7 @@ def api_server_url():
 # ════════════════════════════════════════════
 #  Pipeline Step Helpers
 # ══════════════════════════════════════════════
+
 
 @pytest.fixture
 def mock_page_for_steps() -> mock.MagicMock:
@@ -201,6 +210,8 @@ def patched_get_handle(mock_page_for_steps):
     _mock_mw = mock.AsyncMock()
     _mock_mw.get_page = mock.AsyncMock(return_value=mock_page_for_steps)
 
-    with mock.patch.object(steps, "_get_handle", side_effect=_fake_handle), \
-         mock.patch.object(skill_main, "_ensure_middleware", return_value=_mock_mw):
+    with (
+        mock.patch.object(steps, "_get_handle", side_effect=_fake_handle),
+        mock.patch.object(skill_main, "_ensure_middleware", return_value=_mock_mw),
+    ):
         yield mock_page_for_steps

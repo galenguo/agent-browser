@@ -1,4 +1,5 @@
 """模式3测试：API网关"""
+
 import asyncio
 
 import httpx
@@ -16,11 +17,7 @@ async def test_websocket_realtime_push():
         async with httpx.AsyncClient() as client:
             await client.post(
                 "http://localhost:8000/cli/execute",
-                json={
-                    "command": "open",
-                    "session_id": session_id,
-                    "args": {"url": "https://www.zhipin.com"}
-                }
+                json={"command": "open", "session_id": session_id, "args": {"url": "https://www.zhipin.com"}},
             )
 
         # 接收事件
@@ -38,11 +35,7 @@ async def test_cli_command_execution():
         # 执行snapshot命令
         response = await client.post(
             "http://localhost:8000/cli/execute",
-            json={
-                "command": "snapshot",
-                "session_id": session_id,
-                "args": {"interactive": True}
-            }
+            json={"command": "snapshot", "session_id": session_id, "args": {"interactive": True}},
         )
 
         assert response.status_code == 200

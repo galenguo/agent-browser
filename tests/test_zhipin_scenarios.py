@@ -1,4 +1,5 @@
 """Boss直聘场景测试"""
+
 import pytest
 
 from agent_browser.main import click, create_session, fill, open_page, snapshot

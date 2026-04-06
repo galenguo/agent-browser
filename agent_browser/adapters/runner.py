@@ -1,4 +1,5 @@
 """Adapter Runner — Find adapter → Create session → Execute pipeline → Return result."""
+
 import logging
 from typing import Any
 
@@ -54,6 +55,7 @@ async def run_adapter(
     own_session = False
     if not session_id:
         from agent_browser.main import create_session, delete_session
+
         session_id = await create_session(cdp_url)
         own_session = True
 
@@ -76,6 +78,7 @@ async def run_adapter(
         if own_session:
             try:
                 from agent_browser.main import delete_session
+
                 await delete_session(session_id)
             except Exception:
                 pass

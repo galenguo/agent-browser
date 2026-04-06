@@ -1,4 +1,5 @@
 """Template 边界情况测试 — 错误输入和异常路径"""
+
 from agent_browser.pipeline.template import (
     TemplateContext,
     apply_filter,
@@ -80,6 +81,7 @@ class TestPipeFilters:
 
     def test_json_filter(self):
         import json
+
         result = apply_filter({"key": "value"}, "json")
         parsed = json.loads(result)
         assert parsed["key"] == "value"

@@ -178,9 +178,7 @@ class AgentBrowser:
 
     # ── inspection ──────────────────────────────────────────────
 
-    async def snapshot(
-        self, session_id: str | None = None, interactive_only: bool = False
-    ) -> dict:
+    async def snapshot(self, session_id: str | None = None, interactive_only: bool = False) -> dict:
         """Return a snapshot of the current page DOM.
 
         Args:
@@ -203,9 +201,7 @@ class AgentBrowser:
         """
         await _click(self._resolve(session_id), ref)
 
-    async def fill(
-        self, ref: str, text: str, session_id: str | None = None
-    ) -> None:
+    async def fill(self, ref: str, text: str, session_id: str | None = None) -> None:
         """Fill an input element with *text*.
 
         Args:
@@ -246,9 +242,7 @@ class AgentBrowser:
         """
         return await _evaluate(self._resolve(session_id), expression)
 
-    async def select_option(
-        self, ref: str, value: str, session_id: str | None = None
-    ) -> None:
+    async def select_option(self, ref: str, value: str, session_id: str | None = None) -> None:
         """Select an option in a ``<select>`` element.
 
         Args:
@@ -367,7 +361,4 @@ class AgentBrowser:
             return session_id
         if self._session_id is not None:
             return self._session_id
-        raise RuntimeError(
-            "No session available. Call create_session() first, "
-            "or pass session_id explicitly."
-        )
+        raise RuntimeError("No session available. Call create_session() first, or pass session_id explicitly.")

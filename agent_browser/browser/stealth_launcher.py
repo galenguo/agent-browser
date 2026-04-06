@@ -12,6 +12,7 @@ Integration approach:
   - REBROWSER_PATCHES_RUNTIME_FIX_MODE env var activates Runtime.Enable fix
   - The two work at different layers and do not interfere with each other
 """
+
 import asyncio
 import logging
 import os
@@ -21,6 +22,7 @@ os.environ.setdefault("REBROWSER_PATCHES_RUNTIME_FIX_MODE", "addBinding")
 # Conditional CloakBrowser import
 try:
     import cloakbrowser  # noqa: F401 — launch_browser used below
+
     _HAS_CLOAK = True
 except ImportError:
     _HAS_CLOAK = False
@@ -28,9 +30,11 @@ except ImportError:
 # Conditional patchright import (fallback to playwright)
 try:
     from patchright.async_api import Browser, Playwright, async_playwright
+
     _HAS_PATCHRIGHT = True
 except ImportError:
     from playwright.async_api import Browser, Playwright, async_playwright
+
     _HAS_PATCHRIGHT = False
 
 logger = logging.getLogger(__name__)
@@ -52,6 +56,7 @@ def get_cloakbrowser_path() -> str:
     # Use cloakbrowser Python package to auto-locate / download
     try:
         import cloakbrowser
+
         path = cloakbrowser.ensure_binary()
         logger.info(f"CloakBrowser binary: {path}")
         return path
@@ -62,11 +67,7 @@ def get_cloakbrowser_path() -> str:
         ) from None
 
 
-def _build_launch_args(
-    cdp_port: int = None,
-    proxy: str | None = None,
-    extra_args: list | None = None
-) -> list:
+def _build_launch_args(cdp_port: int | None = None, proxy: str | None = None, extra_args: list | None = None) -> list:
     if cdp_port is None:
         cdp_port = CDP_PORT
 
@@ -75,22 +76,19 @@ def _build_launch_args(
         f"--remote-debugging-port={cdp_port}",
         f"--remote-debugging-address={os.getenv('CDP_BIND_ADDRESS', '127.0.0.1')}",
         "--remote-allow-origins=*",
-
         # -- Environment adaptation --
         "--no-sandbox",
         "--disable-dev-shm-usage",
         "--window-size=1920,1080",
         "--window-position=0,0",
         "--start-maximized",
-        "--disable-infobars",          # Hide info bar (including command-line flag warning)
+        "--disable-infobars",  # Hide info bar (including command-line flag warning)
         "--no-default-browser-check",  # Do not show default browser prompt
-
         # -- WebRTC leak protection --
         "--webrtc-ip-handling-policy=disable_non_proxied_udp",
         "--enforce-webrtc-ip-permission-check",
         "--use-fake-device-for-media-stream",
         "--use-fake-ui-for-media-stream",
-
         # -- Automation signal suppression --
         "--disable-ipc-flooding-protection",
         "--disable-popup-blocking",
@@ -161,6 +159,7 @@ async def launch_stealth_browser(
     # Get CloakBrowser's recommended stealth launch arguments
     try:
         import cloakbrowser as cb
+
         stealth_args = cb.get_default_stealth_args()
     except Exception:
         stealth_args = [
@@ -175,7 +174,7 @@ async def launch_stealth_browser(
 
     # Persistent Profile support (optional)
     # Priority: user_data_dir parameter > PROFILE_STORAGE env var
-    profile_dir = user_data_dir or os.getenv('PROFILE_STORAGE')
+    profile_dir = user_data_dir or os.getenv("PROFILE_STORAGE")
     if profile_dir:
         # Create profile directory
         os.makedirs(profile_dir, mode=0o700, exist_ok=True)
@@ -183,6 +182,7 @@ async def launch_stealth_browser(
 
         # Hide bookmark bar + suppress restore page prompt
         import json as _json
+
         default_dir = os.path.join(profile_dir, "Default")
         os.makedirs(default_dir, exist_ok=True)
         prefs_path = os.path.join(default_dir, "Preferences")
@@ -256,10 +256,7 @@ async def close_browser(pw: Playwright, browser: Browser) -> None:
 
 
 async def launch_cloakbrowser_cdp(
-    cdp_port: int,
-    profile_dir: str | None = None,
-    headless: bool = False,
-    proxy: str | None = None
+    cdp_port: int, profile_dir: str | None = None, headless: bool = False, proxy: str | None = None
 ):
     """Launch CloakBrowser process and return the process object (for Session Pool).
 
@@ -279,6 +276,7 @@ async def launch_cloakbrowser_cdp(
     # Get CloakBrowser's recommended stealth launch arguments
     try:
         import cloakbrowser as cb
+
         stealth_args = cb.get_default_stealth_args()
     except Exception:
         stealth_args = [
@@ -293,7 +291,7 @@ async def launch_cloakbrowser_cdp(
 
     # Build launch arguments
     extra = _build_launch_args(cdp_port=cdp_port, proxy=proxy)
-    all_args = [binary_path] + stealth_args + extra
+    all_args = [binary_path, *stealth_args, *extra]
 
     # Add profile directory
     if profile_dir:
@@ -306,12 +304,7 @@ async def launch_cloakbrowser_cdp(
     logger.info(f"Launching CloakBrowser process on port {cdp_port}")
 
     # Launch process
-    process = subprocess.Popen(
-        all_args,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True
-    )
+    process = subprocess.Popen(all_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
     # Wait for browser startup
     await asyncio.sleep(2)

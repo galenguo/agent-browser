@@ -8,6 +8,7 @@ Records complete information for every atomic operation:
 
 Used for the "step traceability" guarantee in core features.
 """
+
 import json
 import logging
 import time
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TraceStep:
     """Single operation step record."""
+
     step: int
     action: str
     params: dict
@@ -89,10 +91,7 @@ class ActionTracer:
         )
         self._steps.append(step)
 
-        logger.debug(
-            f"[Trace] step={step.step} action={action} status={status} "
-            f"duration={duration_ms:.0f}ms"
-        )
+        logger.debug(f"[Trace] step={step.step} action={action} status={status} duration={duration_ms:.0f}ms")
 
         return step
 

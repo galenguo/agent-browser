@@ -11,6 +11,7 @@ Config precedence:
   4. Auto-detection (localhost:8000, 127.0.0.1:19222)
   5. Hardcoded defaults
 """
+
 import logging
 import os
 from dataclasses import dataclass
@@ -22,14 +23,15 @@ logger = logging.getLogger(__name__)
 
 # ── Primary: SkillConfig (skill-layer unified config) ──────────
 
+
 @dataclass
 class SkillConfig:
     """Unified skill configuration for the agent_browser runtime."""
 
     # Mode
-    calling_mode: str = "cli"         # "cli" | "api"
-    browser_mode: str = "local"       # "local" | "remote"
-    intelligence: str = "llm"         # "llm" | "agent"
+    calling_mode: str = "cli"  # "cli" | "api"
+    browser_mode: str = "local"  # "local" | "remote"
+    intelligence: str = "llm"  # "llm" | "agent"
 
     # Local CDP
     cdp_url: str = "http://127.0.0.1:19222"
@@ -40,12 +42,12 @@ class SkillConfig:
 
     # Daemon
     daemon_enabled: bool = True
-    daemon_idle_timeout: int = 1800   # seconds
+    daemon_idle_timeout: int = 1800  # seconds
     daemon_state_path: str = "~/.agent-browser/daemon-state.json"
 
     # Browser
     headless: bool = False
-    default_timeout: int = 30000      # ms
+    default_timeout: int = 30000  # ms
 
     # Stealth
     stealth_enabled: bool = True
@@ -57,9 +59,11 @@ class SkillConfig:
 
 # ── Server-side dataclasses (absorbed from former ConfigManager) ──
 
+
 @dataclass
 class LLMConfig:
     """LLM provider configuration."""
+
     provider: str
     model: str
     api_key: str | None
@@ -70,6 +74,7 @@ class LLMConfig:
 @dataclass
 class BrowserConfig:
     """Browser engine configuration."""
+
     headless: bool
     cdp_port: int
     cloakbrowser_path: str
@@ -79,6 +84,7 @@ class BrowserConfig:
 @dataclass
 class APIConfig:
     """API server configuration."""
+
     host: str
     port: int
     max_sessions: int
@@ -90,6 +96,7 @@ class APIConfig:
 @dataclass
 class CLIConfig:
     """CLI mode configuration."""
+
     profile_storage: str
     session_storage: str
     default_max_steps: int
@@ -99,6 +106,7 @@ class CLIConfig:
 
 
 # ── ConfigManager (server-side config manager) ──────────────────
+
 
 class ConfigManager:
     """Unified configuration manager with YAML file support and env var resolution."""
@@ -114,6 +122,7 @@ class ConfigManager:
 
         try:
             import yaml
+
             with open(self.config_path) as f:
                 config = yaml.safe_load(f)
         except Exception:
@@ -125,9 +134,9 @@ class ConfigManager:
         """Recursively resolve ${VAR_NAME} environment variable references."""
         if isinstance(obj, dict):
             return {k: self._resolve_env_vars(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
+        if isinstance(obj, list):
             return [self._resolve_env_vars(item) for item in obj]
-        elif isinstance(obj, str) and obj.startswith("${") and obj.endswith("}"):
+        if isinstance(obj, str) and obj.startswith("${") and obj.endswith("}"):
             var_name = obj[2:-1]
             return os.getenv(var_name)
         return obj
@@ -138,18 +147,24 @@ class ConfigManager:
             "llm": {
                 "default_provider": "anthropic",
                 "openai": {"default_model": "gpt-4", "temperature": 0.1},
-                "anthropic": {"default_model": "claude-3-5-sonnet-20241022", "temperature": 0.1}
+                "anthropic": {"default_model": "claude-3-5-sonnet-20241022", "temperature": 0.1},
             },
             "browser": {
                 "local": {"headless": False, "cdp_port": 19222},
-                "remote": {"enabled": False, "host": None, "port": 19222, "cdp_url": None}
+                "remote": {"enabled": False, "host": None, "port": 19222, "cdp_url": None},
             },
             "cli": {
                 "default_max_steps": 10,
                 "browser_mode": "local",
-                "session": {"storage": "~/.agent-browser/sessions.json", "max_sessions": 5, "idle_timeout_minutes": 30}
+                "session": {"storage": "~/.agent-browser/sessions.json", "max_sessions": 5, "idle_timeout_minutes": 30},
             },
-            "api": {"host": "0.0.0.0", "port": 8000, "max_sessions": 10, "idle_timeout_seconds": 1800, "browser_mode": "local"}
+            "api": {
+                "host": "0.0.0.0",
+                "port": 8000,
+                "max_sessions": 10,
+                "idle_timeout_seconds": 1800,
+                "browser_mode": "local",
+            },
         }
 
     def get_llm_config(self, provider: str | None = None, **overrides) -> LLMConfig:
@@ -162,7 +177,7 @@ class ConfigManager:
             model=overrides.get("model") or llm_cfg.get("default_model"),
             api_key=overrides.get("api_key") or llm_cfg.get("api_key") or os.getenv(f"{provider.upper()}_API_KEY"),
             base_url=overrides.get("base_url") or llm_cfg.get("base_url") or os.getenv(f"{provider.upper()}_BASE_URL"),
-            temperature=overrides.get("temperature") or llm_cfg.get("temperature", 0.1)
+            temperature=overrides.get("temperature") or llm_cfg.get("temperature", 0.1),
         )
 
     def get_browser_config(self, **overrides) -> BrowserConfig:
@@ -172,7 +187,7 @@ class ConfigManager:
             headless=overrides.get("headless", cfg.get("headless", False)),
             cdp_port=overrides.get("cdp_port", cfg.get("cdp_port", 19222)),
             cloakbrowser_path=overrides.get("cloakbrowser_path", "/opt/cloakbrowser/chrome"),
-            default_timeout=overrides.get("default_timeout", 30000)
+            default_timeout=overrides.get("default_timeout", 30000),
         )
 
     def get_browser_remote_config(self) -> dict | None:
@@ -183,7 +198,7 @@ class ConfigManager:
         return {
             "host": remote_cfg.get("host"),
             "port": remote_cfg.get("port", 19222),
-            "cdp_url": remote_cfg.get("cdp_url")
+            "cdp_url": remote_cfg.get("cdp_url"),
         }
 
     def get_cli_browser_mode(self) -> str:
@@ -199,7 +214,7 @@ class ConfigManager:
             max_sessions=cfg.get("max_sessions", 10),
             idle_timeout_seconds=cfg.get("idle_timeout_seconds", 1800),
             profile_storage=cfg.get("profile_storage", "/data/profiles"),
-            browser_mode=cfg.get("browser_mode", "local")
+            browser_mode=cfg.get("browser_mode", "local"),
         )
 
     def get_cli_config(self) -> CLIConfig:
@@ -212,7 +227,7 @@ class ConfigManager:
             default_max_steps=cfg.get("default_max_steps", 10),
             auto_cleanup=session_cfg.get("auto_cleanup", True),
             idle_timeout_minutes=session_cfg.get("idle_timeout_minutes", 30),
-            max_sessions=session_cfg.get("max_sessions", 5)
+            max_sessions=session_cfg.get("max_sessions", 5),
         )
 
     def get_execution_mode(self) -> str:
@@ -294,6 +309,7 @@ api:
 
 # ── SkillConfig helpers (environment variable / YAML resolution) ──
 
+
 def _resolve_env_vars(config: dict) -> dict:
     """Recursively resolve ${VAR_NAME} environment variable references."""
     result = {}
@@ -313,6 +329,7 @@ def _load_yaml_config(path: Path) -> dict:
         return {}
     try:
         import yaml
+
         with open(path) as f:
             config = yaml.safe_load(f) or {}
         return _resolve_env_vars(config)
@@ -416,10 +433,14 @@ async def detect_mode() -> SkillConfig:
     if not os.getenv("AGENT_BROWSER_CALLING_MODE") and not yaml_data.get("skill", {}).get("calling_mode"):
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as s, s.get(
-                "http://localhost:8000/health",
-                timeout=aiohttp.ClientTimeout(total=1),
-            ) as r:
+
+            async with (
+                aiohttp.ClientSession() as s,
+                s.get(
+                    "http://localhost:8000/health",
+                    timeout=aiohttp.ClientTimeout(total=1),
+                ) as r,
+            ):
                 if r.status == 200:
                     cfg.calling_mode = "api"
                     cfg.api_url = "http://localhost:8000"
@@ -430,10 +451,14 @@ async def detect_mode() -> SkillConfig:
 
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as s, s.get(
-                "http://127.0.0.1:19222/json/version",
-                timeout=aiohttp.ClientTimeout(total=1),
-            ) as r:
+
+            async with (
+                aiohttp.ClientSession() as s,
+                s.get(
+                    "http://127.0.0.1:19222/json/version",
+                    timeout=aiohttp.ClientTimeout(total=1),
+                ) as r,
+            ):
                 if r.status == 200:
                     cfg.calling_mode = "cli"
                     cfg.browser_mode = "local"
@@ -479,33 +504,33 @@ def from_deploy_config(dep_cfg) -> SkillConfig:
     cfg = SkillConfig()
 
     # Map deployment mode -> calling/browser mode
-    mode = getattr(dep_cfg, 'mode', 'local') or 'local'
-    if 'docker' in mode or 'k8s' in mode:
-        cfg.calling_mode = 'api'
+    mode = getattr(dep_cfg, "mode", "local") or "local"
+    if "docker" in mode or "k8s" in mode:
+        cfg.calling_mode = "api"
     else:
-        cfg.calling_mode = 'cli'
+        cfg.calling_mode = "cli"
 
     # Browser settings
-    cdp_url = getattr(dep_cfg, 'cdp_url', None)
+    cdp_url = getattr(dep_cfg, "cdp_url", None)
     if cdp_url:
         cfg.cdp_url = cdp_url
 
-    headless = getattr(dep_cfg, 'headless', None)
+    headless = getattr(dep_cfg, "headless", None)
     if headless is not None:
         cfg.headless = headless
 
     # API settings (when in docker/k8s mode)
-    api_port = getattr(dep_cfg, 'api_port', None)
+    api_port = getattr(dep_cfg, "api_port", None)
     if api_port:
         cfg.api_url = f"http://127.0.0.1:{api_port}"
 
     # Stealth settings
-    stealth_enabled = getattr(dep_cfg, 'stealth_enabled', None)
+    stealth_enabled = getattr(dep_cfg, "stealth_enabled", None)
     if stealth_enabled is not None:
         cfg.stealth_enabled = stealth_enabled
 
-    stealth_mode = getattr(dep_cfg, 'stealth_mode', None)
-    if stealth_mode in ('full', 'vanilla'):
+    stealth_mode = getattr(dep_cfg, "stealth_mode", None)
+    if stealth_mode in ("full", "vanilla"):
         cfg.stealth_mode = stealth_mode
 
     return cfg

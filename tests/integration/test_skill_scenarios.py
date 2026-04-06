@@ -19,6 +19,7 @@
 - API + local: Agent → main.py → RemoteAPIBackend → HTTP → FastAPI → LocalCDPBackend → CDP
 - API + remote: Agent → HTTP → FastAPI → Gateway /allocate → Docker CDP
 """
+
 import asyncio
 import os
 import sys
@@ -40,64 +41,77 @@ TEST_PROMPTS = {
     "baidu_search": {
         "prompt": "打开百度搜索 ai coding，返回前3条信息内容",
         "url": "https://www.baidu.com",
-        "description": "百度搜索测试"
+        "description": "百度搜索测试",
     },
     "xiaohongshu_search": {
         "prompt": "打开小红书搜索中环小韭这个博主最近5条帖子",
         "url": "https://www.xiaohongshu.com",
-        "description": "小红书搜索测试"
+        "description": "小红书搜索测试",
     },
     "boss_login": {
         "prompt": "打开boss直聘的hr招聘的登录页，打开二维码登录页面",
         "url": "https://www.zhipin.com",
-        "description": "Boss直聘登录测试"
-    }
+        "description": "Boss直聘登录测试",
+    },
 }
 
 # ========== 环境检查函数 ==========
 
+
 async def check_cloakbrowser():
     """检查 CloakBrowser 是否运行 (local 浏览器模式)"""
     import aiohttp
+
     try:
-        async with aiohttp.ClientSession() as session, \
-                session.get("http://127.0.0.1:19222/json/version", timeout=aiohttp.ClientTimeout(total=3)) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    print(f"  ✅ CloakBrowser: {data.get('Browser', 'unknown')}")
-                    return True
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get("http://127.0.0.1:19222/json/version", timeout=aiohttp.ClientTimeout(total=3)) as resp,
+        ):
+            if resp.status == 200:
+                data = await resp.json()
+                print(f"  ✅ CloakBrowser: {data.get('Browser', 'unknown')}")
+                return True
         return False
     except Exception as e:
         print(f"  ❌ CloakBrowser check failed: {e}")
         return False
 
+
 async def check_fastapi():
     """检查 FastAPI 是否运行"""
     import aiohttp
+
     try:
-        async with aiohttp.ClientSession() as session, \
-                session.get("http://localhost:8000/health", timeout=aiohttp.ClientTimeout(total=3)) as resp:
-                if resp.status == 200:
-                    print("  ✅ FastAPI: http://localhost:8000")
-                    return True
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get("http://localhost:8000/health", timeout=aiohttp.ClientTimeout(total=3)) as resp,
+        ):
+            if resp.status == 200:
+                print("  ✅ FastAPI: http://localhost:8000")
+                return True
         return False
     except Exception as e:
         print(f"  ❌ FastAPI check failed: {e}")
         return False
 
+
 async def check_gateway():
     """检查 Gateway 是否运行 (remote 浏览器模式)"""
     import aiohttp
+
     try:
-        async with aiohttp.ClientSession() as session, \
-                session.get("http://localhost:8001/health", timeout=aiohttp.ClientTimeout(total=3)) as resp:
-                if resp.status == 200:
-                    print("  ✅ Gateway: http://localhost:8001")
-                    return True
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get("http://localhost:8001/health", timeout=aiohttp.ClientTimeout(total=3)) as resp,
+        ):
+            if resp.status == 200:
+                print("  ✅ Gateway: http://localhost:8001")
+                return True
         return False
     except Exception as e:
         print(f"  ❌ Gateway check failed: {e}")
         return False
+
 
 def has_llm_key():
     """检查 LLM API Key 是否设置"""
@@ -109,6 +123,7 @@ def has_llm_key():
         print("  ⚠️ LLM API Key: 未设置")
     return key_set
 
+
 # 环境依赖矩阵
 ENV_REQUIREMENTS = {
     "cli_local_llm": {"checks": ["cloakbrowser"], "funcs": [check_cloakbrowser]},
@@ -118,6 +133,7 @@ ENV_REQUIREMENTS = {
     "api_remote_llm": {"checks": ["fastapi", "gateway"], "funcs": [check_fastapi, check_gateway]},
     "api_remote_agent": {"checks": ["fastapi", "gateway", "llm_key"], "funcs": [check_fastapi, check_gateway]},
 }
+
 
 async def check_dependencies(scenario: str) -> bool:
     """检查场景依赖是否满足"""
@@ -136,7 +152,9 @@ async def check_dependencies(scenario: str) -> bool:
 
     return all(check_results)
 
+
 # ========== local 浏览器模式测试 ==========
+
 
 async def test_cli_local_llm_mode(prompt_key: str) -> dict:
     """
@@ -145,13 +163,7 @@ async def test_cli_local_llm_mode(prompt_key: str) -> dict:
     数据流: Agent → main.py → LocalCDPBackend → BrowserDaemon → CDP → CloakBrowser
     """
     test = TEST_PROMPTS[prompt_key]
-    result = {
-        "scenario": "cli_local_llm",
-        "prompt_key": prompt_key,
-        "status": "UNKNOWN",
-        "duration": 0,
-        "error": None
-    }
+    result = {"scenario": "cli_local_llm", "prompt_key": prompt_key, "status": "UNKNOWN", "duration": 0, "error": None}
 
     start_time = time.time()
 
@@ -197,6 +209,7 @@ async def test_cli_local_llm_mode(prompt_key: str) -> dict:
     result["duration"] = time.time() - start_time
     return result
 
+
 async def test_cli_local_agent_mode(prompt_key: str) -> dict:
     """
     场景 2: CLI + local + Agent 模式
@@ -211,7 +224,7 @@ async def test_cli_local_agent_mode(prompt_key: str) -> dict:
         "prompt_key": prompt_key,
         "status": "UNKNOWN",
         "duration": 0,
-        "error": None
+        "error": None,
     }
 
     start_time = time.time()
@@ -230,7 +243,7 @@ async def test_cli_local_agent_mode(prompt_key: str) -> dict:
             session_id,
             test["prompt"],
             intelligence="agent",
-            max_steps=5  # 限制步数以加快测试
+            max_steps=5,  # 限制步数以加快测试
         )
 
         status = agent_result.get("status", "unknown")
@@ -258,6 +271,7 @@ async def test_cli_local_agent_mode(prompt_key: str) -> dict:
     result["duration"] = time.time() - start_time
     return result
 
+
 async def test_api_local_llm_mode(prompt_key: str) -> dict:
     """
     场景 3: API + local + LLM 模式
@@ -265,13 +279,7 @@ async def test_api_local_llm_mode(prompt_key: str) -> dict:
     数据流: Agent → HTTP → FastAPI → LocalCDPBackend → CDP
     """
     test = TEST_PROMPTS[prompt_key]
-    result = {
-        "scenario": "api_local_llm",
-        "prompt_key": prompt_key,
-        "status": "UNKNOWN",
-        "duration": 0,
-        "error": None
-    }
+    result = {"scenario": "api_local_llm", "prompt_key": prompt_key, "status": "UNKNOWN", "duration": 0, "error": None}
 
     start_time = time.time()
 
@@ -309,6 +317,7 @@ async def test_api_local_llm_mode(prompt_key: str) -> dict:
     result["duration"] = time.time() - start_time
     return result
 
+
 async def test_api_local_agent_mode(prompt_key: str) -> dict:
     """
     场景 4: API + local + Agent 模式
@@ -321,7 +330,7 @@ async def test_api_local_agent_mode(prompt_key: str) -> dict:
         "prompt_key": prompt_key,
         "status": "UNKNOWN",
         "duration": 0,
-        "error": None
+        "error": None,
     }
 
     start_time = time.time()
@@ -336,12 +345,7 @@ async def test_api_local_agent_mode(prompt_key: str) -> dict:
         print(f"    ✅ Session 创建成功: {session_id}")
 
         # 使用 Agent 执行任务
-        agent_result = await skill_main.run_task(
-            session_id,
-            test["prompt"],
-            intelligence="agent",
-            max_steps=5
-        )
+        agent_result = await skill_main.run_task(session_id, test["prompt"], intelligence="agent", max_steps=5)
 
         status = agent_result.get("status", "unknown")
         print(f"    ✅ Agent 执行完成: {status}")
@@ -362,7 +366,9 @@ async def test_api_local_agent_mode(prompt_key: str) -> dict:
     result["duration"] = time.time() - start_time
     return result
 
+
 # ========== remote 浏览器模式测试（Gateway + Docker）==========
+
 
 async def test_api_remote_llm_mode(prompt_key: str) -> dict:
     """
@@ -371,24 +377,14 @@ async def test_api_remote_llm_mode(prompt_key: str) -> dict:
     数据流: Agent → HTTP → FastAPI → Gateway /allocate → Docker CDP
     """
     test = TEST_PROMPTS[prompt_key]
-    result = {
-        "scenario": "api_remote_llm",
-        "prompt_key": prompt_key,
-        "status": "UNKNOWN",
-        "duration": 0,
-        "error": None
-    }
+    result = {"scenario": "api_remote_llm", "prompt_key": prompt_key, "status": "UNKNOWN", "duration": 0, "error": None}
 
     start_time = time.time()
 
     try:
         # 重置全局状态并配置为 API + remote 模式
         skill_main.reset()
-        skill_main.configure(
-            calling_mode="api",
-            browser_mode="remote",
-            api_url="http://localhost:8000"
-        )
+        skill_main.configure(calling_mode="api", browser_mode="remote", api_url="http://localhost:8000")
 
         # 创建 session (Gateway 自动分配 Docker 浏览器)
         session_id = await skill_main.create_session()
@@ -420,6 +416,7 @@ async def test_api_remote_llm_mode(prompt_key: str) -> dict:
     result["duration"] = time.time() - start_time
     return result
 
+
 async def test_api_remote_agent_mode(prompt_key: str) -> dict:
     """
     场景 6: API + remote + Agent 模式
@@ -432,7 +429,7 @@ async def test_api_remote_agent_mode(prompt_key: str) -> dict:
         "prompt_key": prompt_key,
         "status": "UNKNOWN",
         "duration": 0,
-        "error": None
+        "error": None,
     }
 
     start_time = time.time()
@@ -440,23 +437,14 @@ async def test_api_remote_agent_mode(prompt_key: str) -> dict:
     try:
         # 重置全局状态并配置为 API + remote + Agent 模式
         skill_main.reset()
-        skill_main.configure(
-            calling_mode="api",
-            browser_mode="remote",
-            api_url="http://localhost:8000"
-        )
+        skill_main.configure(calling_mode="api", browser_mode="remote", api_url="http://localhost:8000")
 
         # 创建 session
         session_id = await skill_main.create_session()
         print(f"    ✅ Session 创建成功: {session_id}")
 
         # 使用 Agent 执行任务
-        agent_result = await skill_main.run_task(
-            session_id,
-            test["prompt"],
-            intelligence="agent",
-            max_steps=5
-        )
+        agent_result = await skill_main.run_task(session_id, test["prompt"], intelligence="agent", max_steps=5)
 
         status = agent_result.get("status", "unknown")
         print(f"    ✅ Agent 执行完成: {status}")
@@ -477,6 +465,7 @@ async def test_api_remote_agent_mode(prompt_key: str) -> dict:
     result["duration"] = time.time() - start_time
     return result
 
+
 # ========== 测试函数映射 ==========
 
 TEST_FUNCTIONS = {
@@ -489,6 +478,7 @@ TEST_FUNCTIONS = {
 }
 
 # ========== 串行测试执行（避免全局状态冲突）==========
+
 
 async def run_sequential_tests(scenarios: list, prompt_keys: list) -> list:
     """
@@ -508,17 +498,13 @@ async def run_sequential_tests(scenarios: list, prompt_keys: list) -> list:
                     result = await test_func(prompt_key)
                     results.append(result)
                 except Exception as e:
-                    results.append({
-                        "scenario": scenario,
-                        "prompt_key": prompt_key,
-                        "status": "ERROR",
-                        "error": str(e)
-                    })
+                    results.append({"scenario": scenario, "prompt_key": prompt_key, "status": "ERROR", "error": str(e)})
 
                 # 测试间休息，让浏览器恢复
                 await asyncio.sleep(1)
 
     return results
+
 
 def print_summary(all_results: list):
     """打印测试汇总"""
@@ -556,6 +542,7 @@ def print_summary(all_results: list):
     print(f"\n总计: {passed} 通过, {partial} 部分通过, {failed} 失败, {errors} 错误, {skipped} 跳过")
     print(f"总测试数: {len(all_results)}")
 
+
 async def main():
     """运行所有集成测试"""
     print("\n" + "=" * 70)
@@ -569,20 +556,20 @@ async def main():
             "name": "CLI + local",
             "scenarios": ["cli_local_llm", "cli_local_agent"],
             "requires": ["cloakbrowser"],
-            "require_llm_for": ["cli_local_agent"]
+            "require_llm_for": ["cli_local_agent"],
         },
         {
             "name": "API + local",
             "scenarios": ["api_local_llm", "api_local_agent"],
             "requires": ["fastapi", "cloakbrowser"],
-            "require_llm_for": ["api_local_agent"]
+            "require_llm_for": ["api_local_agent"],
         },
         {
             "name": "API + remote",
             "scenarios": ["api_remote_llm", "api_remote_agent"],
             "requires": ["fastapi", "gateway"],
-            "require_llm_for": ["api_remote_agent"]
-        }
+            "require_llm_for": ["api_remote_agent"],
+        },
     ]
 
     all_results = []
@@ -597,14 +584,14 @@ async def main():
         "cloakbrowser": await check_cloakbrowser(),
         "fastapi": await check_fastapi(),
         "gateway": await check_gateway(),
-        "llm_key": has_llm_key()
+        "llm_key": has_llm_key(),
     }
 
     # ========== 执行测试批次 ==========
     for batch in batches:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"批次: {batch['name']}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # 检查批次依赖
         batch_ok = True
@@ -622,11 +609,7 @@ async def main():
         for scenario in batch["scenarios"]:
             if scenario in batch.get("require_llm_for", []) and not env_status.get("llm_key", False):
                 print(f"  ⏭️ 跳过 {scenario}: 需要 LLM API Key")
-                all_results.append({
-                    "scenario": scenario,
-                    "status": "SKIPPED",
-                    "reason": "No LLM API Key"
-                })
+                all_results.append({"scenario": scenario, "status": "SKIPPED", "reason": "No LLM API Key"})
                 continue
             scenarios_to_run.append(scenario)
 

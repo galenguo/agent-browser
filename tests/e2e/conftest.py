@@ -5,6 +5,7 @@ Provides:
   - e2e_page: Ready-to-use page (from parent conftest's browser_page fixture)
   - e2e_reset: Auto-cleans agent_browser module-level singleton state between tests
 """
+
 import pytest
 
 from agent_browser import reset

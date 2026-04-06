@@ -78,7 +78,7 @@ class ExtensionPageHandle(BrowserPageHandle):
     async def mouse_move(self, x: float, y: float) -> None:
         # Note: chrome.debugger Input.dispatchMouseEvent is available but complex.
         # Simplified implementation: trigger mousemove event via JS (does not move real cursor).
-        js = f"document.dispatchEvent(new MouseEvent('mousemove', {{clientX: {x}, clientY: {y}}}))"  # noqa: E501
+        js = f"document.dispatchEvent(new MouseEvent('mousemove', {{clientX: {x}, clientY: {y}}}))"
         await self._send("evaluate", {"expression": js})
 
     async def keyboard_press(self, key: str) -> None:
@@ -131,6 +131,7 @@ class ExtensionBackend(BrowserBackend):
 
     def __init__(self, config):
         from agent_browser.browser.daemon import BrowserDaemon
+
         self._config = config
         self._daemon: BrowserDaemon | None = None
         self._bridge: ExtensionBridge | None = None

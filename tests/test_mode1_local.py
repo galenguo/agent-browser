@@ -1,4 +1,5 @@
 """模式1测试：本地开发模式"""
+
 import pytest
 
 from agent_browser.main import click, create_session, open_page, snapshot
@@ -38,6 +39,7 @@ async def test_zhipin_login_flow():
 
         # 等待一下让页面加载
         import asyncio
+
         await asyncio.sleep(2)
 
         # 验证页面变化

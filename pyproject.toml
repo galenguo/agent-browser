@@ -87,12 +87,139 @@ select = [
     "N",      # naming conventions
     "UP",     # pyupgrade
     "B",      # flake8-bugbear
-    "SIM",   # flake8-simplify
+    "SIM",    # flake8-simplify
+    "ARG",    # flake8-unused-arguments
+    "C4",     # flake8-comprehensions
+    "C901",   # mccabe complexity (function too complex)
+    "COM",    # flake8-commas (trailing commas)
+    "DTZ",    # flake8-datetimez
+    "PIE",    # flake8-pie (no exception literals in except)
+    "PTH",    # flake8-use-pathlib
+    "RET",    # flake8-return (implicit return values)
+    "RUF",    # ruff-specific rules
 ]
 ignore = [
-    "E501",  # line too long (handled by formatter)
-    "N802",  # function name should be lowercase (stealth_* etc.)
-    "N806",  # variable name should be lowercase
+    "E501",   # line too long (handled by formatter)
+    "N802",   # function name should be lowercase (stealth_* etc.)
+    "N806",   # variable name should be lowercase
+    "COM812", # trailing comma missing (conflicts with ruff format)
+    "COM819", # trailing comma prohibited (conflicts with ruff format)
+    "DTZ005", # free-form strftime (common in logs)
+    "RUF012", # mutable class attributes (used intentionally in dataclasses)
+    # CJK fullwidth characters: project contains Chinese comments/docstrings intentionally
+    "RUF001", # ambiguous `，` `：` `（` `）` in strings
+    "RUF002", # ambiguous `（` `）` `：` `，` in docstrings
+    "RUF003", # ambiguous `（` `）` `：` `，` in comments
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 18
+
+[tool.ruff.lint.per-file-ignores]
+# Test files: allow broader style flexibility
+"tests/*" = [
+    "ARG001",  # unused function argument (common in fixtures)
+    "ARG002",  # unused method argument
+    "B007",    # loop control variable (intentional in some test patterns)
+    "B023",    # function definition does not bind loop variable
+    "C901",    # complexity (test helpers can be verbose)
+    "E402",    # conditional imports for skip guards
+    "N802",    # test function names with underscores ok
+    "N806",    # test variables can be short
+    "PTH",     # os.path acceptable in test code
+    "RUF043",  # pytest match patterns
+    "S101",    # assert used (standard in tests)
+]
+
+# Source files with intentional complexity or API patterns
+"agent_browser/explore/*" = [
+    "ARG001",  # API signatures with unused params for consistency
+    "C901",    # exploration logic is inherently complex
+    "PTH",     # explore uses os.path extensively for artifact paths
+]
+"agent_browser/browser/daemon.py" = [
+    "C901",    # daemon WebSocket server is complex by nature
+]
+"agent_browser/pipeline/steps.py" = [
+    "ARG001",  # stealth, data, context params for interface consistency
+    "C901",    # step handlers are complex (snapshot especially)
+    "PTH",     # steps use os.path for file operations
+]
+"agent_browser/adapters/loader.py" = [
+    "PTH",     # loader uses os.path for adapter discovery
+]
+"agent_browser/browser/extension.py" = [
+    "ARG002",  # Interface params (wait_until, timeout) for ABC compatibility
+]
+"agent_browser/browser/instance_pool.py" = [
+    "ARG001",  # browser_type param for consistency
+    "ARG002",  # browser_type method param for API consistency
+    "PTH",     # Docker path operations use os.path
+]
+"agent_browser/session/*" = [
+    "ARG002",  # interactive_only etc. for API compatibility
+    "PTH",     # profile management uses os.path/open
+]
+"agent_browser/api/*" = [
+    "E402",    # stale file, will be removed on next migration
+    "PTH",     # api uses os.path for profile paths
+    "ARG001",  # unused args in request handlers
+    "B904",    # HTTPException re-raise style
+    "UP045",   # Optional[X | None] vs X | None style
+]
+"agent_browser/browser/local.py" = [
+    "ARG002",  # kwargs in page handle methods for ABC compatibility
+    "C901",    # run_task is complex (agent mode with chunking)
+    "RUF006",  # create_task return value intentionally unused
+]
+"agent_browser/browser/remote.py" = [
+    "ARG002",  # intelligence, llm_config params for API consistency
+]
+"agent_browser/browser/stealth_launcher.py" = [
+    "PTH",     # launcher uses os.path for profile/chromium paths
+]
+"agent_browser/cli/main.py" = [
+    "ARG001",  # CLI command handlers have unused params from click
+]
+"agent_browser/main.py" = [
+    "ARG001",  # debug_pipeline params (cdp_url, kwargs) for API consistency
+    "RUF006",  # create_task return value intentionally unused
+]
+"agent_browser/pipeline/fallback.py" = [
+    "ARG001",  # session_id param for interface consistency
+]
+"agent_browser/pipeline/template.py" = [
+    "ARG001",  # **kw param in filter functions for API consistency
+]
+"agent_browser/stealth/enhancer.py" = [
+    "ARG002",  # action_type param for interface consistency
+]
+"agent_browser/config.py" = [
+    "PTH",     # config uses open() for YAML files
+]
+"agent_browser/deploy_config.py" = [
+    "C901",    # validate_config checks many conditions
+    "E402",    # async imports inside conditional blocks
+    "PTH",     # deploy_config uses open() for YAML
+]
+"agent_browser/pipeline/executor.py" = [
+    "C901",    # execute_pipeline is complex (step loop + error handling)
+]
+"agent_browser/pipeline/classifier.py" = [
+    "C901",    # classify has many heuristic branches
+]
+"agent_browser/intelligence/agent_runner.py" = [
+    "C901",    # register_stealth_actions + agent setup
+    "RUF006",  # create_task return intentionally unused
+]
+"agent_browser/adapters/validator.py" = [
+    "C901",    # validate_adapter has 5 validation passes
+]
+"agent_browser/llm/factory.py" = [
+    "ARG004",  # **kwargs accepted for API consistency
+]
+"agent_browser/session/pool_manager.py" = [
+    "RUF006", # create_task return intentionally unused
 ]
 
 [tool.ruff.lint.isort]

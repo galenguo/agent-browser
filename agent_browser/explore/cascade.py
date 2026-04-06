@@ -4,6 +4,7 @@ Each level tries a different authentication approach until one succeeds.
 Stealth is automatically handled by StealthMiddleware (navigation delays,
 evaluate passthrough).
 """
+
 import asyncio
 import json
 import logging
@@ -18,6 +19,7 @@ STRATEGY_LEVELS = ["public", "cookie", "header", "intercept", "ui"]
 async def _get_handle(session_id: str):
     """Get BrowserPageHandle via StealthMiddleware."""
     from agent_browser.main import _ensure_middleware
+
     mw = await _ensure_middleware()
     return await mw.get_page(session_id)
 
@@ -71,14 +73,16 @@ async def cascade(
     await asyncio.sleep(random.uniform(1, 2))
 
     # Level 4: INTERCEPT (full browser rendering required)
-    results.append({
-        "strategy": "intercept",
-        "success": True,
-        "endpoint": "",
-        "sample_size": 0,
-        "fields": None,
-        "notes": "Requires full browser rendering + network interception",
-    })
+    results.append(
+        {
+            "strategy": "intercept",
+            "success": True,
+            "endpoint": "",
+            "sample_size": 0,
+            "fields": None,
+            "notes": "Requires full browser rendering + network interception",
+        }
+    )
 
     return results
 
@@ -92,31 +96,46 @@ def _get_test_urls(endpoints: list[Any] | None, base_url: str) -> list[str]:
 async def _try_public(test_urls: list[str], base_url: str) -> dict[str, Any]:
     """Level 1: Public API (no authentication)."""
     if not test_urls:
-        return {"strategy": "public", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "No endpoints to test"}
+        return {
+            "strategy": "public",
+            "success": False,
+            "endpoint": "",
+            "sample_size": 0,
+            "fields": None,
+            "notes": "No endpoints to test",
+        }
 
     import aiohttp
+
     for url in test_urls:
         try:
             async with (
                 aiohttp.ClientSession() as http,
                 http.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp,
             ):
-                    if resp.status == 200:
-                        data = await resp.json()
-                        items = _extract_items(data)
-                        if items:
-                            return {
-                                "strategy": "public",
-                                "success": True,
-                                "endpoint": url,
-                                "sample_size": len(items),
-                                "fields": _infer_fields(items[0]) if items else {},
-                                "notes": "",
-                            }
+                if resp.status == 200:
+                    data = await resp.json()
+                    items = _extract_items(data)
+                    if items:
+                        return {
+                            "strategy": "public",
+                            "success": True,
+                            "endpoint": url,
+                            "sample_size": len(items),
+                            "fields": _infer_fields(items[0]) if items else {},
+                            "notes": "",
+                        }
         except Exception:
             continue
 
-    return {"strategy": "public", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "All endpoints require auth"}
+    return {
+        "strategy": "public",
+        "success": False,
+        "endpoint": "",
+        "sample_size": 0,
+        "fields": None,
+        "notes": "All endpoints require auth",
+    }
 
 
 async def _try_cookie(handle, test_urls: list[str]) -> dict[str, Any]:
@@ -147,7 +166,14 @@ async def _try_cookie(handle, test_urls: list[str]) -> dict[str, Any]:
         except Exception:
             continue
 
-    return {"strategy": "cookie", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "Cookie auth insufficient"}
+    return {
+        "strategy": "cookie",
+        "success": False,
+        "endpoint": "",
+        "sample_size": 0,
+        "fields": None,
+        "notes": "Cookie auth insufficient",
+    }
 
 
 async def _try_header(handle, test_urls: list[str], base_url: str) -> dict[str, Any]:
@@ -187,7 +213,14 @@ async def _try_header(handle, test_urls: list[str], base_url: str) -> dict[str, 
         except Exception:
             continue
 
-    return {"strategy": "header", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "Header auth insufficient"}
+    return {
+        "strategy": "header",
+        "success": False,
+        "endpoint": "",
+        "sample_size": 0,
+        "fields": None,
+        "notes": "Header auth insufficient",
+    }
 
 
 def _extract_items(data: Any) -> list:

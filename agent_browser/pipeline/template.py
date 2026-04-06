@@ -19,6 +19,7 @@ Variables:
 
 Security: Sandboxed evaluation via AST-based safe eval with context sanitization.
 """
+
 import ast
 import contextlib
 import json
@@ -33,11 +34,11 @@ logger = logging.getLogger(__name__)
 
 # ── Template regex ──
 
-TEMPLATE_PATTERN = re.compile(r'\$\{\{\s*(.*?)\s*\}\}')
+TEMPLATE_PATTERN = re.compile(r"\$\{\{\s*(.*?)\s*\}\}")
 
 # ── Pipe split regex (splits on single |, preserves ||) ──
 
-_PIPE_SPLIT_RE = re.compile(r'(?<!\|)\|(?!\|)')
+_PIPE_SPLIT_RE = re.compile(r"(?<!\|)\|(?!\|)")
 
 # ── Built-in pipe filters (19 total) ──
 
@@ -46,9 +47,11 @@ PIPE_FILTERS: dict[str, callable] = {}
 
 def _register_filter(name: str):
     """Pipe filter registration decorator"""
+
     def decorator(fn):
         PIPE_FILTERS[name] = fn
         return fn
+
     return decorator
 
 
@@ -151,27 +154,26 @@ def _filter_json(value: Any, **kw) -> str:
 def _filter_slugify(value: Any, **kw) -> str:
     s = str(value).lower() if value is not None else ""
     # Unicode-aware: keep only letters and numbers, replace rest with hyphen
-    s = re.sub(r'[^\w\s-]', '', unicodedata.normalize('NFKD', s))
-    s = re.sub(r'[\s_]+', '-', s)
-    s = r'^-+|-+$'.sub('', s) if hasattr(r'^-+|-+$', 'sub') else re.sub(r'^-+|-+$', '', s)
+    s = re.sub(r"[^\w\s-]", "", unicodedata.normalize("NFKD", s))
+    s = re.sub(r"[\s_]+", "-", s)
+    s = r"^-+|-+$".sub("", s) if hasattr(r"^-+|-+$", "sub") else re.sub(r"^-+|-+$", "", s)
     # Fix: use re.sub properly
-    s = re.sub(r'^-+|-+$', '', s)
-    return s
+    return re.sub(r"^-+|-+$", "", s)
 
 
 @_register_filter("sanitize")
 def _filter_sanitize(value: Any, **kw) -> str:
     """Replace invalid filename characters with underscore."""
     s = str(value) if value is not None else ""
-    return re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', s)
+    return re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", s)
 
 
 @_register_filter("ext")
 def _filter_ext(value: Any, **kw) -> str:
     """Extract file extension (everything after last . after last / or \\)."""
     s = str(value) if value is not None else ""
-    last_dot = s.rfind('.')
-    last_slash = max(s.rfind('/'), s.rfind('\\'))
+    last_dot = s.rfind(".")
+    last_slash = max(s.rfind("/"), s.rfind("\\"))
     if last_dot > last_slash:
         return s[last_dot:]
     return ""
@@ -181,7 +183,7 @@ def _filter_ext(value: Any, **kw) -> str:
 def _filter_basename(value: Any, **kw) -> str:
     """Extract basename from URL or file path."""
     s = str(value) if value is not None else ""
-    parts = re.split(r'[/\\]', s)
+    parts = re.split(r"[/\\]", s)
     return parts[-1] if parts else s
 
 
@@ -224,13 +226,13 @@ def apply_filter(value: Any, filter_expr: str) -> Any:
     filter_expr = filter_expr.strip()
 
     # Check for filter.property access pattern
-    prop_match = re.match(r'(\w+)(?:\((.*)\))?\.([\w.]+)$', filter_expr)
+    prop_match = re.match(r"(\w+)(?:\((.*)\))?\.([\w.]+)$", filter_expr)
     if prop_match:
         name = prop_match.group(1)
         args_str = prop_match.group(2)
         prop_path = prop_match.group(3)
     else:
-        match = re.match(r'(\w+)(?:\((.*)\))?$', filter_expr)
+        match = re.match(r"(\w+)(?:\((.*)\))?$", filter_expr)
         if not match:
             return value
         name = match.group(1)
@@ -252,7 +254,7 @@ def apply_filter(value: Any, filter_expr: str) -> Any:
 
     # Access property on result (e.g., first.name → apply first, then .name)
     if prop_path is not None and result is not None:
-        for part in prop_path.split('.'):
+        for part in prop_path.split("."):
             if isinstance(result, dict):
                 result = result.get(part)
             elif hasattr(result, part):
@@ -286,7 +288,7 @@ def _parse_filter_args(args_str: str) -> dict[str, Any]:
         elif ch == quote_char and in_quote:
             in_quote = False
             quote_char = None
-        elif ch == ',' and not in_quote:
+        elif ch == "," and not in_quote:
             raw_parts.append((current.strip(), in_quote))
             current = ""
             continue
@@ -295,8 +297,7 @@ def _parse_filter_args(args_str: str) -> dict[str, Any]:
         raw_parts.append((current.strip(), in_quote))
 
     for i, (part, was_quoted) in enumerate(raw_parts):
-        if (part.startswith('"') and part.endswith('"')) or \
-           (part.startswith("'") and part.endswith("'")):
+        if (part.startswith('"') and part.endswith('"')) or (part.startswith("'") and part.endswith("'")):
             part = part[1:-1]
             was_quoted = True
 
@@ -319,6 +320,7 @@ def _parse_filter_args(args_str: str) -> dict[str, Any]:
 
 # ── Context Sanitization (security layer) ──
 
+
 def _sanitize_context(obj: Any) -> Any:
     """
     Deep-copy via JSON round-trip to sever prototype chains.
@@ -339,6 +341,7 @@ def _sanitize_context(obj: Any) -> Any:
 
 
 # ── Public API (backward compatible) ──
+
 
 def resolve(template: str, **context: Any) -> Any:
     """
@@ -373,8 +376,9 @@ class TemplateContext:
     Security: All context values are sanitized before use in _safe_eval().
     """
 
-    def __init__(self, args: dict[str, Any] | None = None, data: Any = None,
-                 item: Any = None, index: int | None = None):
+    def __init__(
+        self, args: dict[str, Any] | None = None, data: Any = None, item: Any = None, index: int | None = None
+    ):
         self._args = args or {}
         self._data = data
         self._item = item
@@ -407,7 +411,9 @@ class TemplateContext:
         value = self._resolve_property(expression)
 
         # If no operators present, return resolved property directly
-        if not any(op in expression for op in ['+', '-', '*', '/', '>', '<', '(', '===', '!==', '==', '!=', '&&', '||']):
+        if not any(
+            op in expression for op in ["+", "-", "*", "/", ">", "<", "(", "===", "!==", "==", "!=", "&&", "||"]
+        ):
             return value
 
         # For expressions with operators, use safe eval
@@ -415,7 +421,7 @@ class TemplateContext:
 
     def _resolve_property(self, path: str) -> Any:
         """Resolve a dot-separated property path like 'args.keyword'"""
-        parts = path.split('.')
+        parts = path.split(".")
         root = parts[0].strip()
 
         root_map = {
@@ -477,7 +483,7 @@ class TemplateContext:
             return fallback
 
         # Layer 2: Forbidden pattern blocklist
-        forbidden = r'\b(constructor|__proto__|prototype|globalThis|process|require|import|eval)\b'
+        forbidden = r"\b(constructor|__proto__|prototype|globalThis|process|require|import|eval)\b"
         if re.search(forbidden, expression):
             logger.warning(f"Blocked forbidden pattern in expression: {expression}")
             return fallback
@@ -496,17 +502,26 @@ class TemplateContext:
             "index": self._index,
             # Safe utility globals
             "json": json,
-            "Math": type("Math", (), {
-                "min": min, "max": max,
-                "floor": lambda x: int(x),
-                "ceil": lambda x: int(x),
-                "round": round,
-                "abs": abs,
-            })(),
-            "Number": type("Number", (), {
-                "parseInt": lambda x, *a: int(float(x)),
-                "parseFloat": float,
-            })(),
+            "Math": type(
+                "Math",
+                (),
+                {
+                    "min": min,
+                    "max": max,
+                    "floor": lambda x: int(x),
+                    "ceil": lambda x: int(x),
+                    "round": round,
+                    "abs": abs,
+                },
+            )(),
+            "Number": type(
+                "Number",
+                (),
+                {
+                    "parseInt": lambda x, *_a: int(float(x)),
+                    "parseFloat": float,
+                },
+            )(),
             "String": str,
             "Boolean": bool,
             "Array": list,
@@ -530,20 +545,43 @@ class TemplateContext:
         expr = expression
 
         # Translate JS-style operators to Python
-        expr = re.sub(r'\|\|\s*', ' or ', expr)
-        expr = re.sub(r'&&\s*', ' and ', expr)
-        expr = re.sub(r'===', '==', expr)
-        expr = re.sub(r'!==', '!=', expr)
+        expr = re.sub(r"\|\|\s*", " or ", expr)
+        expr = re.sub(r"&&\s*", " and ", expr)
+        expr = re.sub(r"===", "==", expr)
+        expr = re.sub(r"!==", "!=", expr)
 
         try:
-            tree = ast.parse(expr, mode='eval')
+            tree = ast.parse(expr, mode="eval")
             allowed_nodes = (
-                ast.Expression, ast.BinOp, ast.UnaryOp, ast.Compare,
-                ast.BoolOp, ast.Num, ast.Constant, ast.Name, ast.Load,
-                ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv,
-                ast.Mod, ast.Pow, ast.UAdd, ast.USub, ast.Not,
-                ast.And, ast.Or, ast.Eq, ast.NotEq, ast.Lt, ast.LtE,
-                ast.Gt, ast.GtE, ast.IfExp, ast.Attribute,
+                ast.Expression,
+                ast.BinOp,
+                ast.UnaryOp,
+                ast.Compare,
+                ast.BoolOp,
+                ast.Num,
+                ast.Constant,
+                ast.Name,
+                ast.Load,
+                ast.Add,
+                ast.Sub,
+                ast.Mult,
+                ast.Div,
+                ast.FloorDiv,
+                ast.Mod,
+                ast.Pow,
+                ast.UAdd,
+                ast.USub,
+                ast.Not,
+                ast.And,
+                ast.Or,
+                ast.Eq,
+                ast.NotEq,
+                ast.Lt,
+                ast.LtE,
+                ast.Gt,
+                ast.GtE,
+                ast.IfExp,
+                ast.Attribute,
             )
             for node in ast.walk(tree):
                 if not isinstance(node, allowed_nodes):
@@ -551,13 +589,11 @@ class TemplateContext:
                     if (
                         isinstance(node, ast.Call)
                         and isinstance(node.func, ast.Attribute)
-                        and node.func.attr in ('min', 'max', 'floor', 'ceil', 'round', 'abs',
-                                              'parseInt', 'parseFloat')
+                        and node.func.attr in ("min", "max", "floor", "ceil", "round", "abs", "parseInt", "parseFloat")
                     ):
-                            continue
+                        continue
                     return fallback
-            result = eval(compile(tree, '<template>', 'eval'), eval_globals)
-            return result
+            return eval(compile(tree, "<template>", "eval"), eval_globals)
         except Exception:
             return fallback
 
@@ -566,6 +602,7 @@ def render_template(template: str, ctx: TemplateContext) -> str:
     """
     Render a string template, replacing all ${{ }} expressions with resolved values.
     """
+
     def replacer(match):
         expr = match.group(1)
         value = ctx.resolve(expr)
@@ -585,14 +622,14 @@ def render_value(value: Any, ctx: TemplateContext) -> Any:
         # Try to convert numeric strings back
         if rendered != value:
             try:
-                if '.' in rendered:
+                if "." in rendered:
                     return float(rendered)
                 return int(rendered)
             except (ValueError, TypeError):
                 pass
         return rendered
-    elif isinstance(value, dict):
+    if isinstance(value, dict):
         return {k: render_value(v, ctx) for k, v in value.items()}
-    elif isinstance(value, list):
+    if isinstance(value, list):
         return [render_value(v, ctx) for v in value]
     return value

@@ -11,6 +11,7 @@ Usage:
     result = await session.run()
     # Pauses after step 2 and step 5
 """
+
 import asyncio
 import logging
 from typing import Any
@@ -120,6 +121,7 @@ class DebugSession:
 
             # Render template parameters
             from .template import render_value
+
             rendered_params = render_value(step.params, self.tmpl_ctx)
 
             # Execute step
@@ -216,7 +218,7 @@ def _summarize(value: Any, max_len: int = 200) -> str:
         return f"[{len(value)} items] {preview}"
     if isinstance(value, dict):
         keys = list(value.keys())[:5]
-        more = f" +{len(value)-5} more" if len(value) > 5 else ""
+        more = f" +{len(value) - 5} more" if len(value) > 5 else ""
         return f"{{dict {len(value)} keys: {keys}{more}}}"
     s = str(value)
     return s[:max_len] + ("..." if len(s) > max_len else "")

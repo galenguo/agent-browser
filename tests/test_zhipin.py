@@ -7,6 +7,7 @@ Boss 直聘端到端测试。
     cd /Users/galen/OpenSource/browser-controller/agent-browser
     python tests/test_zhipin.py
 """
+
 import asyncio
 import logging
 import os
@@ -23,6 +24,7 @@ async def main():
 
     try:
         from browser_use.llm import ChatAnthropic
+
         llm = ChatAnthropic(model="claude-haiku-4-5")
     except ImportError:
         logger.error("browser-use not installed. Run: pip install browser-use")

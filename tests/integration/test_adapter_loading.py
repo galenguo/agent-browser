@@ -10,6 +10,7 @@ and that adapters produce correct structured configs.
 #  Test 1-2: Discovery & Parsing
 # ══════════════════════════════════════════════
 
+
 class TestAdapterDiscovery:
     """Loader scans directory and discovers YAML adapters."""
 
@@ -36,6 +37,7 @@ class TestAdapterDiscovery:
 
         for meta in list_adapters():
             from agent_browser.adapters.loader import get_adapter
+
             adapter = get_adapter(meta["site"], meta["name"])
             assert "pipeline" in adapter
             assert isinstance(adapter["pipeline"], list)
@@ -68,6 +70,7 @@ class TestAdapterParsing:
 #  Test 3: Adapter with Auth Steps
 # ══════════════════════════════════════════════
 
+
 class TestAdapterAuthSteps:
     """Adapters requiring authentication have proper step definitions."""
 
@@ -86,6 +89,7 @@ class TestAdapterAuthSteps:
 #  Test 4: Unknown Adapter Error
 # ══════════════════════════════════════════════
 
+
 class TestUnknownAdapter:
     """Requesting a non-existent adapter returns None."""
 
@@ -100,6 +104,7 @@ class TestUnknownAdapter:
 # ══════════════════════════════════════════════
 #  Tests 6-8: OpenCLI Format Normalization
 # ══════════════════════════════════════════════
+
 
 class TestOpenCLINormalization:
     """_normalize_adapter() translates OpenCLI format to AB-internal."""
@@ -116,20 +121,20 @@ class TestOpenCLINormalization:
         """When both domain and site present, site takes priority."""
         from agent_browser.adapters.loader import _normalize_adapter
 
-        adapter = _normalize_adapter({
-            "domain": "wrong.com",
-            "site": "right.com",
-            "name": "test",
-        })
+        adapter = _normalize_adapter(
+            {
+                "domain": "wrong.com",
+                "site": "right.com",
+                "name": "test",
+            }
+        )
         assert adapter["site"] == "right.com"
 
     def test_intercept_strategy_mapped_to_cookie(self):
         """OpenCLI 'intercept' strategy mapped to 'cookie' internally."""
         from agent_browser.adapters.loader import _normalize_adapter
 
-        adapter = _normalize_adapter({
-            "site": "test", "name": "x", "strategy": "intercept"
-        })
+        adapter = _normalize_adapter({"site": "test", "name": "x", "strategy": "intercept"})
         assert adapter["strategy"] == "cookie"
 
     def test_other_strategies_pass_through(self):
@@ -137,9 +142,7 @@ class TestOpenCLINormalization:
         from agent_browser.adapters.loader import _normalize_adapter
 
         for s in ["public", "ui", "store-action", "header"]:
-            adapter = _normalize_adapter({
-                "site": "test", "name": "x", "strategy": s
-            })
+            adapter = _normalize_adapter({"site": "test", "name": "x", "strategy": s})
             assert adapter["strategy"] == s, f"Strategy '{s}' was modified"
 
 
@@ -150,34 +153,35 @@ class TestNavigateBeforeNormalization:
         """navigateBefore becomes navigate step at index 0."""
         from agent_browser.adapters.loader import _normalize_adapter
 
-        adapter = _normalize_adapter({
-            "site": "test",
-            "name": "x",
-            "pipeline": [{"click": ".btn"}],
-            "navigateBefore": "https://login.example.com",
-        })
+        adapter = _normalize_adapter(
+            {
+                "site": "test",
+                "name": "x",
+                "pipeline": [{"click": ".btn"}],
+                "navigateBefore": "https://login.example.com",
+            }
+        )
         pipeline = adapter["pipeline"]
         assert len(pipeline) == 2
-        first_op = list(pipeline[0].keys())[0]
+        first_op = next(iter(pipeline[0].keys()))
         assert first_op == "navigate"
         assert pipeline[0]["navigate"] == "https://login.example.com"
         # Original click step preserved at index 1
-        assert list(pipeline[1].keys())[0] == "click"
+        assert next(iter(pipeline[1].keys())) == "click"
 
     def test_no_navigate_before_leaves_pipeline_unchanged(self):
         """Without navigateBefore, pipeline is untouched."""
         from agent_browser.adapters.loader import _normalize_adapter
 
         original = [{"click": ".btn"}, {"snapshot": "*"}]
-        adapter = _normalize_adapter({
-            "site": "test", "name": "x", "pipeline": original
-        })
+        adapter = _normalize_adapter({"site": "test", "name": "x", "pipeline": original})
         assert adapter["pipeline"] == original
 
 
 # ══════════════════════════════════════════════
 #  Tests 9-10: Validation & Error Handling
 # ═════════════════════════════════════════════
+
 
 class TestValidationErrors:
     """Invalid adapters are rejected gracefully."""
@@ -253,6 +257,7 @@ class TestValidationErrors:
 # ══════════════════════════════════════════════
 #  Edge Case: Normalization Idempotency
 # ══════════════════════════════════════════════
+
 
 class TestNormalizeIdempotency:
     """Running _normalize_adapter twice is safe."""

@@ -16,6 +16,7 @@ Features:
 
 All browser operations through StealthMiddleware auto-stealth wrapping.
 """
+
 import asyncio
 import json
 import logging
@@ -46,46 +47,49 @@ _DEFAULT_EXPLORE_TIMEOUT = 120.0
 @dataclass
 class Endpoint:
     """Discovered API endpoint."""
+
     url: str
     method: str = "GET"
     status: int = 0
     is_json: bool = False
     sample: Any = None
-    pattern: str = ""              # Normalized URL pattern
+    pattern: str = ""  # Normalized URL pattern
     content_type: str = ""
     query_params: list[str] = field(default_factory=list)
-    score: float = 0.0            # Usefulness score 0-10
+    score: float = 0.0  # Usefulness score 0-10
     has_search: bool = False
     has_pagination: bool = False
     has_limit: bool = False
     auth_indicators: list[str] = field(default_factory=list)
     item_path: str | None = None  # Path to items in response body
-    item_count: int = 0             # Number of items in sample
+    item_count: int = 0  # Number of items in sample
     detected_fields: dict[str, str] = field(default_factory=dict)  # canonical -> actual
 
 
 @dataclass
 class ExplorationResult:
     """Complete exploration result with all metadata."""
-    url: str                           # Original requested URL
-    final_url: str = ""                # After redirects
+
+    url: str  # Original requested URL
+    final_url: str = ""  # After redirects
     title: str = ""
     endpoints: list[Endpoint] = field(default_factory=list)
     capabilities: list[InferredCapability] = field(default_factory=list)
-    site: str = ""                     # Detected site name (e.g., 'boss')
+    site: str = ""  # Detected site name (e.g., 'boss')
     framework: dict[str, Any] = field(default_factory=dict)  # {type, version, stores}
     stores: list[DiscoveredStore] = field(default_factory=list)
-    top_strategy: str = ""             # Best strategy: public/intercept/ui/store-action
+    top_strategy: str = ""  # Best strategy: public/intercept/ui/store-action
     endpoint_count: int = 0
     api_endpoint_count: int = 0
     auth_indicators: list[str] = field(default_factory=list)
-    out_dir: str | None = None      # Artifact output directory
-    duration_ms: int = 0               # Exploration wall-clock time
+    out_dir: str | None = None  # Artifact output directory
+    duration_ms: int = 0  # Exploration wall-clock time
 
 
 async def _get_handle(session_id: str):
     """Get BrowserPageHandle via StealthMiddleware."""
     from agent_browser.main import _ensure_middleware
+
     mw = await _ensure_middleware()
     return await mw.get_page(session_id)
 
@@ -93,6 +97,7 @@ async def _get_handle(session_id: str):
 def _get_behavior():
     try:
         from agent_browser.browser.human_behavior import HumanBehaviorSimulator
+
         return HumanBehaviorSimulator()
     except ImportError:
         return None
@@ -114,9 +119,9 @@ async def _interact_fuzz(handle, page, max_clicks: int = 8):
     safe_selectors = [
         '[data-type="load-more"]',
         '[data-action="load"]',
-        '.load-more',
-        '.show-more',
-        '.pagination .next',
+        ".load-more",
+        ".show-more",
+        ".pagination .next",
         '[class*="tab"]:not(.active)',
         'button:not([type="submit"]):not([data-danger])',
     ]
@@ -136,11 +141,10 @@ async def _interact_fuzz(handle, page, max_clicks: int = 8):
             """)
             if elements and isinstance(elements, list):
                 for elem in elements:
-                    if not elem.get('visible') or clicked >= max_clicks:
+                    if not elem.get("visible") or clicked >= max_clicks:
                         continue
-                    text = elem.get('text', '')
-                    skip_keywords = ('logout', 'sign out', 'delete', 'remove',
-                                     'payment', 'buy', 'order', 'checkout')
+                    text = elem.get("text", "")
+                    skip_keywords = ("logout", "sign out", "delete", "remove", "payment", "buy", "order", "checkout")
                     if any(kw in text.lower() for kw in skip_keywords):
                         continue
                     await page.evaluate(f"""
@@ -173,21 +177,21 @@ def _detect_framework(page_result: Any) -> dict[str, Any]:
 
     framework = {"type": "unknown", "stores": []}
 
-    if '__vue_app__' in result_text or '__VUE__' in result_text or 'Vue' in result_text:
+    if "__vue_app__" in result_text or "__VUE__" in result_text or "Vue" in result_text:
         framework["type"] = "vue"
-        if 'pinia' in result_text.lower() or '$pinia' in result_text:
+        if "pinia" in result_text.lower() or "$pinia" in result_text:
             framework["stores"].append("pinia")
-        if '$store' in result_text or 'vuex' in result_text.lower():
+        if "$store" in result_text or "vuex" in result_text.lower():
             framework["stores"].append("vuex")
 
-    if '_reactRootContainer' in result_text or '__reactFiber' in result_text:
+    if "_reactRootContainer" in result_text or "__reactFiber" in result_text:
         framework["type"] = "react"
-        if 'redux' in result_text.lower():
+        if "redux" in result_text.lower():
             framework["stores"].append("redux")
 
-    if 'ng.probe' in result_text or 'ng-version' in result_text:
+    if "ng.probe" in result_text or "ng-version" in result_text:
         framework["type"] = "angular"
-        if 'ngrx' in result_text.lower():
+        if "ngrx" in result_text.lower():
             framework["stores"].append("ngrx")
 
     return framework
@@ -241,12 +245,14 @@ async def _discover_stores(handle) -> list[DiscoveredStore]:
         if isinstance(raw, list):
             for item in raw:
                 if isinstance(item, dict):
-                    stores.append(DiscoveredStore(
-                        store_type=item.get("storeType", "unknown"),
-                        id=item.get("id", ""),
-                        actions=item.get("actions", []),
-                        state_keys=item.get("stateKeys", []),
-                    ))
+                    stores.append(
+                        DiscoveredStore(
+                            store_type=item.get("storeType", "unknown"),
+                            id=item.get("id", ""),
+                            actions=item.get("actions", []),
+                            state_keys=item.get("stateKeys", []),
+                        )
+                    )
     except Exception as e:
         logger.debug(f"Store discovery failed: {e}")
 
@@ -284,53 +290,62 @@ def _write_explore_artifacts(result: ExplorationResult) -> None:
     # endpoints.json
     endpoints_data = []
     for ep in result.endpoints:
-        endpoints_data.append({
-            "url": ep.url,
-            "method": ep.method,
-            "status": ep.status,
-            "pattern": ep.pattern,
-            "content_type": ep.content_type,
-            "score": ep.score,
-            "is_json": ep.is_json,
-            "has_search": ep.has_search,
-            "has_pagination": ep.has_pagination,
-            "auth_indicators": ep.auth_indicators,
-            "item_path": ep.item_path,
-            "item_count": ep.item_count,
-            "fields": ep.detected_fields,
-        })
+        endpoints_data.append(
+            {
+                "url": ep.url,
+                "method": ep.method,
+                "status": ep.status,
+                "pattern": ep.pattern,
+                "content_type": ep.content_type,
+                "score": ep.score,
+                "is_json": ep.is_json,
+                "has_search": ep.has_search,
+                "has_pagination": ep.has_pagination,
+                "auth_indicators": ep.auth_indicators,
+                "item_path": ep.item_path,
+                "item_count": ep.item_count,
+                "fields": ep.detected_fields,
+            }
+        )
     _write_json(os.path.join(out_dir, "endpoints.json"), endpoints_data)
 
     # capabilities.json
     caps_data = []
     for cap in result.capabilities:
-        caps_data.append({
-            "name": cap.name,
-            "description": cap.description,
-            "strategy": cap.strategy,
-            "confidence": cap.confidence,
-            "endpoint": cap.endpoint,
-            "item_path": cap.item_path,
-            "columns": cap.recommended_columns,
-            "args": cap.recommended_args,
-        })
+        caps_data.append(
+            {
+                "name": cap.name,
+                "description": cap.description,
+                "strategy": cap.strategy,
+                "confidence": cap.confidence,
+                "endpoint": cap.endpoint,
+                "item_path": cap.item_path,
+                "columns": cap.recommended_columns,
+                "args": cap.recommended_args,
+            }
+        )
     _write_json(os.path.join(out_dir, "capabilities.json"), caps_data)
 
     # auth.json
-    _write_json(os.path.join(out_dir, "auth.json"), {
-        "indicators": result.auth_indicators,
-        "top_strategy": result.top_strategy,
-    })
+    _write_json(
+        os.path.join(out_dir, "auth.json"),
+        {
+            "indicators": result.auth_indicators,
+            "top_strategy": result.top_strategy,
+        },
+    )
 
     # stores.json
     stores_data = []
     for s in result.stores:
-        stores_data.append({
-            "type": s.store_type,
-            "id": s.id,
-            "actions": s.actions,
-            "state_keys": s.state_keys,
-        })
+        stores_data.append(
+            {
+                "type": s.store_type,
+                "id": s.id,
+                "actions": s.actions,
+                "state_keys": s.state_keys,
+            }
+        )
     _write_json(os.path.join(out_dir, "stores.json"), stores_data)
 
     logger.info(f"Artifacts written to {out_dir}")
@@ -384,13 +399,15 @@ async def explore(
             ct = response.headers.get("content-type", "")
             resp_url = response.url
             if "json" in ct or "/api/" in resp_url or "/graphql" in resp_url:
-                intercepted.append(Endpoint(
-                    url=resp_url,
-                    method=response.request.method,
-                    status=response.status,
-                    is_json="json" in ct,
-                    content_type=ct,
-                ))
+                intercepted.append(
+                    Endpoint(
+                        url=resp_url,
+                        method=response.request.method,
+                        status=response.status,
+                        is_json="json" in ct,
+                        content_type=ct,
+                    )
+                )
         except Exception:
             pass
 
@@ -411,7 +428,7 @@ async def explore(
         result.title = await handle.title()
 
         # Stealth scrolling
-        raw_page = getattr(handle, 'raw_page', None)
+        raw_page = getattr(handle, "raw_page", None)
         behavior = _get_behavior()
         if behavior and raw_page:
             await behavior._random_scroll(raw_page, scroll_count=scroll_count)
@@ -434,14 +451,21 @@ async def explore(
                     ep.sample = await _fetch_sample(handle, ep.url)
                     # Score endpoint
                     ep.score = score_endpoint(
-                        ep.url, ep.method, ep.status, ep.is_json,
-                        ep.sample, ep.content_type,
+                        ep.url,
+                        ep.method,
+                        ep.status,
+                        ep.is_json,
+                        ep.sample,
+                        ep.content_type,
                     )
                     # Normalize URL pattern
                     ep.pattern = url_to_pattern(ep.url)
                     # Detect auth indicators
                     ep.auth_indicators = detect_auth_indicators(
-                        ep.url, ep.status, {}, {},
+                        ep.url,
+                        ep.status,
+                        {},
+                        {},
                     )
                     # Detect item path and count
                     if isinstance(ep.sample, dict):
@@ -451,16 +475,11 @@ async def explore(
                         if items and len(items) > 0 and isinstance(items[0], dict):
                             ep.detected_fields = _detect_fields_from_item(items[0])
                             from urllib.parse import parse_qs, urlparse
+
                             qs = parse_qs(urlparse(ep.url).query)
-                            ep.has_search = any(
-                                k.lower() in ('q', 'query', 'keyword', 'search')
-                                for k in qs
-                            )
-                            ep.has_pagination = any(
-                                k.lower() in ('page', 'limit', 'offset', 'cursor')
-                                for k in qs
-                            )
-                            ep.has_limit = 'limit' in qs or 'pagesize' in qs
+                            ep.has_search = any(k.lower() in ("q", "query", "keyword", "search") for k in qs)
+                            ep.has_pagination = any(k.lower() in ("page", "limit", "offset", "cursor") for k in qs)
+                            ep.has_limit = "limit" in qs or "pagesize" in qs
                 except Exception:
                     pass
 
@@ -561,6 +580,7 @@ def _analyze_endpoints(endpoints: list[Endpoint], base_url: str) -> list[dict]:
             continue
 
         from urllib.parse import urlparse
+
         path = urlparse(ep.url).path
         pattern_key = f"{path}:{ep.method}"
         if pattern_key in seen_patterns:
@@ -588,15 +608,17 @@ def _analyze_endpoints(endpoints: list[Endpoint], base_url: str) -> list[dict]:
                 fields["id"] = key
 
         if len(fields) >= 2:
-            strategy_map = {'public': 'public', 'intercept': 'cookie', 'ui': 'ui', 'store-action': 'store-action'}
-            strat = getattr(ep, 'top_strategy', '') or 'cookie'
-            capabilities.append({
-                "endpoint": ep.url,
-                "method": ep.method,
-                "fields": fields,
-                "sample_count": len(data),
-                "strategy_guess": strategy_map.get(strat, strat) if isinstance(strat, str) else strat,
-            })
+            strategy_map = {"public": "public", "intercept": "cookie", "ui": "ui", "store-action": "store-action"}
+            strat = getattr(ep, "top_strategy", "") or "cookie"
+            capabilities.append(
+                {
+                    "endpoint": ep.url,
+                    "method": ep.method,
+                    "fields": fields,
+                    "sample_count": len(data),
+                    "strategy_guess": strategy_map.get(strat, strat) if isinstance(strat, str) else strat,
+                }
+            )
 
     return capabilities
 
@@ -632,7 +654,7 @@ def _get_items_from_sample(sample: Any) -> list | None:
             sub = val.get("data") or val.get("items") or val.get("list")
             if isinstance(sub, list) and sub:
                 return sub
-    if any(isinstance(sample.get(k), (str, int, float)) for k in ('title', 'name', 'url')):
+    if any(isinstance(sample.get(k), (str, int, float)) for k in ("title", "name", "url")):
         return [sample]
     return None
 
@@ -640,6 +662,7 @@ def _get_items_from_sample(sample: Any) -> list | None:
 def _detect_fields_from_item(item: dict) -> dict[str, str]:
     """Detect canonical field names from a sample item."""
     from .analysis import _FIELD_NAME_MAP
+
     fields = {}
     for key, _value in item.items():
         kl = key.lower()

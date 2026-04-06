@@ -3,6 +3,7 @@
 Supports both native and compatible format YAML adapters.
 Compatible top-level fields are accepted and normalized internally.
 """
+
 import logging
 import os
 from pathlib import Path
@@ -21,7 +22,7 @@ _ADAPTER_DIR = str(Path(__file__).resolve().parents[2] / "adapters")
 
 # Strategy value mapping
 _STRATEGY_MAP = {
-    "intercept": "cookie",   # 'intercept' = cookie-based fetch interception
+    "intercept": "cookie",  # 'intercept' = cookie-based fetch interception
     # Other values pass through: public, ui, store-action, header, cookie
 }
 
@@ -87,6 +88,7 @@ def _ensure_loaded():
 
                 # Validate structure (warn but still register for backward compat)
                 from .validator import validate_adapter
+
                 errs = validate_adapter(adapter)
                 if errs:
                     logger.warning(f"Adapter validation warnings for {fpath}: {errs}")

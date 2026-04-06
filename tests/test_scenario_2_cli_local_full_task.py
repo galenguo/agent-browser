@@ -13,6 +13,7 @@
   3. 提取到有效数据（非空）
   4. 会话自动清理（destroy 后验证 session 不存在）
 """
+
 import contextlib
 import time
 
@@ -76,7 +77,7 @@ class TestScenario2CLILocalFullTask:
         # 每次延迟应该 > 200ms（pre_action + post_action）
         assert all(d > 0.2 for d in delays)
         # 延迟应该有随机性（不完全相同）
-        assert len(set(int(d * 100) for d in delays)) > 1
+        assert len({int(d * 100) for d in delays}) > 1
 
     def test_data_extraction(self):
         """验证数据提取有效性"""

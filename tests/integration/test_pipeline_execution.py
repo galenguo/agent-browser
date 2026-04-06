@@ -5,6 +5,7 @@ Tests both browser steps (navigate, click, type, wait, snapshot) and
 data transformation steps (map, filter, sort, limit), plus security
 (SSRF protection in fetch).
 """
+
 from unittest import mock
 
 import pytest
@@ -12,6 +13,7 @@ import pytest
 # ══════════════════════════════════════════════
 #  Test 1-2: Pipeline Loading & Execution
 # ══════════════════════════════════════════════
+
 
 class TestPipelineLoading:
     """Load YAML adapter pipelines and verify structure."""
@@ -34,7 +36,7 @@ class TestPipelineLoading:
 
         adapter = get_adapter("baidu", "search")
         for step in adapter.get("pipeline", []):
-            op = list(step.keys())[0]
+            op = next(iter(step.keys()))
             assert op in STEPS, f"Unknown step '{op}' not in STEPS registry"
 
 
@@ -74,10 +76,12 @@ class TestPipelineExecution:
         """step_snapshot() returns list of element dicts."""
         from agent_browser.pipeline.steps import step_snapshot
 
-        patched_get_handle.evaluate = mock.AsyncMock(return_value=[
-            {"_index": 0, "tag": "div", "text": "hello", "attrs": {}},
-            {"_index": 1, "tag": "span", "text": "world", "attrs": {}},
-        ])
+        patched_get_handle.evaluate = mock.AsyncMock(
+            return_value=[
+                {"_index": 0, "tag": "div", "text": "hello", "attrs": {}},
+                {"_index": 1, "tag": "span", "text": "world", "attrs": {}},
+            ]
+        )
 
         result = await step_snapshot(
             session_id="test-001",
@@ -94,6 +98,7 @@ class TestPipelineExecution:
 # ══════════════════════════════════════════════
 #  Test 3: Invalid Pipeline Error Handling
 # ══════════════════════════════════════════════
+
 
 class TestPipelineErrorHandling:
     """Invalid inputs produce appropriate errors."""
@@ -145,6 +150,7 @@ class TestPipelineErrorHandling:
 #  Test 4: Output Schema Verification
 # ══════════════════════════════════════════════
 
+
 class TestOutputSchema:
     """Step outputs match expected schema."""
 
@@ -153,9 +159,11 @@ class TestOutputSchema:
         """snapshot output contains tag, text, attrs keys per element."""
         from agent_browser.pipeline.steps import step_snapshot
 
-        patched_get_handle.evaluate = mock.AsyncMock(return_value=[
-            {"_index": 0, "tag": "h1", "text": "Title", "attrs": {"class": "header"}},
-        ])
+        patched_get_handle.evaluate = mock.AsyncMock(
+            return_value=[
+                {"_index": 0, "tag": "h1", "text": "Title", "attrs": {"class": "header"}},
+            ]
+        )
 
         result = await step_snapshot(
             session_id="test",
@@ -178,6 +186,7 @@ class TestOutputSchema:
         page.goto = mock.AsyncMock()
 
         import agent_browser.pipeline.steps as steps_mod
+
         original_get_handle = steps_mod._get_handle
 
         async def fake_handle(sid):
@@ -201,6 +210,7 @@ class TestOutputSchema:
 # ══════════════════════════════════════════════
 #  Test 5: Template Variable Substitution
 # ══════════════════════════════════════════════
+
 
 class TestTemplateSubstitution:
     """Template variables resolve correctly inside step execution."""
@@ -240,6 +250,7 @@ class TestTemplateSubstitution:
 # ══════════════════════════════════════════════
 #  Test 6-9: Data Transformation Steps
 # ══════════════════════════════════════════════
+
 
 class TestDataTransformMap:
     """map step transforms array items via template."""
@@ -363,9 +374,7 @@ class TestDataTransformSort:
         """sort by numeric field ascending."""
         from agent_browser.pipeline.steps import step_sort
 
-        mock_page_for_steps.evaluate.return_value = [
-            {"v": 1}, {"v": 2}, {"v": 3}
-        ]
+        mock_page_for_steps.evaluate.return_value = [{"v": 1}, {"v": 2}, {"v": 3}]
         data = [{"v": 3}, {"v": 1}, {"v": 2}]
         result = await step_sort(
             session_id="test",
@@ -382,9 +391,7 @@ class TestDataTransformSort:
         """sort by string field descending."""
         from agent_browser.pipeline.steps import step_sort
 
-        mock_page_for_steps.evaluate.return_value = [
-            {"name": "Charlie"}, {"name": "Bob"}, {"name": "Alice"}
-        ]
+        mock_page_for_steps.evaluate.return_value = [{"name": "Charlie"}, {"name": "Bob"}, {"name": "Alice"}]
         data = [{"name": "Alice"}, {"name": "Charlie"}, {"name": "Bob"}]
         result = await step_sort(
             session_id="test",
@@ -466,6 +473,7 @@ class TestDataTransformLimit:
 # ══════════════════════════════════════════════
 #  Test 10: Fetch SSRF Protection
 # ══════════════════════════════════════════════
+
 
 class TestFetchSSRFProtection:
     """step_fetch blocks requests to private/internal addresses."""

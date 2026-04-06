@@ -14,6 +14,7 @@ Circuit breaker state machine (per-session, not global):
   OPEN:   stealth disabled for this session, failure_count >= threshold
   RESET:  new session resets failure_count = 0
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -37,8 +38,8 @@ logger = logging.getLogger(__name__)
 
 
 class CircuitState(Enum):
-    CLOSED = "closed"   # Normal: stealth active
-    OPEN = "open"       # Degraded: stealth disabled
+    CLOSED = "closed"  # Normal: stealth active
+    OPEN = "open"  # Degraded: stealth disabled
 
 
 @dataclass
@@ -55,8 +56,7 @@ class _PerSessionCircuit:
         if self.failure_count >= self.threshold:
             self.state = CircuitState.OPEN
             logger.warning(
-                f"Circuit OPEN after {self.failure_count} stealth failures; "
-                f"disabling stealth for this session"
+                f"Circuit OPEN after {self.failure_count} stealth failures; disabling stealth for this session"
             )
             return True
         return False
@@ -78,10 +78,17 @@ _STEALTH_OPS: dict[str, str] = {
 }
 
 # Pass-through operations (read-only or non-interactive, no delay needed)
-_PASSTHROUGH_OPS = frozenset({
-    "evaluate", "wait_for_selector", "title", "url",
-    "on", "remove_listener", "close",
-})
+_PASSTHROUGH_OPS = frozenset(
+    {
+        "evaluate",
+        "wait_for_selector",
+        "title",
+        "url",
+        "on",
+        "remove_listener",
+        "close",
+    }
+)
 
 
 # ── StealthPageHandle ─────────────────────────────────────────
@@ -255,8 +262,7 @@ class StealthMiddleware:
                 logger.info("StealthMiddleware initialized (stealth ON)")
             else:
                 logger.warning(
-                    "StealthEnhancer not available (CloakBrowser not installed); "
-                    "running in pass-through mode"
+                    "StealthEnhancer not available (CloakBrowser not installed); running in pass-through mode"
                 )
         else:
             logger.info("StealthMiddleware initialized (stealth OFF -- pass-through)")
@@ -380,7 +386,8 @@ class StealthMiddleware:
             try:
                 return await asyncio.wait_for(
                     self._backend.run_task(
-                        session_id, task,
+                        session_id,
+                        task,
                         intelligence=intelligence,
                         llm_config=llm_config,
                         max_steps=max_steps,
@@ -396,7 +403,8 @@ class StealthMiddleware:
                 }
 
         return await self._backend.run_task(
-            session_id, task,
+            session_id,
+            task,
             intelligence=intelligence,
             llm_config=llm_config,
             max_steps=max_steps,

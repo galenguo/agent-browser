@@ -8,6 +8,7 @@ Phase 1: 配置系统单元测试
 - A1.4 显式参数优先级
 - A1.5 CLI+remote 约束（应降级为 local）
 """
+
 import os
 import tempfile
 from pathlib import Path
