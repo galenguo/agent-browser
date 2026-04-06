@@ -676,21 +676,33 @@ def _install_skill(custom_path=None, force=False):
         return
 
     # Copy SKILL.md
-    shutil.copy2(src_skill_md, target_skill)
+    try:
+        shutil.copy2(src_skill_md, target_skill)
+    except (OSError, shutil.Error) as e:
+        click.echo(json.dumps({"status": "error", "error": f"Failed to copy SKILL.md: {e}"}))
+        return
 
     # Copy references/
     target_refs = target_dir / "references"
     if src_references.exists():
-        if target_refs.exists():
-            shutil.rmtree(target_refs)
-        shutil.copytree(src_references, target_refs)
+        try:
+            if target_refs.exists():
+                shutil.rmtree(target_refs)
+            shutil.copytree(src_references, target_refs)
+        except (OSError, shutil.Error) as e:
+            click.echo(json.dumps({"status": "error", "error": f"Failed to copy references: {e}"}))
+            return
 
     # Copy scripts/
     target_scripts = target_dir / "scripts"
     if src_scripts.exists():
-        if target_scripts.exists():
-            shutil.rmtree(target_scripts)
-        shutil.copytree(src_scripts, target_scripts)
+        try:
+            if target_scripts.exists():
+                shutil.rmtree(target_scripts)
+            shutil.copytree(src_scripts, target_scripts)
+        except (OSError, shutil.Error) as e:
+            click.echo(json.dumps({"status": "error", "error": f"Failed to copy scripts: {e}"}))
+            return
 
     click.echo(
         json.dumps({

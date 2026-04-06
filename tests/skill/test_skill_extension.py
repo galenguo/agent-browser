@@ -165,7 +165,8 @@ class TestDoctorScript:
     @pytest.mark.asyncio
     async def test_ready_property(self, doctor_mod):
         report = await doctor_mod.run_diagnosis()
-        assert report.ready == (report.failed == 0)
+        # ready requires BOTH zero failures AND zero warnings
+        assert report.ready == (report.failed == 0 and report.warned == 0)
 
 
 # ══════════════════════════════════════════════════════════════════

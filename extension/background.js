@@ -197,22 +197,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         tabUrl: tab ? tab.url : null,
         reconnectAttempts: reconnectAttempts,
         lastActivity: lastActivity,
-        commandsProcessed: pendingCommands || 0,
+        commandsProcessed: commandCount || 0,
       });
     });
     return true; // Keep channel open for async response
   }
 });
 
-// Track command count for stats display
-let pendingCommands = 0;
+// Track command count for stats display (separate from pendingCommands Map)
+let commandCount = 0;
 
 // ── Message Handling (from daemon) ──────────────────────────
 
 async function handleMessage(msg) {
   // Count incoming commands for popup stats
   if (msg.id && msg.method) {
-    pendingCommands++;
+    commandCount++;
   }
 
   // Heartbeat from daemon
