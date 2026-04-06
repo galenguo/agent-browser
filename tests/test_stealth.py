@@ -312,17 +312,16 @@ class TestHumanScroll:
             mock_page.evaluate = mock.AsyncMock()
             scroll_calls = []
 
-            def capture(js):
-                scroll_calls.append(js)
+            def capture(js, _calls=scroll_calls):
+                _calls.append(js)
+
             mock_page.evaluate.side_effect = capture
 
             await enhancer.human_scroll(mock_page, scroll_count=1)
 
             # 检查是否有负数滚动（回滚）
-            for call in scroll_calls:
-                if "-" in call and "scrollBy" in call:
-                    back_count += 1
-                    break
+            if any("-" in call and "scrollBy" in call for call in scroll_calls):
+                back_count += 1
 
         # 回滚概率应在 15-25% 范围（考虑随机性）
         back_ratio = back_count / total

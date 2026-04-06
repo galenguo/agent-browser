@@ -153,7 +153,7 @@ class ExtensionBridge:
             return await asyncio.wait_for(cmd.future, timeout=timeout)
         except TimeoutError:
             self._commands.pop(cmd.id, None)
-            raise TimeoutError(f"Extension command '{method}' timed out after {timeout}s")
+            raise TimeoutError(f"Extension command '{method}' timed out after {timeout}s") from None
         except Exception:
             self._commands.pop(cmd.id, None)
             raise
@@ -257,7 +257,7 @@ class BrowserDaemon:
                 if attempt < retries - 1:
                     await asyncio.sleep(0.3 * (attempt + 1))
                 else:
-                    raise ConnectionError(f"Failed to connect to CDP at {cdp_url}: {e}")
+                    raise ConnectionError(f"Failed to connect to CDP at {cdp_url}: {e}") from e
 
     async def disconnect(self) -> None:
         """Disconnect browser."""

@@ -1,21 +1,35 @@
 """
-E2E 测试共享 fixtures
+E2E test shared fixtures.
 
-提供基于 conftest.py 中 cdp_url / browser_context / browser_page 的
-E2E 专用便捷 fixture，减少 test_e2e_*.py 中的重复 boilerplate。
+Provides:
+  - e2e_page: Ready-to-use page (from parent conftest's browser_page fixture)
+  - e2e_reset: Auto-cleans agent_browser module-level singleton state between tests
 """
-
 import pytest
+
+from agent_browser import reset
 
 
 @pytest.fixture
 async def e2e_page(browser_page):
     """
-    E2E 页面 fixture — 已连接 CloakBrowser，可直接使用。
+    E2E page fixture -- already connected to CloakBrowser, ready to use.
 
-    用法：
+    Usage::
+
         async def test_xxx(e2e_page):
             await e2e_page.goto("https://example.com")
             title = await e2e_page.title()
     """
     yield browser_page
+
+
+@pytest.fixture(autouse=True)
+async def _e2e_cleanup():
+    """Reset agent_browser module singletons after each E2E test.
+
+    Prevents sequential-test timeouts caused by stale middleware/backend
+    state (e.g., held asyncio.Lock, orphaned sessions, cached connections).
+    """
+    yield
+    reset()

@@ -59,7 +59,7 @@ class LLMFactory:
                 raise ImportError(
                     "anthropic provider requires 'langchain-anthropic'. "
                     "Install with: pip install agent-browser[full]"
-                )
+                ) from None
 
             llm = ChatAnthropic(
                 model=model or "claude-3-5-sonnet-20241022",

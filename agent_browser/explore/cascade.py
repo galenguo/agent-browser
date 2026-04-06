@@ -97,8 +97,10 @@ async def _try_public(test_urls: list[str], base_url: str) -> dict[str, Any]:
     import aiohttp
     for url in test_urls:
         try:
-            async with aiohttp.ClientSession() as http:
-                async with http.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            async with (
+                aiohttp.ClientSession() as http,
+                http.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp,
+            ):
                     if resp.status == 200:
                         data = await resp.json()
                         items = _extract_items(data)

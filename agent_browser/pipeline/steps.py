@@ -501,7 +501,7 @@ async def step_evaluate(session_id: str, params: Any, data: Any,
         raise ValueError(
             f"JavaScript execution timed out after {eval_timeout}s. "
             "Use _timeout param to increase limit."
-        )
+        ) from None
 
     return result
 

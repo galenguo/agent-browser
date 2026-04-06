@@ -41,8 +41,9 @@ class SessionNotFoundError(Exception):
     pass
 
 
-# Re-export PipelineError from pipeline layer (for API layer consumption)
-from agent_browser.pipeline.errors import PipelineError as PipelineError
+from agent_browser.pipeline.errors import (  # noqa: E402
+    PipelineError as PipelineError,
+)
 
 # ============ Browser instances ============
 

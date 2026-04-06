@@ -129,10 +129,9 @@ class TestTimingNoiseGraceful:
             pytest.skip("StealthEnhancer not available")
 
         # Should not raise when called with None
-        try:
-            await StealthEnhancer.inject_timing_noise(None)
-        except Exception:
-            pass  # May raise if not implemented for None; acceptable
+        import contextlib
+        with contextlib.suppress(Exception):
+            await StealthEnhancer.inject_timing_noise(None)  # May raise if not implemented for None; acceptable
 
 
 # ══════════════════════════════════════════════
@@ -366,10 +365,9 @@ class TestStealthEnhancerBehavioral:
             pytest.skip("StealthEnhancer not available")
 
         # Call static method directly
-        try:
-            await StealthEnhancer.inject_timing_noise(None)
-        except (TypeError, AttributeError):
-            pass  # Acceptable if implementation doesn't handle None
+        import contextlib
+        with contextlib.suppress(TypeError, AttributeError):
+            await StealthEnhancer.inject_timing_noise(None)  # Acceptable if implementation doesn't handle None
 
 
 # ══════════════════════════════════════════════

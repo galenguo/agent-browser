@@ -18,7 +18,7 @@ import pytest
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Import ABCs from the new package path
-from agent_browser.browser import BrowserBackend, BrowserPageHandle
+from agent_browser.browser import BrowserBackend, BrowserPageHandle  # noqa: E402
 
 # Skip legacy monolithic test (not pytest-compatible, calls sys.exit at import)
 collect_ignore = ["test_skill_scenarios.py"]

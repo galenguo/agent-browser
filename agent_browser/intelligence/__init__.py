@@ -1,5 +1,4 @@
 """Intelligence mode routing — Delegates to StealthMiddleware.run_task()."""
-from typing import Dict, Optional
 
 
 async def run_task(

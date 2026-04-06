@@ -287,8 +287,8 @@ class TestGenerateConfigEdgeCases:
         content2 = target.read_text()
 
         # All other content should match (strip timestamps for comparison)
-        lines1 = [l for l in content1.split('\n') if 'configured_at' not in l]
-        lines2 = [l for l in content2.split('\n') if 'configured_at' not in l]
+        lines1 = [entry for entry in content1.split('\n') if 'configured_at' not in entry]
+        lines2 = [entry for entry in content2.split('\n') if 'configured_at' not in entry]
         assert lines1 == lines2, "non-timestamp content should be identical"
         # Timestamps may be identical if writes happen within same second (CI)
 
@@ -401,24 +401,24 @@ class TestEnsureMiddlewareRecovery:
             DepStatus(name="cdp", available=False, fixable=True, message="CDP down")
         ])
 
-        with mock.patch("agent_browser.stealth.middleware.StealthMiddleware", return_value=mock_instance):
-            with mock.patch("agent_browser.main._select_backend") as mock_sb:
-                mock_sb.return_value = mock.MagicMock()
-                with mock.patch("agent_browser.main.detect_missing_deps", return_value=non_ready_report):
+        with mock.patch("agent_browser.stealth.middleware.StealthMiddleware", return_value=mock_instance), \
+             mock.patch("agent_browser.main._select_backend") as mock_sb, \
+             mock.patch("agent_browser.main.detect_missing_deps", return_value=non_ready_report):
+            mock_sb.return_value = mock.MagicMock()
 
-                    with pytest.raises(FirstSessionError) as exc_info:
-                        from agent_browser.main import SkillConfig, _ensure_middleware
-                        config = SkillConfig()
-                        # Reset global state
-                        import agent_browser.main as main_mod
-                        main_mod._config = config
-                        main_mod._middleware = None
+            with pytest.raises(FirstSessionError) as exc_info:
+                from agent_browser.main import SkillConfig, _ensure_middleware
+                config = SkillConfig()
+                # Reset global state
+                import agent_browser.main as main_mod
+                main_mod._config = config
+                main_mod._middleware = None
 
-                        await _ensure_middleware(config)
+                await _ensure_middleware(config)
 
-                    assert exc_info.value.recovery is not None
-                    assert "ready" in exc_info.value.recovery
-                    assert exc_info.value.recovery["ready"] is False
+            assert exc_info.value.recovery is not None
+            assert "ready" in exc_info.value.recovery
+            assert exc_info.value.recovery["ready"] is False
 
 
 # ══════════════════════════════════════════════════════════════════

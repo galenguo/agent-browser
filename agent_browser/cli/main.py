@@ -195,12 +195,12 @@ def session_destroy(session):
 
 
 async def _session_destroy(session_id):
+    import contextlib
+
     try:
         # Destroy from UnifiedSessionManager (if exists)
-        try:
-            await session_mgr.destroy_session(session_id)
-        except Exception:
-            pass  # May already be gone from memory
+        with contextlib.suppress(Exception):
+            await session_mgr.destroy_session(session_id)  # May already be gone from memory
 
         # Delete from file
         cli_store.delete(session_id)

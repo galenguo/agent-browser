@@ -100,8 +100,8 @@ class TestDetectMissingDeps:
             mock_session_cls = mock.MagicMock()
             mock_session_cls.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_resp
 
-            with mock.patch("aiohttp.ClientSession", return_value=mock_session_cls):
-                with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+            with mock.patch("aiohttp.ClientSession", return_value=mock_session_cls), \
+                 mock.patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
                     report = await detect_missing_deps()
                     # Should be ready (or at least have no blocking deps)
                     assert isinstance(report, RecoveryReport)

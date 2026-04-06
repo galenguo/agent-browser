@@ -56,10 +56,9 @@ class TestRecord:
     def test_record_non_blocking(self):
         """telemetry 失败不应抛异常"""
         # 即使目录不可写也不应崩溃
-        try:
-            Telemetry.record("safe/test", True, 10, 1, 1)
-        except Exception:
-            pass  # should not happen
+        import contextlib
+        with contextlib.suppress(Exception):
+            Telemetry.record("safe/test", True, 10, 1, 1)  # should not happen
         # 验证没有崩溃即可
 
 

@@ -547,15 +547,14 @@ class TestPipelineErrorHandling:
             return real_handle
         monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
         # fail_fast=False 应该不抛异常（或返回部分数据）
-        try:
+        import contextlib
+        with contextlib.suppress(Exception):
             await execute_pipeline(
                 pipeline,
                 session_id="pipe_fs",
                 args={},
                 fail_fast=False,
-            )
-        except Exception:
-                pass  # 也允许异常，关键是 snapshot 是否被执行
+            )  # 也允许异常，关键是 snapshot 是否被执行
 
         # 关键断言：即使 click 失败，snapshot 步骤仍执行了
         status = "PASS" if snapshot_executed else "FAIL"

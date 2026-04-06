@@ -60,8 +60,8 @@ async def check_cloakbrowser():
     """检查 CloakBrowser 是否运行 (local 浏览器模式)"""
     import aiohttp
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get("http://127.0.0.1:19222/json/version", timeout=aiohttp.ClientTimeout(total=3)) as resp:
+        async with aiohttp.ClientSession() as session, \
+                session.get("http://127.0.0.1:19222/json/version", timeout=aiohttp.ClientTimeout(total=3)) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     print(f"  ✅ CloakBrowser: {data.get('Browser', 'unknown')}")
@@ -75,8 +75,8 @@ async def check_fastapi():
     """检查 FastAPI 是否运行"""
     import aiohttp
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get("http://localhost:8000/health", timeout=aiohttp.ClientTimeout(total=3)) as resp:
+        async with aiohttp.ClientSession() as session, \
+                session.get("http://localhost:8000/health", timeout=aiohttp.ClientTimeout(total=3)) as resp:
                 if resp.status == 200:
                     print("  ✅ FastAPI: http://localhost:8000")
                     return True
@@ -89,8 +89,8 @@ async def check_gateway():
     """检查 Gateway 是否运行 (remote 浏览器模式)"""
     import aiohttp
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get("http://localhost:8001/health", timeout=aiohttp.ClientTimeout(total=3)) as resp:
+        async with aiohttp.ClientSession() as session, \
+                session.get("http://localhost:8001/health", timeout=aiohttp.ClientTimeout(total=3)) as resp:
                 if resp.status == 200:
                     print("  ✅ Gateway: http://localhost:8001")
                     return True

@@ -79,9 +79,8 @@ skill:
   calling_mode: cli
 """)
 
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_CALLING_MODE": "api"}):
-            # Need to also patch Path.home to point to tmp_path
-            with mock.patch("agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
+        with mock.patch.dict(os.environ, {"AGENT_BROWSER_CALLING_MODE": "api"}), \
+             mock.patch("agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
                 cfg = load_config()
                 assert cfg.calling_mode == "api"
 

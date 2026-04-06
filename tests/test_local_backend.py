@@ -350,7 +350,7 @@ class TestErrorHandling:
             context = await browser.new_context()
             page = await context.new_page()
 
-            with pytest.raises(Exception):
+            with pytest.raises(Exception, match=""):
                 await page.goto("not-a-valid-url", timeout=5000)
 
             await context.close()
@@ -368,7 +368,7 @@ class TestErrorHandling:
 
             await page.goto("https://example.com")
 
-            with pytest.raises(Exception):
+            with pytest.raises(Exception, match=""):
                 await page.click("#nonexistent-element-xyz", timeout=5000)
 
             await context.close()

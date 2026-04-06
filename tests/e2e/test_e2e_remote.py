@@ -30,8 +30,8 @@ class TestRemoteAPIHealth:
     @pytest.mark.asyncio
     async def test_health_endpoint(self):
         """健康检查端点"""
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{API_BASE_URL}/health", timeout=aiohttp.ClientTimeout(total=5)) as resp:
+        async with aiohttp.ClientSession() as session, \
+                session.get(f"{API_BASE_URL}/health", timeout=aiohttp.ClientTimeout(total=5)) as resp:
                 assert resp.status == 200
                 data = await resp.json()
                 assert data["status"] == "ok"
@@ -41,8 +41,8 @@ class TestRemoteAPIHealth:
     @pytest.mark.asyncio
     async def test_api_available(self):
         """API 服务可用"""
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{API_BASE_URL}/sessions", timeout=aiohttp.ClientTimeout(total=5)) as resp:
+        async with aiohttp.ClientSession() as session, \
+                session.get(f"{API_BASE_URL}/sessions", timeout=aiohttp.ClientTimeout(total=5)) as resp:
                 assert resp.status == 200
                 data = await resp.json()
                 assert "sessions" in data
@@ -58,8 +58,8 @@ class TestRemoteSessionManagement:
         """测试后清理所有 session"""
         yield
         # 清理
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{API_BASE_URL}/sessions", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+        async with aiohttp.ClientSession() as session, \
+                session.get(f"{API_BASE_URL}/sessions", timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     for sess in data.get("sessions", []):
@@ -197,13 +197,12 @@ class TestRemotePageNavigation:
         """导航到 URL"""
         session_id = session_with_cleanup
 
-        async with aiohttp.ClientSession() as client:
-            # 导航
-            async with client.post(
-                f"{API_BASE_URL}/sessions/{session_id}/navigate",
-                json={"url": "https://example.com", "wait_until": "domcontentloaded"},
-                timeout=aiohttp.ClientTimeout(total=120)
-            ) as resp:
+        async with aiohttp.ClientSession() as client, \
+                client.post(
+                    f"{API_BASE_URL}/sessions/{session_id}/navigate",
+                    json={"url": "https://example.com", "wait_until": "domcontentloaded"},
+                    timeout=aiohttp.ClientTimeout(total=120)
+                ) as resp:
                 assert resp.status == 200
                 data = await resp.json()
                 assert data["status"] == "ok"
@@ -606,17 +605,16 @@ class TestRemoteAgentMode:
         """提交 Agent 任务"""
         session_id = session_with_cleanup
 
-        async with aiohttp.ClientSession() as client:
-            # 提交任务
-            async with client.post(
-                f"{API_BASE_URL}/sessions/{session_id}/task",
-                json={
-                    "task": "访问 example.com 并提取页面标题",
-                    "model": "glm-5-turbo",
-                    "max_steps": 5
-                },
-                timeout=aiohttp.ClientTimeout(total=180)
-            ) as resp:
+        async with aiohttp.ClientSession() as client, \
+                client.post(
+                    f"{API_BASE_URL}/sessions/{session_id}/task",
+                    json={
+                        "task": "访问 example.com 并提取页面标题",
+                        "model": "glm-5-turbo",
+                        "max_steps": 5
+                    },
+                    timeout=aiohttp.ClientTimeout(total=180)
+                ) as resp:
                 assert resp.status == 200
                 data = await resp.json()
                 assert "task_id" in data

@@ -6,6 +6,7 @@ Supports two modes:
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 from typing import Literal
@@ -312,10 +313,8 @@ class BrowserInstancePool:
                 instance.container.stop(timeout=10)
                 if self._debug_mode:
                     # Debug mode: manually remove (auto_remove=False)
-                    try:
-                        instance.container.remove(force=True)
-                    except Exception:
-                        pass  # Container may already be removed
+                    with contextlib.suppress(Exception):
+                        instance.container.remove(force=True)  # Container may already be removed
                 logger.info(f"Docker container stopped: {instance.container_name}")
             except Exception as e:
                 logger.warning(f"Failed to stop Docker container: {e}")

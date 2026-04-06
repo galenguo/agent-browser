@@ -139,12 +139,10 @@ def synthesize(
 
     best = exploration.capabilities[0]
     # Handle both InferredCapability (new) and Dict (legacy) formats
-    if hasattr(best, 'strategy'):
-        # New InferredCapability format
-        strategy = best.strategy
-    else:
-        # Legacy Dict format with strategy_guess key
-        strategy = best.get("strategy_guess", "intercept")
+    strategy = (
+        best.strategy if hasattr(best, 'strategy')
+        else best.get("strategy_guess", "intercept")
+    )
 
     if strategy == "public":
         adapter = _generate_fetch_adapter(site, command_name, best, exploration)

@@ -146,7 +146,7 @@ class RemoteAPIBackend(BrowserBackend):
                 raise ConnectionError(
                     f"Cannot connect to API at {self._api_url}. "
                     f"Ensure FastAPI server is running: uvicorn agent_browser.api:app --port 8000"
-                )
+                ) from e
             raise
 
     async def connect(self) -> None:
@@ -156,7 +156,7 @@ class RemoteAPIBackend(BrowserBackend):
             await self._request("GET", "/health")
             logger.info(f"Remote API connected: {self._api_url}")
         except Exception as e:
-            raise ConnectionError(f"FastAPI not reachable at {self._api_url}/health: {e}")
+            raise ConnectionError(f"FastAPI not reachable at {self._api_url}/health: {e}") from e
 
     async def disconnect(self) -> None:
         """Close all sessions + HTTP connection."""

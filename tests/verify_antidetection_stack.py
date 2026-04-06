@@ -184,9 +184,8 @@ class TestLayer4NonStandardPort:
         """CDP 端口应该是 19222"""
         import aiohttp
 
-        async with aiohttp.ClientSession() as session:
-            # 验证 19222 端口可达
-            async with session.get(
+        async with aiohttp.ClientSession() as session, \
+                session.get(
                 "http://127.0.0.1:19222/json/version",
                 timeout=aiohttp.ClientTimeout(total=5)
             ) as resp:

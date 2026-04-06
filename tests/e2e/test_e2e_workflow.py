@@ -93,7 +93,7 @@ class TestE2EWorkflow:
             assert isinstance(links, list), "Links should be a list"
             assert len(links) > 0, "example.com should have at least one link"
             assert all("href" in link for link in links), "Each link should have href"
-            print(f"[E2E] Found {len(links)} links: {[l['text'] for l in links]}")
+            print(f"[E2E] Found {len(links)} links: {[entry['text'] for entry in links]}")
 
             # Extract heading
             h1 = await ab.evaluate(

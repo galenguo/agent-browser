@@ -90,10 +90,7 @@ async def _retry_with_longer_timeout(
         new_params = dict(original_params) if isinstance(original_params, dict) else {}
 
         current_timeout = new_params.get("_timeout") or new_params.get("timeout")
-        if current_timeout:
-            new_timeout = int(current_timeout * 1.5)
-        else:
-            new_timeout = 30  # Default 30s
+        new_timeout = int(current_timeout * 1.5) if current_timeout else 30
 
         new_params["_timeout"] = new_timeout
         logger.info(f"Timeout recovery: retrying '{error.step_name}' with {new_timeout}s timeout")

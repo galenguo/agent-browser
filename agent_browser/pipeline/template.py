@@ -548,9 +548,12 @@ class TemplateContext:
             for node in ast.walk(tree):
                 if not isinstance(node, allowed_nodes):
                     # Allow Math.* calls
-                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-                        if node.func.attr in ('min', 'max', 'floor', 'ceil', 'round', 'abs',
-                                               'parseInt', 'parseFloat'):
+                    if (
+                        isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Attribute)
+                        and node.func.attr in ('min', 'max', 'floor', 'ceil', 'round', 'abs',
+                                              'parseInt', 'parseFloat')
+                    ):
                             continue
                     return fallback
             result = eval(compile(tree, '<template>', 'eval'), eval_globals)

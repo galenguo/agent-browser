@@ -20,6 +20,7 @@ Usage::
         # auto-cleanup on exit
 """
 
+import contextlib
 from typing import Any
 
 from .config import SkillConfig
@@ -37,6 +38,9 @@ from .main import (
 )
 from .main import (
     delete_session as _delete_session,
+)
+from .main import (
+    evaluate as _evaluate,
 )
 from .main import (
     fill as _fill,
@@ -61,9 +65,6 @@ from .main import (
 )
 from .main import (
     scroll as _scroll,
-)
-from .main import (
-    evaluate as _evaluate,
 )
 from .main import (
     select_option as _select_option,
@@ -121,10 +122,8 @@ class AgentBrowser:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         if self._session_id:
-            try:
-                await _delete_session(self._session_id)
-            except Exception:
-                pass  # best-effort cleanup
+            with contextlib.suppress(Exception):
+                await _delete_session(self._session_id)  # best-effort cleanup
             self._session_id = None
         _reset()
 

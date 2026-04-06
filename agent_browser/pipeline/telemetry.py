@@ -94,7 +94,7 @@ class Telemetry:
                 else:
                     by_adapter[a]["failures"] += 1
             # Calculate success rate per adapter
-            for a, s in by_adapter.items():
+            for _a, s in by_adapter.items():
                 s["success_rate"] = s["success"] / s["total"] if s["total"] > 0 else 0
 
         result: dict[str, Any] = {
@@ -121,7 +121,8 @@ class Telemetry:
         """Clear all telemetry data. Returns number of deleted records."""
         if not _TEL_FILE.exists():
             return 0
-        count = sum(1 for _ in open(_TEL_FILE))
+        with open(_TEL_FILE) as f:
+            count = sum(1 for _ in f)
         _TEL_FILE.unlink(missing_ok=True)
         return count
 

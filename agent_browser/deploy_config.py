@@ -124,17 +124,21 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> list[ConfigIss
     if cfg.cdp_url and "19222" in cfg.cdp_url and env_check:
         try:
             import aiohttp
-            async def _check():
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as s:
-                    async with s.get(cfg.cdp_url + "/json/version") as r:
-                        if r.status != 200:
-                            issues.append(ConfigIssue(
-                                severity="warning", section="browser",
-                                message=f"CDP not reachable at {cfg.cdp_url} (status {r.status})",
-                                fix_hint="Start CloakBrowser or verify CDP port",
-                            ))
             import asyncio
-            asyncio.get_event_loop().run_until_complete(_check())
+
+            async def _check():
+                async with (
+                    aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as s,
+                    s.get(cfg.cdp_url + "/json/version") as r,
+                ):
+                    if r.status != 200:
+                        issues.append(ConfigIssue(
+                            severity="warning", section="browser",
+                            message=f"CDP not reachable at {cfg.cdp_url} (status {r.status})",
+                            fix_hint="Start CloakBrowser or verify CDP port",
+                        ))
+
+            asyncio.run(_check())
         except Exception:
             issues.append(ConfigIssue(
                 severity="warning", section="browser",
@@ -182,18 +186,22 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> list[ConfigIss
     if cfg.api_enabled and env_check:
         try:
             import aiohttp
+            import asyncio
+
             async def _check_api():
                 url = f"http://{cfg.api_host}:{cfg.api_port}/health"
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as s:
-                    async with s.get(url) as r:
-                        if r.status != 200:
-                            issues.append(ConfigIssue(
-                                severity="info", section="api",
-                                message=f"API not running at {url} (status {r.status})",
-                                fix_hint="Start API server with: uvicorn src.api:app --port {cfg.api_port}",
-                            ))
-            import asyncio
-            asyncio.get_event_loop().run_until_complete(_check_api())
+                async with (
+                    aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as s,
+                    s.get(url) as r,
+                ):
+                    if r.status != 200:
+                        issues.append(ConfigIssue(
+                            severity="info", section="api",
+                            message=f"API not running at {url} (status {r.status})",
+                            fix_hint="Start API server with: uvicorn src.api:app --port {cfg.api_port}",
+                        ))
+
+            asyncio.run(_check_api())
         except Exception:
             pass  # API not required for basic usage
 

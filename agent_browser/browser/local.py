@@ -130,8 +130,10 @@ class LocalCDPBackend(BrowserBackend):
             health_url = cdp_url.replace("http://", "http://") + "/json/version"
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(health_url, timeout=aiohttp.ClientTimeout(total=2)) as resp:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(health_url, timeout=aiohttp.ClientTimeout(total=2)) as resp,
+            ):
                     return resp.status == 200
         except Exception:
             return False

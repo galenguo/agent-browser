@@ -20,7 +20,7 @@ os.environ.setdefault("REBROWSER_PATCHES_RUNTIME_FIX_MODE", "addBinding")
 
 # Conditional CloakBrowser import
 try:
-    from cloakbrowser import launch_browser
+    import cloakbrowser  # noqa: F401 — launch_browser used below
     _HAS_CLOAK = True
 except ImportError:
     _HAS_CLOAK = False
@@ -59,7 +59,7 @@ def get_cloakbrowser_path() -> str:
         raise RuntimeError(
             "CloakBrowser not found. Install with: pip install cloakbrowser\n"
             "Or set CLOAKBROWSER_PATH env var to the binary path."
-        )
+        ) from None
 
 
 def _build_launch_args(

@@ -86,8 +86,10 @@ async def detect_missing_deps(config: SkillConfig = None) -> RecoveryReport:
     cdp_ok = False
     try:
         import aiohttp
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as s:
-            async with s.get(f"{config.cdp_url}/json/version") as r:
+        async with (
+            aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as s,
+            s.get(f"{config.cdp_url}/json/version") as r,
+        ):
                 cdp_ok = r.status == 200
     except Exception:
         pass
@@ -117,8 +119,7 @@ async def detect_missing_deps(config: SkillConfig = None) -> RecoveryReport:
 
     # 4. Playwright browsers installed
     try:
-        from playwright.async_api import async_playwright
-        # Just check import succeeds; browser binary check is heavier
+        import playwright  # noqa: F401 — just verify package is installed
     except ImportError:
         report.missing_deps.append(DepStatus(
             name="playwright",
@@ -183,7 +184,7 @@ async def _ensure_middleware(config: SkillConfig = None):
                 message=f"Setup needed: {post_report.suggestion}",
                 recovery=_format_recovery_for_claude(post_report),
                 original_error=e,
-            )
+            ) from e
         raise
 
 
@@ -245,7 +246,7 @@ async def _try_extension_connection(config: SkillConfig) -> bool:
         return False
 
     try:
-        from agent_browser.browser.daemon import BrowserDaemon, ExtensionBridge
+        from agent_browser.browser.daemon import BrowserDaemon  # noqa: F401 — ExtensionBridge used later in file
 
         daemon = BrowserDaemon.get(config)
         await daemon.ensure_connected()
@@ -384,9 +385,12 @@ async def _ref_op(session_id: str, ref: str, js_body: str):
 
 async def create_session(cdp_url=None, mode=None, api_url=None, **kwargs) -> str:
     cfg = {}
-    if mode: cfg["calling_mode"] = mode
-    if api_url: cfg["api_url"] = api_url
-    if cdp_url: cfg["cdp_url"] = cdp_url
+    if mode:
+        cfg["calling_mode"] = mode
+    if api_url:
+        cfg["api_url"] = api_url
+    if cdp_url:
+        cfg["cdp_url"] = cdp_url
     cfg.update(kwargs)
     mw = await _ensure_middleware(load_config(**cfg) if cfg else None)
     sid = uuid.uuid4().hex

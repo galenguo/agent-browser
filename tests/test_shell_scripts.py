@@ -294,12 +294,11 @@ docker:
                     in_docker_section = True
                     continue
                 # Reset section tracker when we hit a new top-level key
-                if stripped and not line.startswith(" ") and not line.startswith("\t") and ":" in stripped and in_docker_section:
-                    if not stripped.startswith("registry") and not stripped.startswith("image_tag") and not stripped.startswith("shm_size") and not stripped.startswith("resource_limits") and not stripped.startswith("memory") and not stripped.startswith("cpu"):
-                        # Check if this is still a sub-key of docker (indented more than parent)
-                        if not line.startswith("  ") and not line.startswith("    "):
-                            in_docker_section = False
-                            continue
+                if stripped and not line.startswith(" ") and not line.startswith("\t") and ":" in stripped and in_docker_section \
+                        and not stripped.startswith("registry") and not stripped.startswith("image_tag") and not stripped.startswith("shm_size") and not stripped.startswith("resource_limits") and not stripped.startswith("memory") and not stripped.startswith("cpu") \
+                        and not line.startswith("  ") and not line.startswith("    "):
+                    in_docker_section = False
+                    continue
 
                 if not in_docker_section:
                     continue
