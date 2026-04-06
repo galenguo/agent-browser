@@ -428,6 +428,12 @@ async def scroll(session_id: str, direction: str = "down", amount: int = 500):
     await page.mouse_wheel(0, amount if direction == "down" else -amount)
 
 
+async def evaluate(session_id: str, expression: str):
+    """Execute JavaScript in the page context and return the result."""
+    page = await _get_page(session_id)
+    return await page.evaluate(expression)
+
+
 async def select_option(session_id: str, ref: str, value: str):
     v = json.dumps(value)
     await _ref_op(session_id, ref,

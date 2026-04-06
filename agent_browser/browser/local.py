@@ -322,7 +322,7 @@ class LocalCDPBackend(BrowserBackend):
             return page_handle
 
         # Non-daemon path
-        context = await self._browser.new_context()
+        context = await self._browser.new_context(ignore_https_errors=True)
         page = await context.new_page()
 
         # Inject stealth enhancements

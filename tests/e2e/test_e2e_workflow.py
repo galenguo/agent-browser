@@ -134,8 +134,8 @@ class TestE2EPipelineWorkflow:
         from agent_browser.pipeline.executor import execute_pipeline
 
         steps = [
-            {"action": "navigate", "url": "https://example.com"},
-            {"action": "evaluate", "expression": "document.title"},
+            {"navigate": "https://example.com"},
+            {"evaluate": "document.title"},
         ]
 
         cfg = SkillConfig(cdp_url=cdp_url)
@@ -146,7 +146,7 @@ class TestE2EPipelineWorkflow:
             result = await execute_pipeline(
                 steps=steps,
                 session_id=session_id,
-                config=cfg,
+                args={},
             )
             assert result is not None, "Pipeline should return a result"
             print(f"[E2E Pipeline] Result: {result}")

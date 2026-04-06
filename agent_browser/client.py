@@ -63,6 +63,9 @@ from .main import (
     scroll as _scroll,
 )
 from .main import (
+    evaluate as _evaluate,
+)
+from .main import (
     select_option as _select_option,
 )
 from .main import (
@@ -227,6 +230,22 @@ class AgentBrowser:
             session_id: Session to use.  Defaults to the current session.
         """
         await _scroll(self._resolve(session_id), direction=direction, amount=amount)
+
+    async def evaluate(
+        self,
+        expression: str,
+        session_id: str | None = None,
+    ):
+        """Execute JavaScript in the page and return the result.
+
+        Args:
+            expression: JavaScript expression to evaluate.
+            session_id: Session to use.  Defaults to the current session.
+
+        Returns:
+            The result of the JavaScript evaluation.
+        """
+        return await _evaluate(self._resolve(session_id), expression)
 
     async def select_option(
         self, ref: str, value: str, session_id: str | None = None
