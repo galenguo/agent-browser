@@ -381,6 +381,7 @@ class TestAdaptiveYAMLPipeline:
             # Continues despite errors; returns final data
 
     @pytest.mark.asyncio
+    @pytest.mark.timeout(60)
     async def test_telemetry_non_blocking(self, tmp_path):
         from agent_browser.pipeline import telemetry as tel_module
         from agent_browser.pipeline.executor import execute_pipeline
@@ -403,6 +404,7 @@ class TestAdaptiveYAMLPipeline:
                 entry = json.loads(content)
                 assert entry["success"] is True
 
+    @pytest.mark.timeout(60)
     def test_template_data_context_resolution(self):
         from agent_browser.pipeline.template import TemplateContext, resolve
 
@@ -423,6 +425,7 @@ class TestAdaptiveYAMLPipeline:
         result = resolve("${{ query | upper | truncate(4) }}", args=ctx._args)
         assert result == "TEST"
 
+    @pytest.mark.timeout(60)
     def test_error_classification_all_types(self):
         from agent_browser.pipeline.classifier import ErrorCategory, classify
         from agent_browser.pipeline.errors import (
@@ -455,6 +458,7 @@ class TestAdaptiveYAMLPipeline:
 
 class TestExploreOrchestrator:
     @pytest.mark.asyncio
+    @pytest.mark.timeout(60)
     async def test_explore_mocked_full_flow(self, mock_page_handle):
         from agent_browser.explore.explorer import ExplorationResult, explore
 
@@ -481,6 +485,7 @@ class TestExploreOrchestrator:
             assert isinstance(result, ExplorationResult)
             assert result.url == "https://example.com"
 
+    @pytest.mark.timeout(60)
     def test_synthesize_from_artifacts_roundtrip(self, temp_adapter_dir):
         # Ensure InferredCapability is available in the synthesizer module namespace
         # (synthesizer.py uses InferredCapability at line 931 but doesn't import it)
