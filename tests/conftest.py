@@ -38,14 +38,6 @@ _SCREENSHOT_DIR = Path(__file__).parent / "screenshots"
 _RESULT_DIR = Path(__file__).parent / "results"
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """创建事件循环"""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest.fixture
 def skill_config():
     """默认 SkillConfig"""

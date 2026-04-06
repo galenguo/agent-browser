@@ -1,12 +1,47 @@
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/agent-browser.svg)](https://pypi.org/project/agent-browser/)
+[![CI](https://github.com/galen/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/galen/agent-browser/actions/workflows/ci.yml)
+
 # Agent Browser
 
 > Anti-detection browser automation framework built on [browser-use](https://github.com/browser-use/browser-use).
 
 Agent Browser extends **browser-use** with industrial-grade anti-detection capabilities, a YAML pipeline engine, site exploration, and adapter synthesis. It is designed for **browser-use power users** who hit detection walls when automating interactions with protected websites.
 
+## What It Does
+
+- **Evades detection** -- 7-layer anti-detection stack from C++ fingerprint spoofing to AI-driven circuit breaker
+- **Automates at scale** -- YAML pipeline engine v2.3 with auto-recovery, error classification, and single-step debugger
+- **Runs anywhere** -- CLI, REST API, or Python library; local browser, Chrome extension, or remote gateway
+- **Explores sites** -- automatic DOM analysis + cascade CSS selector generation + YAML adapter synthesis
+
+## Quick Start
+
+```bash
+pip install agent-browser
+```
+
+```python
+import asyncio
+from agent_browser import create_session, open_page, snapshot, click, fill
+
+async def main():
+    session_id = await create_session()
+    await open_page(session_id, "https://example.com")
+
+    data = await snapshot(session_id)
+    print(f"Found {len(data['elements'])} interactive elements")
+
+    await click(session_id, "@e0")       # Click by element ref
+    await fill(session_id, "@e1", "hello")  # Type into input
+
+asyncio.run(main())
+```
+
 ## Features
 
-### 7-Layer Anti-Detection Stack
+### Anti-Detection (7 Layers)
 
 | Layer | Component | What it does |
 |-------|-----------|--------------|
@@ -22,20 +57,27 @@ Agent Browser extends **browser-use** with industrial-grade anti-detection capab
 
 - YAML-driven automation pipelines
 - 19 template filters with arithmetic expressions
-- Typed error hierarchy (6 error categories)
+- Typed error hierarchy (6 categories)
 - Automatic error classification and recovery
 - Single-step debugger with breakpoints
 - JSONL telemetry for execution tracking
 
-### Site Explorer
+### Multi-Mode Support
+
+| Mode | Browser | Intelligence | Use Case |
+|------|---------|-------------|----------|
+| CLI + local | CloakBrowser / Playwright | LLM or Agent | Local development |
+| CLI + extension | User's Chrome (real fingerprint) | LLM or Agent | Production scraping |
+| API + local | FastAPI -> local CDP | LLM or Agent | Team server |
+| API + remote | FastAPI -> Docker gateway | LLM or Agent | Distributed cluster |
+
+### Site Exploration & Adapter Synthesis
 
 - Automatic DOM structure analysis
 - Cascade CSS selector generation
-- YAML adapter synthesis from exploration results
+- One-command YAML adapter synthesis from exploration results
 
-## Quick Start
-
-### Install
+## Installation
 
 ```bash
 # Basic (stealth layers 6-7 only, works with standard Playwright)
@@ -48,30 +90,34 @@ pip install agent-browser[cloak]
 pip install agent-browser[full]
 ```
 
-### Basic Usage (Functional API)
+<details>
+<summary>From Source</summary>
+
+```bash
+git clone https://github.com/galen/agent-browser.git
+cd agent-browser
+pip install -e ".[full]"
+playwright install chromium
+```
+
+</details>
+
+## Usage
+
+### Functional API
 
 ```python
 import asyncio
 from agent_browser import create_session, open_page, snapshot, click, fill, evaluate
 
 async def main():
-    # Create a stealth-wrapped browser session
     session_id = await create_session()
-
-    # Navigate to a page (automatic stealth delays applied)
     await open_page(session_id, "https://example.com")
-
-    # Take a snapshot (returns interactive elements with refs)
     data = await snapshot(session_id)
-    print(f"Found {len(data['elements'])} elements")
 
-    # Interact using element refs
-    await click(session_id, "@e0")  # Click first interactive element
+    await click(session_id, "@e0")
     await fill(session_id, "@e1", "hello world")
-
-    # Execute JavaScript in page context
     title = await evaluate(session_id, "document.title")
-    print(f"Page title: {title}")
 
 asyncio.run(main())
 ```
@@ -84,22 +130,12 @@ from agent_browser import AgentBrowser
 
 async def main():
     async with AgentBrowser() as ab:
-        # Create session (auto-tracked)
         await ab.create_session()
-
-        # All methods omit session_id when tracked
         await ab.open_page("https://example.com")
         snap = await ab.snapshot()
-        print(f"Found {len(snap['elements'])} elements")
-
         await ab.click("@e0")
-        await ab.fill("@e1", "hello world")
-        result = await ab.evaluate("document.title")
-        print(f"Title: {result}")
-
-        # Run autonomous agent task
-        task_result = await ab.run_task("Find the search box and type 'python'")
-        print(f"Task: {task_result['status']}")
+        result = await ab.run_task("Find the search box and type 'python'")
+        print(result['status'])
 
 asyncio.run(main())
 ```
@@ -107,23 +143,17 @@ asyncio.run(main())
 ### Server Mode (FastAPI)
 
 ```bash
-# Install with server dependencies
 pip install agent-browser[full]
-
-# Start the API server
 uvicorn agent_browser.api:app --port 8000
-
-# Check health
 curl http://localhost:8000/health
-# {"status":"ok","sessions":0,"max_concurrent":10,"browser_mode":"local"}
 ```
 
-**REST API endpoints** (all under `/sessions/{session_id}/`):
+**REST API endpoints:**
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Server health + pool stats |
-| POST | `/sessions/create` | Create session (`{"user_id": "..."}`) |
+| POST | `/sessions/create` | Create session |
 | GET | `/sessions/{id}` | Session status |
 | DELETE | `/sessions/{id}` | Delete session |
 | POST | `/navigate` | Navigate to URL |
@@ -133,28 +163,6 @@ curl http://localhost:8000/health
 | POST | `/evaluate` | Execute JavaScript |
 | POST | `/task` | Submit LLM/Agent task |
 
-### Public API Reference
-
-| Function | Description |
-|----------|-------------|
-| `create_session()` | Create browser session, returns UUID |
-| `open_page(sid, url)` | Navigate to URL |
-| `snapshot(sid)` | Get DOM snapshot with `@eN` element refs |
-| `click(sid, ref)` | Click element by ref (`"@e0"`) |
-| `fill(sid, ref, text)` | Type text into input element |
-| `scroll(sid, direction, amount)` | Scroll page |
-| `select_option(sid, ref, value)` | Select dropdown option |
-| `hover(sid, ref)` | Move mouse to element center |
-| `press_key(sid, key)` | Press keyboard key |
-| `wait_for_selector(sel, timeout)` | Wait for CSS selector |
-| `go_back(sid)` | Navigate back |
-| **`evaluate(sid, expr)`** | Execute JS, return result |
-| `run_task(sid, task, intelligence)` | LLM/Agent autonomous task |
-| `delete_session(sid)` | Release session resources |
-| `configure(**kwargs)` | Update config for next session |
-| `reset()` | Clear all global state |
-| `setup()` | Full first-session setup with validation |
-
 ### Pipeline Mode
 
 ```python
@@ -162,7 +170,6 @@ from agent_browser.pipeline import PipelineExecutor
 
 executor = PipelineExecutor(stealth_enabled=True)
 result = await executor.run("adapters/my-site.yaml")
-print(result)
 ```
 
 ### Explore Mode
@@ -178,7 +185,7 @@ async def main():
     explorer = Explorer(session_id)
     snapshot = await explorer.explore()
 
-    # Generate an adapter YAML from the exploration snapshot
+    # Generate adapter YAML automatically
     adapter_yaml = Synthesizer.synthesize(snapshot)
     print(adapter_yaml)
 
@@ -191,6 +198,28 @@ asyncio.run(main())
 agent-browser --help
 ```
 
+## Public API Reference
+
+| Function | Description |
+|----------|-------------|
+| `create_session()` | Create browser session, returns UUID |
+| `open_page(sid, url)` | Navigate to URL |
+| `snapshot(sid)` | Get DOM snapshot with `@eN` element refs |
+| `click(sid, ref)` | Click element by ref (`"@e0"`) |
+| `fill(sid, ref, text)` | Type text into input element |
+| `scroll(sid, direction, amount)` | Scroll page |
+| `select_option(sid, ref, value)` | Select dropdown option |
+| `hover(sid, ref)` | Move mouse to element center |
+| `press_key(sid, key)` | Press keyboard key |
+| `wait_for_selector(sel, timeout)` | Wait for CSS selector |
+| `go_back(sid)` | Navigate back |
+| `evaluate(sid, expr)` | Execute JS, return result |
+| `run_task(sid, task, intelligence)` | LLM/Agent autonomous task |
+| `delete_session(sid)` | Release session resources |
+| `configure(**kwargs)` | Update config for next session |
+| `reset()` | Clear all global state |
+| `setup()` | Full first-session setup with validation |
+
 ## Architecture
 
 ```
@@ -199,7 +228,6 @@ agent_browser/
 ├── main.py          # Facade API (create_session, snapshot, click, run_task, etc.)
 ├── client.py        # AgentBrowser OOP interface (session tracking, context manager)
 ├── config.py        # SkillConfig dataclass + mode detection
-├── deploy_config.py # DeployConfig for Docker/K8s deployments
 ├── browser/         # Backend ABCs + implementations (local, remote, extension)
 ├── stealth/         # Anti-detection: middleware, enhancer, actions, patches
 ├── pipeline/        # YAML pipeline engine v2.3
@@ -211,6 +239,15 @@ agent_browser/
 ├── llm/             # LLM factory (OpenAI, Anthropic, GLM)
 └── utils/           # Shared utilities
 ```
+
+Full architecture guide: see [CLAUDE.md](CLAUDE.md) for detailed design decisions, mode routing, and development standards.
+
+## Examples
+
+See [`examples/`](examples/) directory:
+
+- [`examples/getting_started/`](examples/getting_started/) -- Basic search, snapshot exploration, agent tasks, site-specific examples (Zhihu, Bilibili, batch search)
+- [`examples/advanced/`](examples/advanced/) -- Advanced usage patterns
 
 ## How It Compares to Raw browser-use
 
@@ -243,10 +280,31 @@ agent_browser/
 - `[cloak]` - CloakBrowser C++ fingerprinting + patchright (layers 1-5)
 - `[full]` - FastAPI server + LLM integrations (langchain-openai, langchain-anthropic)
 
+## Documentation
+
+- [Architecture Guide](CLAUDE.md) -- Full system design, mode matrix, development standards
+- [Contributing Guide](CONTRIBUTING.md) -- Development setup, code style, PR process
+- [Security Policy](SECURITY.md) -- Vulnerability reporting, security best practices
+- [Deployment Guide](deploy/README.md) -- Docker, Kubernetes, Helm deployment
+- [CHANGELOG](CHANGELOG.md) -- Version history
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+
+- Development environment setup
+- Code style guidelines (ruff formatter/linter)
+- Pull request process
+- Test suite (716 tests across unit, integration, scenario, stealth, browser, and skill tests)
+
 ## License
 
 Apache 2.0. See [LICENSE](LICENSE) for details.
 
-## Contributing
+## Acknowledgments
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style guidelines, and pull request process.
+Built on top of excellent open-source projects:
+
+- [browser-use](https://github.com/browser-use/browser-use) -- AI browser agent framework (MIT)
+- [Playwright](https://github.com/microsoft/playwright) -- Reliable browser automation (Apache 2.0)
+- [CloakBrowser](https://github.com/nickyc975/cloakbrowser) -- C++ anti-detection Chromium (MIT)
