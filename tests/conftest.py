@@ -102,7 +102,7 @@ def temp_state_path():
 @pytest.fixture
 def reset_daemon():
     """每个测试后重置 BrowserDaemon singleton"""
-    from agent_browser.daemon import BrowserDaemon
+    from agent_browser.browser.daemon import BrowserDaemon
 
     yield
     BrowserDaemon.reset()

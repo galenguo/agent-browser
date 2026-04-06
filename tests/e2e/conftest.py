@@ -9,6 +9,7 @@ Provides:
 import pytest
 
 from agent_browser import reset
+from agent_browser.browser.daemon import BrowserDaemon
 
 
 @pytest.fixture
@@ -30,7 +31,10 @@ async def _e2e_cleanup():
     """Reset agent_browser module singletons after each E2E test.
 
     Prevents sequential-test timeouts caused by stale middleware/backend
-    state (e.g., held asyncio.Lock, orphaned sessions, cached connections).
+    state (e.g., held asyncio.Lock, orphaned sessions, cached connections,
+    BrowserDaemon singleton holding dead CDP connections).
     """
     yield
     reset()
+    # Also reset the BrowserDaemon singleton so next test gets a fresh CDP connection
+    BrowserDaemon.reset()
