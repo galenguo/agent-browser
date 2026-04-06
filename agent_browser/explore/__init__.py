@@ -3,15 +3,15 @@
 Explores target sites, analyzes DOM structure, generates cascade CSS
 selectors, and synthesizes YAML adapters.
 """
-from .explorer import explore, Endpoint, ExplorationResult
 from .analysis import (
     DiscoveredStore,
     InferredCapability,
-    detect_site_name,
     detect_auth_indicators,
+    detect_site_name,
     infer_capabilities_from_endpoints,
 )
 from .cascade import cascade as cascade_explore
+from .explorer import Endpoint, ExplorationResult, explore
 from .synthesizer import synthesize
 
 __all__ = [

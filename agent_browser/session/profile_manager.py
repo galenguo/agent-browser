@@ -13,9 +13,7 @@ import logging
 import os
 import shutil
 import time
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
-from typing import Dict, Optional, List
+from dataclasses import asdict, dataclass, field
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +40,7 @@ class ProfileManager:
     ):
         self.storage_dir = storage_dir
         self.profile_ttl = profile_ttl
-        self.profiles: Dict[str, UserProfile] = {}
+        self.profiles: dict[str, UserProfile] = {}
 
         # Ensure storage directory exists
         os.makedirs(storage_dir, mode=0o700, exist_ok=True)
@@ -65,7 +63,7 @@ class ProfileManager:
 
                 metadata_file = os.path.join(profile_dir, ".metadata.json")
                 if os.path.exists(metadata_file):
-                    with open(metadata_file, 'r') as f:
+                    with open(metadata_file) as f:
                         data = json.load(f)
                         profile = UserProfile(**data)
                         self.profiles[profile.profile_id] = profile
@@ -127,7 +125,7 @@ class ProfileManager:
             profile.last_activity = time.time()
             self._save_metadata(profile)
 
-    def cleanup_expired_profiles(self) -> List[str]:
+    def cleanup_expired_profiles(self) -> list[str]:
         """Clean up expired profiles."""
         cleaned = []
         now = time.time()
@@ -148,7 +146,7 @@ class ProfileManager:
 
         return cleaned
 
-    def get_profile_stats(self) -> Dict:
+    def get_profile_stats(self) -> dict:
         """Get profile statistics."""
         total_disk_usage = 0
         profile_list = []
@@ -157,7 +155,7 @@ class ProfileManager:
             # Calculate disk usage
             disk_usage = 0
             try:
-                for root, dirs, files in os.walk(profile.profile_dir):
+                for root, _dirs, files in os.walk(profile.profile_dir):
                     for f in files:
                         fp = os.path.join(root, f)
                         if os.path.exists(fp):

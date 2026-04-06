@@ -1,6 +1,7 @@
 """Adapter 回归测试 — 所有 YAML adapter 通过验证器 + 结构检查"""
 import pytest
-from agent_browser.adapters.loader import get_adapter, list_adapters
+
+from agent_browser.adapters.loader import get_adapter
 from agent_browser.adapters.validator import validate_adapter
 
 
@@ -81,7 +82,9 @@ class TestPipelineErrors:
 
     def test_subclass_hierarchy(self):
         from agent_browser.pipeline.errors import (
-            PipelineError, PipelineStepError, SelectorNotFoundError,
+            PipelineError,
+            PipelineStepError,
+            SelectorNotFoundError,
         )
         assert issubclass(SelectorNotFoundError, PipelineStepError)
         assert issubclass(PipelineStepError, PipelineError)

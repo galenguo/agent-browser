@@ -5,9 +5,9 @@ Tests both browser steps (navigate, click, type, wait, snapshot) and
 data transformation steps (map, filter, sort, limit), plus security
 (SSRF protection in fetch).
 """
-import pytest
 from unittest import mock
 
+import pytest
 
 # ══════════════════════════════════════════════
 #  Test 1-2: Pipeline Loading & Execution
@@ -46,7 +46,7 @@ class TestPipelineExecution:
         """step_navigate() validates URL and calls page.goto()."""
         from agent_browser.pipeline.steps import step_navigate
 
-        result = await step_navigate(
+        await step_navigate(
             session_id="test-001",
             params={"url": "https://example.com"},  # Dict format avoids .get() bug on string
             data=None,
@@ -546,7 +546,7 @@ class TestFetchSSRFProtection:
         from agent_browser.pipeline.steps import step_fetch
 
         mock_page_for_steps.evaluate.return_value = '{"ok": true}'
-        result = await step_fetch(
+        await step_fetch(
             session_id="test",
             params="https://api.example.com/data",
             data=None,

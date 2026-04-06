@@ -5,19 +5,19 @@ When something fails, return structured dict so Claude Code can present options.
 """
 import asyncio
 import json
+import logging
 import os
 import re
 import uuid
-import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .config import SkillConfig, detect_mode, load_config
 
 logger = logging.getLogger(__name__)
 _REF_PATTERN = re.compile(r'^@e\d+$')
 
-_config: Optional[SkillConfig] = None
+_config: SkillConfig | None = None
 _middleware = None
 _middleware_lock = asyncio.Lock()
 
@@ -40,9 +40,9 @@ class RecoveryReport:
 
     Claude Code receives this and presents options via AskUserQuestion.
     """
-    missing_deps: List[DepStatus] = field(default_factory=list)
-    fixable: List[DepStatus] = field(default_factory=list)
-    needs_human: List[DepStatus] = field(default_factory=list)
+    missing_deps: list[DepStatus] = field(default_factory=list)
+    fixable: list[DepStatus] = field(default_factory=list)
+    needs_human: list[DepStatus] = field(default_factory=list)
 
     @property
     def ready(self) -> bool:
@@ -131,7 +131,7 @@ async def detect_missing_deps(config: SkillConfig = None) -> RecoveryReport:
     return report
 
 
-def _format_recovery_for_claude(report: RecoveryReport) -> Dict[str, Any]:
+def _format_recovery_for_claude(report: RecoveryReport) -> dict[str, Any]:
     """Convert RecoveryReport to plain dict for Claude Code tool context."""
     return {
         "ready": report.ready,
@@ -193,7 +193,7 @@ class FirstSessionError(Exception):
     Carries a 'recovery' dict that Claude Code can use to present options.
     """
 
-    def __init__(self, message: str, recovery: Dict[str, Any], original_error: Exception = None):
+    def __init__(self, message: str, recovery: dict[str, Any], original_error: Exception = None):
         super().__init__(message)
         self.recovery = recovery
         self.original_error = original_error
@@ -284,7 +284,7 @@ def reset():
     _middleware = None
 
 
-async def setup(**kwargs) -> Dict[str, Any]:
+async def setup(**kwargs) -> dict[str, Any]:
     """First-session setup: detect, validate, configure, and verify.
 
     Designed for Claude Code context: returns structured dict, never calls input().
@@ -299,8 +299,10 @@ async def setup(**kwargs) -> Dict[str, Any]:
     Kwargs are forwarded to DeployConfig constructor for programmatic override.
     """
     from agent_browser.deploy_config import (
-        DeployConfig, load_deploy_config, generate_config,
-        validate_config, detect_environment,
+        detect_environment,
+        generate_config,
+        load_deploy_config,
+        validate_config,
     )
 
     # 1. Detect environment
@@ -368,7 +370,7 @@ async def _ref_op(session_id: str, ref: str, js_body: str):
     safe_ref = json.dumps(ref)
     result = await page.evaluate(
         f"""(() => {{
-            const el = document.querySelector('[data-ab-ref=' + {safe_ref} + ']');
+            const el = document.querySelector('[data-ab-ref="' + {safe_ref} + '"]');
             if (!el) return {{error: 'not found'}};
             {js_body}
             return {{status: 'ok'}};
@@ -438,7 +440,7 @@ async def hover(session_id: str, ref: str):
     safe_ref = json.dumps(ref)
     box = await page.evaluate(
         f"""(() => {{
-            const el = document.querySelector('[data-ab-ref=' + {safe_ref} + ']');
+            const el = document.querySelector('[data-ab-ref="' + {safe_ref} + '"]');
             if (!el) return null;
             const r = el.getBoundingClientRect();
             return {{x: r.x + r.width/2, y: r.y + r.height/2}};
@@ -480,48 +482,48 @@ async def run_task(
 
 
 async def debug_pipeline(
-	session_id: str,
-	site: str,
-	command: str,
-	args: dict = None,
-	breakpoints: list = None,
-	cdp_url: str = "http://127.0.0.1:19222",
-	**kwargs,
+    session_id: str,
+    site: str,
+    command: str,
+    args: dict = None,
+    breakpoints: list = None,
+    cdp_url: str = "http://127.0.0.1:19222",
+    **kwargs,
 ) -> Any:
-	"""Debug mode: single-step execute adapter pipeline with breakpoint support.
+    """Debug mode: single-step execute adapter pipeline with breakpoint support.
 
-	Args:
-		session_id: Browser session ID
-		site: Site name (e.g., "boss")
-		command: Command name (e.g., "search")
-		args: Adapter parameters
-		breakpoints: Breakpoint step index list (e.g., [2, 5] means pause after steps 2 and 5)
-		cdp_url: CDP connection address
+    Args:
+        session_id: Browser session ID
+        site: Site name (e.g., "boss")
+        command: Command name (e.g., "search")
+        args: Adapter parameters
+        breakpoints: Breakpoint step index list (e.g., [2, 5] means pause after steps 2 and 5)
+        cdp_url: CDP connection address
 
-	Returns:
-		Breakpoint state dict or final data (compatible with execute_pipeline)
+    Returns:
+        Breakpoint state dict or final data (compatible with execute_pipeline)
 
-	Example::
+    Example::
 
-		result = await debug_pipeline(session_id, "boss", "search",
-		                                {"query": "Python"}, breakpoints=[2])
-		# Pause after navigate, return current page data
-	"""
-	from agent_browser.adapters.loader import get_adapter
-	from agent_browser.pipeline.debugger import debug_pipeline as _debug
+        result = await debug_pipeline(session_id, "boss", "search",
+                                        {"query": "Python"}, breakpoints=[2])
+        # Pause after navigate, return current page data
+    """
+    from agent_browser.adapters.loader import get_adapter
+    from agent_browser.pipeline.debugger import debug_pipeline as _debug
 
-	adapter = get_adapter(site, command)
-	if not adapter:
-		raise ValueError(f"Adapter not found: {site}/{command}")
+    adapter = get_adapter(site, command)
+    if not adapter:
+        raise ValueError(f"Adapter not found: {site}/{command}")
 
-	merged_args = {**(args or {}), "_adapter_name": f"{site}/{command}"}
-	pipeline = adapter.get("pipeline", [])
-	stealth = adapter.get("stealth", {})
+    merged_args = {**(args or {}), "_adapter_name": f"{site}/{command}"}
+    pipeline = adapter.get("pipeline", [])
+    stealth = adapter.get("stealth", {})
 
-	return await _debug(
-		steps=pipeline,
-		session_id=session_id,
-		args=merged_args,
-		breakpoints=breakpoints,
-		stealth_config=stealth,
-	)
+    return await _debug(
+        steps=pipeline,
+        session_id=session_id,
+        args=merged_args,
+        breakpoints=breakpoints,
+        stealth_config=stealth,
+    )

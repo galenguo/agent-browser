@@ -1,7 +1,8 @@
 """模式3测试：API网关"""
-import pytest
-import httpx
 import asyncio
+
+import httpx
+import pytest
 from websockets import connect
 
 

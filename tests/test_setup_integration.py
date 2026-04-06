@@ -1,19 +1,17 @@
 """Tests for setup() function, First-Session Recovery, and Phase 0 integration."""
 import os
-import sys
-import pytest
-import asyncio
-from pathlib import Path
 from unittest import mock
 
-from agent_browser.main import (
-    setup,
-    detect_missing_deps,
-    DepStatus,
-    RecoveryReport,
-    FirstSessionError,
-)
+import pytest
+
 from agent_browser.deploy_config import DeployConfig
+from agent_browser.main import (
+    DepStatus,
+    FirstSessionError,
+    RecoveryReport,
+    detect_missing_deps,
+    setup,
+)
 
 
 class TestDepStatus:
@@ -135,7 +133,7 @@ class TestSetupFunction:
     async def test_writes_config_file(self, tmp_path):
         cfg_path = tmp_path / "config.yaml"
         with mock.patch("agent_browser.deploy_config.CONFIG_PATH", cfg_path):
-            result = await setup()
+            await setup()
             assert cfg_path.exists()
             content = cfg_path.read_text()
             assert "deployment:" in content or "mode:" in content

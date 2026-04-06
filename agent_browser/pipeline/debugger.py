@@ -13,9 +13,9 @@ Usage:
 """
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from .executor import PipelineStep, PipelineResult
+from .executor import PipelineStep
 from .template import TemplateContext
 
 logger = logging.getLogger(__name__)
@@ -30,9 +30,9 @@ class StepRecord:
         op: str,
         params: Any,
         output_type: str = "unknown",
-        output_size: Optional[int] = None,
+        output_size: int | None = None,
         duration_ms: int = 0,
-        error: Optional[Dict] = None,
+        error: dict | None = None,
     ):
         self.step_index = step_index
         self.op = op
@@ -63,11 +63,11 @@ class DebugSession:
 
     def __init__(
         self,
-        steps: List[Dict[str, Any]],
+        steps: list[dict[str, Any]],
         session_id: str,
-        args: Dict[str, Any],
-        breakpoints: Optional[List[int]] = None,
-        stealth_config: Optional[Dict] = None,
+        args: dict[str, Any],
+        breakpoints: list[int] | None = None,
+        stealth_config: dict | None = None,
     ):
         self.steps = [PipelineStep(s) for s in steps]
         self.session_id = session_id
@@ -77,8 +77,8 @@ class DebugSession:
 
         self.current_step = 0
         self.data: Any = None
-        self.history: List[StepRecord] = []
-        self.context: Dict[str, Any] = {"args": args, "data": None}
+        self.history: list[StepRecord] = []
+        self.context: dict[str, Any] = {"args": args, "data": None}
         self.tmpl_ctx = TemplateContext(args=args)
 
         self._start_time: float = 0
@@ -88,7 +88,7 @@ class DebugSession:
     def total_steps(self) -> int:
         return len(self.steps)
 
-    async def run_to_breakpoint(self) -> Dict[str, Any]:
+    async def run_to_breakpoint(self) -> dict[str, Any]:
         """
         Execute until next breakpoint or completion.
 
@@ -186,12 +186,12 @@ class DebugSession:
             "total_steps": self.total_steps,
         }
 
-    async def run_all(self) -> Dict[str, Any]:
+    async def run_all(self) -> dict[str, Any]:
         """Execute all steps without breakpoints (same as execute_pipeline but with history)."""
         self.breakpoints.clear()  # Clear breakpoints = no pauses
         return await self.run_to_breakpoint()
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         """Get current debug state snapshot."""
         return {
             "session_id": self.session_id,
@@ -223,11 +223,11 @@ def _summarize(value: Any, max_len: int = 200) -> str:
 
 
 async def debug_pipeline(
-    steps: List[Dict[str, Any]],
+    steps: list[dict[str, Any]],
     session_id: str,
-    args: Dict[str, Any],
-    breakpoints: Optional[List[int]] = None,
-    stealth_config: Optional[Dict] = None,
+    args: dict[str, Any],
+    breakpoints: list[int] | None = None,
+    stealth_config: dict | None = None,
 ) -> Any:
     """
     Execute pipeline in debug mode.

@@ -1,9 +1,10 @@
 """Adapter Runner — Find adapter → Create session → Execute pipeline → Return result."""
 import logging
-from typing import Any, List, Optional
+from typing import Any
+
+from agent_browser.pipeline.executor import execute_pipeline
 
 from .loader import get_adapter
-from agent_browser.pipeline.executor import execute_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -11,10 +12,10 @@ logger = logging.getLogger(__name__)
 async def run_adapter(
     site: str,
     command: str,
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
     cdp_url: str = "http://127.0.0.1:19222",
     **kwargs: Any,
-) -> List[dict]:
+) -> list[dict]:
     """
     Execute a site adapter command (deterministic, zero LLM cost).
 

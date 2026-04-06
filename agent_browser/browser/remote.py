@@ -9,11 +9,14 @@ It is an HTTP remote proxy for LocalCDPBackend:
 """
 
 import asyncio
+import contextlib
 import logging
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
+
+from agent_browser.config import SkillConfig
 
 from . import BrowserBackend, BrowserPageHandle
-from agent_browser.config import SkillConfig
 
 logger = logging.getLogger(__name__)
 
@@ -108,9 +111,9 @@ class RemoteAPIBackend(BrowserBackend):
         self._api_url = config.api_url.rstrip("/")
         self._api_key = config.api_key
         self._http_session = None  # aiohttp.ClientSession
-        self._sessions: Dict[str, RemotePageHandle] = {}
-        self._id_map: Dict[str, str] = {}  # local_id -> remote_id
-        self._reverse_id_map: Dict[str, str] = {}  # remote_id -> local_id
+        self._sessions: dict[str, RemotePageHandle] = {}
+        self._id_map: dict[str, str] = {}  # local_id -> remote_id
+        self._reverse_id_map: dict[str, str] = {}  # remote_id -> local_id
 
     async def _ensure_http(self):
         """Ensure aiohttp session has been created."""
@@ -158,10 +161,8 @@ class RemoteAPIBackend(BrowserBackend):
     async def disconnect(self) -> None:
         """Close all sessions + HTTP connection."""
         for sid in list(self._sessions.keys()):
-            try:
+            with contextlib.suppress(Exception):
                 await self.delete_session(sid)
-            except Exception:
-                pass
         if self._http_session:
             await self._http_session.close()
             self._http_session = None
@@ -213,12 +214,12 @@ class RemoteAPIBackend(BrowserBackend):
         session_id: str,
         task: str,
         intelligence: str = "agent",
-        llm_config: Optional[Dict] = None,
+        llm_config: dict | None = None,
         max_steps: int = 6,
         poll_interval: float = 5.0,
         poll_timeout: float = 120.0,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         """Submit Agent task to remote FastAPI and poll for results."""
         remote_id = self._id_map.get(session_id)
         if not remote_id:
@@ -253,7 +254,7 @@ class RemoteAPIBackend(BrowserBackend):
 
     # -- Snapshot (requires FastAPI endpoint) --
 
-    async def snapshot(self, session_id: str, interactive_only: bool = False) -> Dict:
+    async def snapshot(self, session_id: str, interactive_only: bool = False) -> dict:
         """Get snapshot remotely."""
         remote_id = self._id_map.get(session_id)
         if not remote_id:

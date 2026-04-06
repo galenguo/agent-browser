@@ -10,20 +10,21 @@ Contains:
 - Exception classes
 """
 
-import time
 import asyncio
-from enum import Enum
-from typing import Optional, Any, List, Dict, TYPE_CHECKING
+import time
 from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
+
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
-    from playwright.async_api import Playwright, Browser
+    pass
 
 
 # ============ Enums ============
 
-class BrowserType(str, Enum):
+class BrowserType(StrEnum):
     """Browser engine type."""
     CHROMIUM = "chromium"   # CloakBrowser + patchright (default)
 
@@ -42,7 +43,6 @@ class SessionNotFoundError(Exception):
 
 # Re-export PipelineError from pipeline layer (for API layer consumption)
 from agent_browser.pipeline.errors import PipelineError as PipelineError
-
 
 # ============ Browser instances ============
 
@@ -72,12 +72,12 @@ class DockerBrowserInstance(BrowserInstance):
     """Docker browser instance (container)."""
     container: Any = None  # docker.models.containers.Container
     container_name: str = None
-    novnc_host_port: Optional[int] = None   # Allocated host noVNC port (Mode B)
+    novnc_host_port: int | None = None   # Allocated host noVNC port (Mode B)
     # Public access info (requires BROWSER_PUBLIC_HOST env var)
-    public_host: Optional[str] = None       # Public IP or domain name
-    public_cdp_port: Optional[int] = None   # Public CDP port (Mode B has it, Mode D does not)
-    public_novnc_port: Optional[int] = None # Public noVNC port
-    novnc_url: Optional[str] = None         # Full noVNC monitoring URL
+    public_host: str | None = None       # Public IP or domain name
+    public_cdp_port: int | None = None   # Public CDP port (Mode B has it, Mode D does not)
+    public_novnc_port: int | None = None # Public noVNC port
+    novnc_url: str | None = None         # Full noVNC monitoring URL
 
     def __post_init__(self):
         super().__post_init__()
@@ -126,7 +126,7 @@ class ClickRequest(BaseModel):
     ref: str  # Element reference, e.g., @e0, @e1
     button: str = "left"  # left | right | middle
     click_count: int = 1
-    delay: Optional[int] = None  # Click delay in ms
+    delay: int | None = None  # Click delay in ms
 
 
 class FillRequest(BaseModel):
@@ -152,7 +152,7 @@ class ScrollRequest(BaseModel):
 
 class WaitRequest(BaseModel):
     """Wait request."""
-    selector: Optional[str] = None  # CSS selector
+    selector: str | None = None  # CSS selector
     timeout: int = 10000  # ms
     state: str = "visible"  # visible | hidden | attached | detached
 
@@ -163,20 +163,20 @@ class ElementInfo(BaseModel):
     """Element information."""
     ref: str  # @e0, @e1...
     tag: str
-    text: Optional[str] = None
-    role: Optional[str] = None
-    type: Optional[str] = None
-    placeholder: Optional[str] = None
-    href: Optional[str] = None
+    text: str | None = None
+    role: str | None = None
+    type: str | None = None
+    placeholder: str | None = None
+    href: str | None = None
     is_visible: bool = True
     is_enabled: bool = True
-    bounding_box: Optional[Dict] = None
+    bounding_box: dict | None = None
 
 
 class SnapshotResponse(BaseModel):
     """Snapshot response."""
     url: str
     title: str
-    elements: List[ElementInfo]
-    raw_html_size: Optional[int] = None
-    snapshot_size: Optional[int] = None
+    elements: list[ElementInfo]
+    raw_html_size: int | None = None
+    snapshot_size: int | None = None

@@ -15,10 +15,12 @@
   4. max_input_tokens=8000 配置已应用
   5. ActionTracer 的 trace 信息不包含完整 HTML（节省 token）
 """
-import pytest
 import asyncio
-from helpers.cli_runner import CLIRunner
+import contextlib
+
+import pytest
 from helpers.api_client import APIClient
+from helpers.cli_runner import CLIRunner
 
 
 @pytest.mark.integration
@@ -34,10 +36,8 @@ class TestScenario7TokenOptimization:
 
     def teardown_method(self):
         """清理会话"""
-        try:
+        with contextlib.suppress(Exception):
             self.cli.session_destroy(self.session_name)
-        except Exception:
-            pass
 
         if self.api_session:
             asyncio.run(self.api.delete_session(self.api_session))

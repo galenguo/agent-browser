@@ -16,16 +16,11 @@ All tests use mocked browsers (no real CDP needed).
 import asyncio
 import json
 import os
-import sys
 import tempfile
 import time
-from pathlib import Path
 from unittest import mock
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 
 import pytest
-
 
 # ════════════════════════════════════════════
 #  FIXTURES
@@ -104,7 +99,7 @@ def _make_config(**overrides):
 class TestStealthRecovery:
 
     def test_circuit_recovers_after_cooldown(self):
-        from agent_browser.stealth.middleware import _PerSessionCircuit, CircuitState
+        from agent_browser.stealth.middleware import CircuitState, _PerSessionCircuit
         circuit = _PerSessionCircuit(threshold=2)
         circuit.record_failure()
         circuit.record_failure()
@@ -122,8 +117,8 @@ class TestStealthRecovery:
         cfg = _make_config(stealth_enabled=True)
         mw = StealthMiddleware(mock_backend, cfg)
         await mw.connect()
-        s1 = await mw.create_session("session_a")
-        s2 = await mw.create_session("session_b")
+        await mw.create_session("session_a")
+        await mw.create_session("session_b")
         assert "session_a" in mw.circuits
         assert "session_b" in mw.circuits
         assert mw.circuits["session_a"] is not mw.circuits["session_b"]
@@ -168,7 +163,7 @@ class TestStealthRecovery:
 class TestStealthOperationClassification:
 
     def test_all_known_ops_classified(self):
-        from agent_browser.stealth.middleware import _STEALTH_OPS, _PASSTHROUGH_OPS
+        from agent_browser.stealth.middleware import _PASSTHROUGH_OPS, _STEALTH_OPS
         all_ops = _STEALTH_OPS.keys() | _PASSTHROUGH_OPS
         expected = {
             "goto", "go_back", "mouse_wheel", "mouse_move", "keyboard_press",
@@ -242,7 +237,7 @@ class TestPerformanceLatency:
 
     @pytest.mark.asyncio
     async def test_template_rendering_performance(self):
-        from agent_browser.pipeline.template import render_value, TemplateContext
+        from agent_browser.pipeline.template import TemplateContext, render_value
         ctx = TemplateContext(args={"query": "test", "limit": 20})
         start = time.monotonic()
         result = render_value("${{ query }}", ctx)
@@ -309,7 +304,7 @@ class TestTokenEfficiency:
             assert op not in ("llm", "agent", "vision")
 
     def test_template_output_minimal_tokens(self):
-        from agent_browser.pipeline.template import render_value, TemplateContext
+        from agent_browser.pipeline.template import TemplateContext, render_value
         ctx = TemplateContext(args={"q": "python"})
         result = render_value("${{ q | upper }}", ctx)
         assert result == "PYTHON"
@@ -337,7 +332,7 @@ class TestAdaptiveYAMLPipeline:
                 side_effect=lambda js: '{"error": "not found"}' if "querySelector" in js else None
             )
             mock_get.return_value = h
-            data = await execute_pipeline(steps, session_id="ff1", args={}, fail_fast=True)
+            await execute_pipeline(steps, session_id="ff1", args={}, fail_fast=True)
             # With fail_fast, pipeline returns data (may be None if first step fails after navigate)
 
     @pytest.mark.asyncio
@@ -356,13 +351,13 @@ class TestAdaptiveYAMLPipeline:
                 side_effect=lambda js: '{"error": "not found"}' if "querySelector" in js else []
             )
             mock_get.return_value = h
-            data = await execute_pipeline(steps, session_id="ffs", args={}, fail_fast=False)
+            await execute_pipeline(steps, session_id="ffs", args={}, fail_fast=False)
             # Continues despite errors; returns final data
 
     @pytest.mark.asyncio
     async def test_telemetry_non_blocking(self, tmp_path):
-        from agent_browser.pipeline.executor import execute_pipeline
         from agent_browser.pipeline import telemetry as tel_module
+        from agent_browser.pipeline.executor import execute_pipeline
         tel_file = tmp_path / "tel.jsonl"
         original_tel_file = tel_module._TEL_FILE
         tel_module._TEL_FILE = tel_file
@@ -382,7 +377,7 @@ class TestAdaptiveYAMLPipeline:
                 assert entry["success"] is True
 
     def test_template_data_context_resolution(self):
-        from agent_browser.pipeline.template import render_value, TemplateContext, resolve
+        from agent_browser.pipeline.template import TemplateContext, resolve
         ctx = TemplateContext(args={"query": "test"})
         ctx._data = [
             {"title": "First Result", "score": 95},
@@ -401,9 +396,12 @@ class TestAdaptiveYAMLPipeline:
         assert result == "TEST"
 
     def test_error_classification_all_types(self):
-        from agent_browser.pipeline.classifier import classify, ErrorCategory
+        from agent_browser.pipeline.classifier import ErrorCategory, classify
         from agent_browser.pipeline.errors import (
-            PipelineError, PipelineStepError, SelectorNotFoundError, StepTimeoutError, URLError,
+            PipelineStepError,
+            SelectorNotFoundError,
+            StepTimeoutError,
+            URLError,
         )
         cases = [
             (SelectorNotFoundError("msg", 0, "click", {}, None), ErrorCategory.SELECTOR_DRIFT),
@@ -427,7 +425,7 @@ class TestExploreOrchestrator:
 
     @pytest.mark.asyncio
     async def test_explore_mocked_full_flow(self, mock_page_handle):
-        from agent_browser.explore.explorer import explore, ExplorationResult
+        from agent_browser.explore.explorer import ExplorationResult, explore
         mw = mock.MagicMock()
         mw.get_page = mock.AsyncMock(return_value=mock_page_handle)
         with mock.patch("agent_browser.main._ensure_middleware", return_value=mw):
@@ -453,11 +451,12 @@ class TestExploreOrchestrator:
             assert result.url == "https://example.com"
 
     def test_synthesize_from_artifacts_roundtrip(self, temp_adapter_dir):
-        from agent_browser.explore.synthesizer import synthesize_from_artifacts
-        from agent_browser.explore.analysis import InferredCapability
         # Ensure InferredCapability is available in the synthesizer module namespace
         # (synthesizer.py uses InferredCapability at line 931 but doesn't import it)
         import importlib
+
+        from agent_browser.explore.analysis import InferredCapability
+        from agent_browser.explore.synthesizer import synthesize_from_artifacts
         synth_module = importlib.import_module("agent_browser.explore.synthesizer")
         synth_module.InferredCapability = InferredCapability
         # Also add a .get() method to InferredCapability since _build_pipeline calls cap.get()
@@ -475,7 +474,7 @@ class TestExploreOrchestrator:
             "top_strategy": "public",
             "duration_ms": 1500,
         }
-        capabilities = [InferredCapability(
+        [InferredCapability(
             name="list items", description="List items from API",
             strategy="public", confidence=0.9,
             endpoint="https://example.com/api/items",
@@ -507,7 +506,7 @@ class TestExploreOrchestrator:
         assert adapter["strategy"] == "public"
 
     def test_synthesize_detects_strategy_from_exploration(self):
-        from agent_browser.explore.explorer import ExplorationResult, Endpoint
+        from agent_browser.explore.explorer import Endpoint, ExplorationResult
         from agent_browser.explore.synthesizer import synthesize
         # Use dict-based capabilities (legacy format) since _build_pipeline uses .get()
         # which works on dicts but not on InferredCapability dataclass instances.
@@ -597,8 +596,8 @@ class TestYAMLUniversality:
             assert len(errors) == 0, f"Portable to {site}: {errors}"
 
     def test_selector_drift_fallback_updates_selector(self):
-        from agent_browser.pipeline.fallback import _retry_with_fresh_selector
         from agent_browser.pipeline.errors import PipelineStepError
+        from agent_browser.pipeline.fallback import _retry_with_fresh_selector
         error = PipelineStepError(
             message="Element .item-card not found", step_index=2,
             step_name="click", step_params={"selector": ".item-card"},
@@ -634,9 +633,9 @@ class TestYAMLUniversality:
         assert len(errors) > 0
 
     def test_synthesized_adapter_passes_validation(self, temp_adapter_dir):
-        from agent_browser.explore.synthesizer import synthesize
-        from agent_browser.explore.explorer import ExplorationResult
         from agent_browser.adapters.validator import validate_adapter
+        from agent_browser.explore.explorer import ExplorationResult
+        from agent_browser.explore.synthesizer import synthesize
         # Use dict-based capability to avoid .get() AttributeError on dataclass
         exp = ExplorationResult(
             url="https://example.com/list", site="example",
@@ -721,8 +720,8 @@ class TestDockerRemoteBackend:
 
     @pytest.mark.asyncio
     async def test_remote_backend_translates_to_http(self):
+        from agent_browser.browser.remote import RemoteAPIBackend, RemotePageHandle
         from agent_browser.config import SkillConfig
-        from agent_browser.backends.remote import RemoteAPIBackend, RemotePageHandle
         cfg = SkillConfig(calling_mode="api", browser_mode="remote",
                                api_url="http://localhost:8000", api_key="test-key",
                                stealth_enabled=False)
@@ -738,8 +737,8 @@ class TestDockerRemoteBackend:
 
     @pytest.mark.asyncio
     async def test_remote_backend_sends_auth_header(self):
-        from agent_browser.config import SkillConfig
         from agent_browser.backends.remote import RemoteAPIBackend
+        from agent_browser.config import SkillConfig
         cfg = SkillConfig(calling_mode="api", browser_mode="remote",
                                api_url="http://gateway.example.com",
                                api_key="secret-key-12345", stealth_enabled=False)
@@ -761,8 +760,8 @@ class TestPipelineEndToEnd:
 
     @pytest.mark.asyncio
     async def test_full_navigate_extract_pipeline(self, mock_backend):
-        from agent_browser.stealth.middleware import StealthMiddleware
         from agent_browser.pipeline.executor import execute_pipeline
+        from agent_browser.stealth.middleware import StealthMiddleware
         cfg = _make_config(stealth_enabled=True)
         mw = StealthMiddleware(mock_backend, cfg)
         await mw.connect()
@@ -807,7 +806,7 @@ class TestPipelineEndToEnd:
             h = mock.MagicMock()
             h.goto = mock.AsyncMock()
             mock_get.return_value = h
-            data = await execute_pipeline(pipeline, session_id="tmpl",
+            await execute_pipeline(pipeline, session_id="tmpl",
                                               args={"host": "example.com", "query": "python"},
                                               fail_fast=True)
             h.goto.assert_called_once()

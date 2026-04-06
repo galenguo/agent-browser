@@ -11,9 +11,7 @@ Strategy:
   - Operate on the same page throughout, never create new context/page
   - Only execute a single context.close() at task end
 """
-import asyncio
 import logging
-from typing import Optional
 
 try:
     from patchright.async_api import Browser, BrowserContext, Page
@@ -40,8 +38,8 @@ class PersistentCDPSession:
 
     def __init__(self, browser: Browser):
         self._browser = browser
-        self._context: Optional[BrowserContext] = None
-        self._page: Optional[Page] = None
+        self._context: BrowserContext | None = None
+        self._page: Page | None = None
         self._initialized = False
 
     async def initialize(
@@ -50,7 +48,7 @@ class PersistentCDPSession:
         viewport_height: int = 1080,
         locale: str = "zh-CN",
         timezone_id: str = "Asia/Shanghai",
-        extra_http_headers: Optional[dict] = None,
+        extra_http_headers: dict | None = None,
     ) -> Page:
         """
         Create the only context and page -- no new sessions created afterward.
@@ -98,7 +96,7 @@ class PersistentCDPSession:
             await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
         return page
 
-    async def screenshot(self, path: Optional[str] = None, type: str = "png") -> bytes:
+    async def screenshot(self, path: str | None = None, type: str = "png") -> bytes:
         """Take a screenshot of the current page."""
         page = await self.get_page()
         return await page.screenshot(path=path, type=type)
@@ -121,5 +119,5 @@ class PersistentCDPSession:
         return self._initialized
 
     @property
-    def page(self) -> Optional[Page]:
+    def page(self) -> Page | None:
         return self._page

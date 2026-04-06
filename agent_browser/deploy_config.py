@@ -13,13 +13,12 @@ Config precedence (unchanged from existing system):
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ class DeployConfig:
     os: str = ""  # auto-detected: darwin, linux
     arch: str = ""  # auto-detected: arm64, amd64
     configured_at: str = ""
-    last_verified: Optional[str] = None
+    last_verified: str | None = None
 
     # ── Browser ──
     browser_type: str = "cloakbrowser"  # cloakbrowser | chrome | playwright
@@ -56,14 +55,14 @@ class DeployConfig:
     llm_provider: str = ""  # empty = use existing SkillConfig logic
     llm_model: str = ""
     llm_api_key_set: bool = False  # presence flag only, never store key
-    llm_base_url: Optional[str] = None
+    llm_base_url: str | None = None
 
     # ── Stealth ──
     stealth_enabled: bool = True
     stealth_mode: str = "full"  # full | vanilla
 
     # ── Docker (only relevant when mode=docker-*) ──
-    docker_registry: Optional[str] = None
+    docker_registry: str | None = None
     docker_image_tag: str = "latest"
     docker_shm_size: str = "256Mi"
     docker_memory_limit: str = "2Gi"
@@ -71,20 +70,20 @@ class DeployConfig:
 
     # ── K8s (Phase 4+ — schema reserved now) ──
     k8s_namespace: str = "agent-browser"
-    k8s_context: Optional[str] = None
-    k8s_registry: Optional[str] = None
+    k8s_context: str | None = None
+    k8s_registry: str | None = None
     k8s_storage_class: str = "standard"
     k8s_replicas: int = 1
 
     # ── Proxy ──
     proxy_enabled: bool = False
-    proxy_list: List[str] = field(default_factory=list)
+    proxy_list: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dict, excluding empty/None values for clean YAML."""
         raw = asdict(self)
         return {k: v for k, v in raw.items()
-               if v is not None and v != "" and v != [] and v != False}
+               if v is not None and v != "" and v != [] and v}
 
 
 # ── Validation ──────────────────────────────────────────────
@@ -98,9 +97,9 @@ class ConfigIssue:
     auto_fixable: bool = False
 
 
-def validate_config(cfg: DeployConfig, env_check: bool = True) -> List[ConfigIssue]:
+def validate_config(cfg: DeployConfig, env_check: bool = True) -> list[ConfigIssue]:
     """Validate deployment config and return list of issues."""
-    issues: List[ConfigIssue] = []
+    issues: list[ConfigIssue] = []
 
     # Mode validation
     valid_modes = {"local", "docker-aio", "docker-distributed", "k8s-aio", "k8s-distributed"}
@@ -112,96 +111,91 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> List[ConfigIss
         ))
 
     # Browser validation
-    if cfg.browser_type == "cloakbrowser":
-        if env_check:
-            try:
-                import cloakbrowser  # noqa: F401
-            except ImportError:
-                issues.append(ConfigIssue(
-                    severity="error", section="browser",
-                    message="CloakBrowser package not installed",
-                    fix_hint="Run: pip install cloakbrowser",
-                    auto_fixable=True,
-                ))
-    if cfg.cdp_url and "19222" in cfg.cdp_url:
-        if env_check:
-            try:
-                import aiohttp
-                async def _check():
-                    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as s:
-                        async with s.get(cfg.cdp_url + "/json/version") as r:
-                            if r.status != 200:
-                                issues.append(ConfigIssue(
-                                    severity="warning", section="browser",
-                                    message=f"CDP not reachable at {cfg.cdp_url} (status {r.status})",
-                                    fix_hint="Start CloakBrowser or verify CDP port",
-                                ))
-                import asyncio
-                asyncio.get_event_loop().run_until_complete(_check())
-            except Exception:
-                issues.append(ConfigIssue(
-                    severity="warning", section="browser",
-                    message=f"Cannot verify CDP at {cfg.cdp_url}",
-                    fix_hint="Start CloakBrowser or set headless=true to skip browser check",
-                ))
+    if cfg.browser_type == "cloakbrowser" and env_check:
+        try:
+            import cloakbrowser  # noqa: F401
+        except ImportError:
+            issues.append(ConfigIssue(
+                severity="error", section="browser",
+                message="CloakBrowser package not installed",
+                fix_hint="Run: pip install cloakbrowser",
+                auto_fixable=True,
+            ))
+    if cfg.cdp_url and "19222" in cfg.cdp_url and env_check:
+        try:
+            import aiohttp
+            async def _check():
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as s:
+                    async with s.get(cfg.cdp_url + "/json/version") as r:
+                        if r.status != 200:
+                            issues.append(ConfigIssue(
+                                severity="warning", section="browser",
+                                message=f"CDP not reachable at {cfg.cdp_url} (status {r.status})",
+                                fix_hint="Start CloakBrowser or verify CDP port",
+                            ))
+            import asyncio
+            asyncio.get_event_loop().run_until_complete(_check())
+        except Exception:
+            issues.append(ConfigIssue(
+                severity="warning", section="browser",
+                message=f"Cannot verify CDP at {cfg.cdp_url}",
+                fix_hint="Start CloakBrowser or set headless=true to skip browser check",
+            ))
 
     # Docker validation
-    if "docker" in cfg.mode:
-        if env_check:
-            docker_ok = _command_exists("docker")
-            if not docker_ok:
-                issues.append(ConfigIssue(
-                    severity="error", section="docker",
-                    message="Docker not installed but Docker mode selected",
-                    fix_hint="Install Docker: https://docs.docker.com/get-docker/",
-                ))
-            compose_ok = _command_exists("docker-compose")
-            if not compose_ok:
-                issues.append(ConfigIssue(
-                    severity="warning", section="docker",
-                    message="docker-compose not found (needed for Docker mode)",
-                    fix_hint="Install Docker Compose or use local mode instead",
-                ))
+    if "docker" in cfg.mode and env_check:
+        docker_ok = _command_exists("docker")
+        if not docker_ok:
+            issues.append(ConfigIssue(
+                severity="error", section="docker",
+                message="Docker not installed but Docker mode selected",
+                fix_hint="Install Docker: https://docs.docker.com/get-docker/",
+            ))
+        compose_ok = _command_exists("docker-compose")
+        if not compose_ok:
+            issues.append(ConfigIssue(
+                severity="warning", section="docker",
+                message="docker-compose not found (needed for Docker mode)",
+                fix_hint="Install Docker Compose or use local mode instead",
+            ))
 
     # K8s validation
-    if "k8s" in cfg.mode:
-        if env_check:
-            kubectl_ok = _command_exists("kubectl")
-            if not kubectl_ok:
+    if "k8s" in cfg.mode and env_check:
+        kubectl_ok = _command_exists("kubectl")
+        if not kubectl_ok:
+            issues.append(ConfigIssue(
+                severity="error", section="k8s",
+                message="kubectl not installed but K8s mode selected",
+                fix_hint="Install kubectl or use local/Docker mode",
+            ))
+        # Check for cluster access
+        if kubectl_ok:
+            result = _run_cmd("kubectl config current-context", timeout=5)
+            if result.returncode != 0:
                 issues.append(ConfigIssue(
-                    severity="error", section="k8s",
-                    message="kubectl not installed but K8s mode selected",
-                    fix_hint="Install kubectl or use local/Docker mode",
+                    severity="warning", section="k8s",
+                    message="kubectl cannot connect to any cluster",
+                    fix_hint="Run: kubectl config use-context <context>",
                 ))
-            # Check for cluster access
-            if kubectl_ok:
-                result = _run_cmd("kubectl config current-context", timeout=5)
-                if result.returncode != 0:
-                    issues.append(ConfigIssue(
-                        severity="warning", section="k8s",
-                        message="kubectl cannot connect to any cluster",
-                        fix_hint="Run: kubectl config use-context <context>",
-                    ))
 
     # API port check
-    if cfg.api_enabled:
-        if env_check:
-            try:
-                import aiohttp
-                async def _check_api():
-                    url = f"http://{cfg.api_host}:{cfg.api_port}/health"
-                    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as s:
-                        async with s.get(url) as r:
-                            if r.status != 200:
-                                issues.append(ConfigIssue(
-                                    severity="info", section="api",
-                                    message=f"API not running at {url} (status {r.status})",
-                                    fix_hint="Start API server with: uvicorn src.api:app --port {cfg.api_port}",
-                                ))
-                import asyncio
-                asyncio.get_event_loop().run_until_complete(_check_api())
-            except Exception:
-                pass  # API not required for basic usage
+    if cfg.api_enabled and env_check:
+        try:
+            import aiohttp
+            async def _check_api():
+                url = f"http://{cfg.api_host}:{cfg.api_port}/health"
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as s:
+                    async with s.get(url) as r:
+                        if r.status != 200:
+                            issues.append(ConfigIssue(
+                                severity="info", section="api",
+                                message=f"API not running at {url} (status {r.status})",
+                                fix_hint="Start API server with: uvicorn src.api:app --port {cfg.api_port}",
+                            ))
+            import asyncio
+            asyncio.get_event_loop().run_until_complete(_check_api())
+        except Exception:
+            pass  # API not required for basic usage
 
     # LLM config
     if not cfg.llm_api_key_set and env_check:
@@ -220,7 +214,7 @@ def validate_config(cfg: DeployConfig, env_check: bool = True) -> List[ConfigIss
 
 # ── Environment Detection ──────────────────────────────────────────
 
-def detect_environment() -> Dict[str, Any]:
+def detect_environment() -> dict[str, Any]:
     """Detect OS, arch, and available tools. Returns dict for DeployConfig."""
     import platform
 
@@ -354,7 +348,7 @@ def load_deploy_config() -> DeployConfig:
     return cfg
 
 
-def generate_config(cfg: DeployConfig, path: Optional[Path] = None) -> Path:
+def generate_config(cfg: DeployConfig, path: Path | None = None) -> Path:
     """Write validated DeployConfig to config.yaml (atomic write).
 
     Extends existing config.yaml with new sections without overwriting
@@ -459,7 +453,7 @@ def generate_config(cfg: DeployConfig, path: Optional[Path] = None) -> Path:
     return target
 
 
-def _load_yaml_config(path: Path) -> Optional[Dict]:
+def _load_yaml_config(path: Path) -> dict | None:
     """Load YAML config file, returning dict or None if missing/invalid."""
     if not path.exists():
         return None
@@ -473,7 +467,7 @@ def _load_yaml_config(path: Path) -> Optional[Dict]:
         return None
 
 
-def _dump_yaml(data: Dict) -> str:
+def _dump_yaml(data: dict) -> str:
     """Dump dict to YAML string without external dependencies."""
     try:
         import yaml

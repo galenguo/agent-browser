@@ -3,9 +3,8 @@ CLI 命令执行工具
 
 通过 subprocess 运行 CLI 命令并解析 JSON 输出。
 """
-import subprocess
 import json
-from typing import Dict, List, Optional
+import subprocess
 
 
 class CLIRunner:
@@ -14,7 +13,7 @@ class CLIRunner:
     def __init__(self, cli_path: str = "python -m src.cli.commands"):
         self.cli_path = cli_path
 
-    def run(self, args: List[str], timeout: int = 900) -> Dict:
+    def run(self, args: list[str], timeout: int = 900) -> dict:
         """
         执行 CLI 命令并返回 JSON 结果。
 
@@ -43,26 +42,26 @@ class CLIRunner:
                 "stderr": result.stderr,
             }
 
-    def session_create(self, name: str, browser: str = "local") -> Dict:
+    def session_create(self, name: str, browser: str = "local") -> dict:
         """创建会话"""
         return self.run(["session", "create", "--name", name, "--browser", browser])
 
-    def session_destroy(self, name: str) -> Dict:
+    def session_destroy(self, name: str) -> dict:
         """销毁会话"""
         return self.run(["session", "destroy", "--session", name])
 
-    def navigate_goto(self, session: str, url: str) -> Dict:
+    def navigate_goto(self, session: str, url: str) -> dict:
         """导航到 URL"""
         return self.run(["navigate", "goto", "--session", session, "--url", url])
 
-    def interact_click(self, session: str, selector: str) -> Dict:
+    def interact_click(self, session: str, selector: str) -> dict:
         """点击元素"""
         return self.run(["interact", "click", "--session", session, "--selector", selector])
 
-    def interact_input(self, session: str, selector: str, text: str) -> Dict:
+    def interact_input(self, session: str, selector: str, text: str) -> dict:
         """输入文本"""
         return self.run(["interact", "input", "--session", session, "--selector", selector, "--text", text])
 
-    def extract_text(self, session: str, selector: str) -> Dict:
+    def extract_text(self, session: str, selector: str) -> dict:
         """提取文本"""
         return self.run(["extract", "text", "--session", session, "--selector", selector])

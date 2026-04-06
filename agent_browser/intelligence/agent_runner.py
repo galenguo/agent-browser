@@ -18,11 +18,13 @@ from typing import Any
 # Activate rebrowser Runtime.Enable addBinding fix (env var, compatible with patchright)
 os.environ.setdefault("REBROWSER_PATCHES_RUNTIME_FIX_MODE", "addBinding")
 
+import contextlib
+
 from browser_use import Agent, Tools
 from browser_use.browser import BrowserProfile, BrowserSession
 
-from agent_browser.browser.stealth_launcher import launch_stealth_browser, close_browser
 from agent_browser.browser.human_behavior import HumanBehaviorSimulator
+from agent_browser.browser.stealth_launcher import close_browser, launch_stealth_browser
 from agent_browser.session.session_manager import SessionProfileManager
 
 logger = logging.getLogger(__name__)
@@ -146,10 +148,8 @@ async def run_agent_task(
         raise
     finally:
         # Don't close browser (keep persistent session), only close browser-use session object
-        try:
+        with contextlib.suppress(Exception):
             await browser_session.kill()
-        except Exception:
-            pass
 
 
 async def shutdown_browser() -> None:

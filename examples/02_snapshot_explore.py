@@ -4,8 +4,8 @@
   1. CloakBrowser 已启动（CDP 端口 19222）
 """
 import asyncio
-from skills.agent_browser.main import create_session, open_page, snapshot
-from skills.agent_browser.explore.explorer import explore
+from agent_browsermain import create_session, open_page, snapshot
+from agent_browserexplore.explorer import explore
 
 
 async def main():

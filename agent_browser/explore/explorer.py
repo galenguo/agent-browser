@@ -21,15 +21,16 @@ import json
 import logging
 import os
 import random
+import re
 import time
-from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
+from typing import Any
 
 from .analysis import (
     DiscoveredStore,
     InferredCapability,
-    detect_site_name,
     detect_auth_indicators,
+    detect_site_name,
     infer_capabilities_from_endpoints,
     infer_strategy,
     score_endpoint,
@@ -52,15 +53,15 @@ class Endpoint:
     sample: Any = None
     pattern: str = ""              # Normalized URL pattern
     content_type: str = ""
-    query_params: List[str] = field(default_factory=list)
+    query_params: list[str] = field(default_factory=list)
     score: float = 0.0            # Usefulness score 0-10
     has_search: bool = False
     has_pagination: bool = False
     has_limit: bool = False
-    auth_indicators: List[str] = field(default_factory=list)
-    item_path: Optional[str] = None  # Path to items in response body
+    auth_indicators: list[str] = field(default_factory=list)
+    item_path: str | None = None  # Path to items in response body
     item_count: int = 0             # Number of items in sample
-    detected_fields: Dict[str, str] = field(default_factory=dict)  # canonical -> actual
+    detected_fields: dict[str, str] = field(default_factory=dict)  # canonical -> actual
 
 
 @dataclass
@@ -69,16 +70,16 @@ class ExplorationResult:
     url: str                           # Original requested URL
     final_url: str = ""                # After redirects
     title: str = ""
-    endpoints: List[Endpoint] = field(default_factory=list)
-    capabilities: List[InferredCapability] = field(default_factory=list)
+    endpoints: list[Endpoint] = field(default_factory=list)
+    capabilities: list[InferredCapability] = field(default_factory=list)
     site: str = ""                     # Detected site name (e.g., 'boss')
-    framework: Dict[str, Any] = field(default_factory=dict)  # {type, version, stores}
-    stores: List[DiscoveredStore] = field(default_factory=list)
+    framework: dict[str, Any] = field(default_factory=dict)  # {type, version, stores}
+    stores: list[DiscoveredStore] = field(default_factory=list)
     top_strategy: str = ""             # Best strategy: public/intercept/ui/store-action
     endpoint_count: int = 0
     api_endpoint_count: int = 0
-    auth_indicators: List[str] = field(default_factory=list)
-    out_dir: Optional[str] = None      # Artifact output directory
+    auth_indicators: list[str] = field(default_factory=list)
+    out_dir: str | None = None      # Artifact output directory
     duration_ms: int = 0               # Exploration wall-clock time
 
 
@@ -156,7 +157,7 @@ async def _interact_fuzz(handle, page, max_clicks: int = 8):
     logger.info(f"Interaction fuzz: {clicked} safe clicks")
 
 
-def _detect_framework(page_result: Any) -> Dict[str, Any]:
+def _detect_framework(page_result: Any) -> dict[str, Any]:
     """
     Feature 2: Framework Detection.
 
@@ -192,7 +193,7 @@ def _detect_framework(page_result: Any) -> Dict[str, Any]:
     return framework
 
 
-async def _discover_stores(handle) -> List[DiscoveredStore]:
+async def _discover_stores(handle) -> list[DiscoveredStore]:
     """
     Feature 3: Store Discovery.
 
@@ -352,7 +353,7 @@ async def explore(
     scroll_count: int = 5,
     goal: str = "",
     timeout: float = _DEFAULT_EXPLORE_TIMEOUT,
-    out_dir: Optional[str] = None,
+    out_dir: str | None = None,
 ) -> ExplorationResult:
     """
     Explore a site: navigate → intercept network → scroll triggers → detect framework → analyze API.
@@ -376,7 +377,7 @@ async def explore(
         site=detect_site_name(url),
         out_dir=out_dir,
     )
-    intercepted: List[Endpoint] = []
+    intercepted: list[Endpoint] = []
 
     def on_response(response):
         try:
@@ -449,7 +450,7 @@ async def explore(
                         ep.item_count = len(items) if items else 0
                         if items and len(items) > 0 and isinstance(items[0], dict):
                             ep.detected_fields = _detect_fields_from_item(items[0])
-                            from urllib.parse import urlparse, parse_qs
+                            from urllib.parse import parse_qs, urlparse
                             qs = parse_qs(urlparse(ep.url).query)
                             ep.has_search = any(
                                 k.lower() in ('q', 'query', 'keyword', 'search')
@@ -519,14 +520,14 @@ async def explore(
 
 async def _fetch_sample(handle, url: str) -> Any:
     """Execute browser-side fetch via BrowserPageHandle.evaluate."""
-    safe_url = json.dumps(url)
-    js = f"""
-    (() => {{
-        return fetch({{safe_url}}, {{credentials: 'include'}})
+    json.dumps(url)
+    js = """
+    (() => {
+        return fetch({safe_url}, {credentials: 'include'})
             .then(r => r.text())
             .then(t => t.substring(0, 4096))
             .catch(() => null);
-    }})()
+    })()
     """
     text = await handle.evaluate(js)
     if text:
@@ -537,7 +538,7 @@ async def _fetch_sample(handle, url: str) -> Any:
     return None
 
 
-def _analyze_endpoints(endpoints: List[Endpoint], base_url: str) -> List[Dict]:
+def _analyze_endpoints(endpoints: list[Endpoint], base_url: str) -> list[dict]:
     """Legacy compatibility: convert Endpoint list to old-style capability dicts."""
     capabilities = []
     seen_patterns = set()
@@ -567,7 +568,7 @@ def _analyze_endpoints(endpoints: List[Endpoint], base_url: str) -> List[Dict]:
         seen_patterns.add(pattern_key)
 
         fields = {}
-        for key, value in sample_item.items():
+        for key, _value in sample_item.items():
             kl = key.lower()
             if any(t in kl for t in ["title", "name", "headline"]):
                 fields["title"] = key
@@ -588,7 +589,7 @@ def _analyze_endpoints(endpoints: List[Endpoint], base_url: str) -> List[Dict]:
 
         if len(fields) >= 2:
             strategy_map = {'public': 'public', 'intercept': 'cookie', 'ui': 'ui', 'store-action': 'store-action'}
-            strat = getattr(result, 'top_strategy', '') or 'cookie'
+            strat = getattr(ep, 'top_strategy', '') or 'cookie'
             capabilities.append({
                 "endpoint": ep.url,
                 "method": ep.method,
@@ -600,7 +601,7 @@ def _analyze_endpoints(endpoints: List[Endpoint], base_url: str) -> List[Dict]:
     return capabilities
 
 
-def _detect_item_path_in_sample(sample: Any) -> Optional[str]:
+def _detect_item_path_in_sample(sample: Any) -> str | None:
     """Detect path to items array inside a JSON response."""
     if not isinstance(sample, dict):
         return None
@@ -619,7 +620,7 @@ def _detect_item_path_in_sample(sample: Any) -> Optional[str]:
     return None
 
 
-def _get_items_from_sample(sample: Any) -> Optional[list]:
+def _get_items_from_sample(sample: Any) -> list | None:
     """Extract items array from a sample response."""
     if not isinstance(sample, dict):
         return None
@@ -636,11 +637,11 @@ def _get_items_from_sample(sample: Any) -> Optional[list]:
     return None
 
 
-def _detect_fields_from_item(item: dict) -> Dict[str, str]:
+def _detect_fields_from_item(item: dict) -> dict[str, str]:
     """Detect canonical field names from a sample item."""
     from .analysis import _FIELD_NAME_MAP
     fields = {}
-    for key, value in item.items():
+    for key, _value in item.items():
         kl = key.lower()
         for pattern, canonical in _FIELD_NAME_MAP:
             if re.search(pattern, kl):

@@ -9,8 +9,7 @@
 """
 import asyncio
 import time
-import statistics
-from typing import List, Dict
+
 import httpx
 
 
@@ -19,7 +18,7 @@ class PerformanceTest:
 
     def __init__(self, base_url: str = "http://localhost:8000"):
         self.base_url = base_url
-        self.results: List[Dict] = []
+        self.results: list[dict] = []
 
     async def test_concurrent_sessions(self, num_sessions: int = 10):
         """测试并发会话创建"""

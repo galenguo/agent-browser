@@ -5,17 +5,16 @@ Supports two modes:
 2. docker: Launch CloakBrowser in a Docker container
 """
 
-import os
 import asyncio
 import logging
-from typing import Literal, Optional
+import os
+from typing import Literal
 
 from agent_browser.models import (
     BrowserInstance,
-    LocalBrowserInstance,
     DockerBrowserInstance,
+    LocalBrowserInstance,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -255,8 +254,9 @@ class BrowserInstancePool:
 
     async def _wait_cdp_ready(self, cdp_url: str, timeout: int = 30):
         """Wait for CDP port to become ready."""
-        import aiohttp
         from urllib.parse import urlparse
+
+        import aiohttp
 
         parsed = urlparse(cdp_url)
         host = parsed.hostname
@@ -275,14 +275,13 @@ class BrowserInstancePool:
         start = asyncio.get_event_loop().time()
         while asyncio.get_event_loop().time() - start < timeout:
             try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        f"{check_url}/json/version",
-                        timeout=aiohttp.ClientTimeout(total=2),
-                    ) as resp:
-                        if resp.status == 200:
-                            logger.info(f"CDP ready at {cdp_url}")
-                            return
+                async with aiohttp.ClientSession() as session, session.get(
+                    f"{check_url}/json/version",
+                    timeout=aiohttp.ClientTimeout(total=2),
+                ) as resp:
+                    if resp.status == 200:
+                        logger.info(f"CDP ready at {cdp_url}")
+                        return
             except Exception:
                 pass
             await asyncio.sleep(1)

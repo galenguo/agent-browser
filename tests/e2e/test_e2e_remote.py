@@ -14,12 +14,10 @@ Phase 4: E2E Remote 模式测试
   服务端: FastAPI → LocalCDPBackend → CloakBrowser
 """
 import asyncio
-import json
 import os
+
 import aiohttp
 import pytest
-from typing import Dict, Any, Optional
-
 
 # FastAPI 基础 URL
 API_BASE_URL = "http://localhost:8000"
@@ -78,17 +76,16 @@ class TestRemoteSessionManagement:
     @pytest.mark.asyncio
     async def test_create_session(self, cleanup_sessions):
         """创建 session"""
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{API_BASE_URL}/sessions/create",
-                json={"user_id": "test_user_1", "browser_type": "chromium"},
-                timeout=aiohttp.ClientTimeout(total=120)
-            ) as resp:
-                assert resp.status == 200
-                data = await resp.json()
-                assert "session_id" in data
-                assert data["user_id"] == "test_user_1"
-                assert data["status"] == "created"
+        async with aiohttp.ClientSession() as session, session.post(
+            f"{API_BASE_URL}/sessions/create",
+            json={"user_id": "test_user_1", "browser_type": "chromium"},
+            timeout=aiohttp.ClientTimeout(total=120)
+        ) as resp:
+            assert resp.status == 200
+            data = await resp.json()
+            assert "session_id" in data
+            assert data["user_id"] == "test_user_1"
+            assert data["status"] == "created"
 
     @pytest.mark.asyncio
     async def test_get_session_status(self, cleanup_sessions):
@@ -607,7 +604,6 @@ class TestRemoteAgentMode:
     )
     async def test_submit_agent_task(self, session_with_cleanup):
         """提交 Agent 任务"""
-        import os
         session_id = session_with_cleanup
 
         async with aiohttp.ClientSession() as client:
@@ -633,7 +629,6 @@ class TestRemoteAgentMode:
     )
     async def test_get_task_status(self, session_with_cleanup):
         """获取任务状态"""
-        import os
         session_id = session_with_cleanup
 
         async with aiohttp.ClientSession() as client:

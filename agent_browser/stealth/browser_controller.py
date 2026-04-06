@@ -2,19 +2,19 @@
 
 Bridges browser-use's BrowserSession with CLI/API atomic operations.
 """
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
 class ActionResult:
     """Result of an atomic operation."""
     status: str = "ok"
-    error: Optional[str] = None
-    data: Optional[Dict[str, Any]] = None
+    error: str | None = None
+    data: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
-        d: Dict[str, Any] = {"status": self.status}
+    def to_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {"status": self.status}
         if self.error:
             d["error"] = self.error
         if self.data:

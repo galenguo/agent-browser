@@ -13,8 +13,9 @@ Phase 6: 性能和 Token 测试
 import asyncio
 import json
 import time
-from playwright.async_api import async_playwright
+
 import pytest
+from playwright.async_api import async_playwright
 
 
 class TestLatencyBenchmark:
@@ -79,7 +80,7 @@ class TestLatencyBenchmark:
             latencies = []
             for _ in range(10):
                 start = time.time()
-                snapshot = await page.evaluate("""
+                await page.evaluate("""
                     () => {
                         const elements = [];
                         document.querySelectorAll('a, button, input').forEach((el, i) => {
@@ -366,7 +367,7 @@ class TestResourceUsage:
             browser = await p.chromium.connect_over_cdp("http://127.0.0.1:19222")
 
             # 创建和销毁多个 session
-            for i in range(5):
+            for _i in range(5):
                 context = await browser.new_context(ignore_https_errors=True)
                 page = await context.new_page()
                 await page.goto("https://example.com", wait_until="domcontentloaded")
@@ -391,7 +392,7 @@ class TestResourceUsage:
             page = await context.new_page()
 
             # 执行 20 次操作
-            for i in range(20):
+            for _i in range(20):
                 await page.goto("https://example.com", wait_until="domcontentloaded")
                 await page.evaluate("document.title")
 

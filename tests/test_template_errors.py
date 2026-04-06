@@ -1,7 +1,9 @@
 """Template 边界情况测试 — 错误输入和异常路径"""
-import pytest
 from agent_browser.pipeline.template import (
-    TemplateContext, resolve, render_template, render_value, apply_filter,
+    TemplateContext,
+    apply_filter,
+    render_template,
+    render_value,
 )
 
 

@@ -1,18 +1,17 @@
 """Fallback 测试 — 错误恢复策略"""
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-from agent_browser.pipeline.fallback import (
-    attempt_fallback,
-    _FALLBACK_HANDLER_NAMES,
-    _MAX_RETRIES,
-)
+import pytest
+
+from agent_browser.pipeline.classifier import ErrorCategory
 from agent_browser.pipeline.errors import (
     PipelineStepError,
     StepTimeoutError,
-    SelectorNotFoundError,
 )
-from agent_browser.pipeline.classifier import ErrorCategory, classify
+from agent_browser.pipeline.fallback import (
+    _FALLBACK_HANDLER_NAMES,
+    attempt_fallback,
+)
 
 
 class TestFallbackHandlersExist:
@@ -57,7 +56,7 @@ class TestFallbackSelectorDrift:
         )
 
         with patch("agent_browser.pipeline.fallback._retry_with_fresh_selector",
-                   new_callable=AsyncMock(return_value=False)) as mock_retry:
+                   new_callable=AsyncMock(return_value=False)):
 
             recovered = await attempt_fallback("s1", pe, {"data": []})
             assert recovered is False
@@ -94,7 +93,7 @@ class TestFallbackTimeout:
         te = StepTimeoutError(message="timed out", step_index=1)
 
         with patch("agent_browser.pipeline.fallback._retry_with_longer_timeout",
-                   new_callable=AsyncMock(return_value=False)) as mock_retry:
+                   new_callable=AsyncMock(return_value=False)):
 
             recovered = await attempt_fallback("s1", te, {})
             assert recovered is False

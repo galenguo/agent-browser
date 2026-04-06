@@ -5,7 +5,7 @@
   2. LLM API Key 已配置（OPENAI_API_KEY 或 ANTHROPIC_API_KEY）
 """
 import asyncio
-from skills.agent_browser.main import create_session, run_task
+from agent_browsermain import create_session, run_task
 
 
 async def main():

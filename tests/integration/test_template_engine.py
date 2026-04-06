@@ -12,16 +12,14 @@ Tests the ${{ }} expression engine with focus on:
 These are integration-level tests for template.py — proving the engine works
 correctly in the context it's used (pipeline variable substitution).
 """
-import pytest
 
 from agent_browser.pipeline.template import (
-    TemplateContext,
-    resolve,
-    render_template,
     PIPE_FILTERS,
+    TemplateContext,
     apply_filter,
+    render_template,
+    resolve,
 )
-
 
 # ══════════════════════════════════════════════
 #  Test 1: Pipe Chaining with Logical OR
@@ -220,9 +218,9 @@ class TestSecuritySandbox:
         """Expressions >2000 chars are blocked (DoS protection)."""
         long_expr = " + ".join(["1"] * 1001)  # ~3000 chars
         ctx = TemplateContext(args={})
-        result = ctx.resolve(long_expr)
+        ctx.resolve(long_expr)
         # Either blocked by length or returns a number; either way no crash
-        assert result is not None or True  # Just verify no exception raised
+        assert True  # Just verify no exception raised
 
     def test_safe_arithmetic_works(self):
         """Normal arithmetic still works through sandbox (bare names)."""
@@ -378,7 +376,7 @@ class TestTemplateRendering:
 
     def test_resolve_single_expression_returns_raw(self):
         """resolve() on pure ${{ expr }} returns raw value (not string-wrapped)."""
-        ctx = TemplateContext(args={"count": 42})
+        TemplateContext(args={"count": 42})
         result = resolve("${{ args.count }}", args={"count": 42})
         assert result == 42
         assert isinstance(result, int)

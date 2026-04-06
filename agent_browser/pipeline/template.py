@@ -19,12 +19,13 @@ Variables:
 
 Security: Sandboxed evaluation via AST-based safe eval with context sanitization.
 """
-import re
 import ast
+import contextlib
 import json
 import logging
+import re
 import unicodedata
-from typing import Any, Dict, List, Optional
+from typing import Any
 from urllib.parse import quote_plus as _urlencode
 from urllib.parse import unquote as _urldecode
 
@@ -40,7 +41,7 @@ _PIPE_SPLIT_RE = re.compile(r'(?<!\|)\|(?!\|)')
 
 # ── Built-in pipe filters (19 total) ──
 
-PIPE_FILTERS: Dict[str, callable] = {}
+PIPE_FILTERS: dict[str, callable] = {}
 
 
 def _register_filter(name: str):
@@ -264,7 +265,7 @@ def apply_filter(value: Any, filter_expr: str) -> Any:
     return result
 
 
-def _parse_filter_args(args_str: str) -> Dict[str, Any]:
+def _parse_filter_args(args_str: str) -> dict[str, Any]:
     """Parse filter arguments like '20' or '"hello", "world"'
 
     Returns dict with 'arg' (first arg, for single-arg filters) plus
@@ -304,10 +305,8 @@ def _parse_filter_args(args_str: str) -> Dict[str, Any]:
             try:
                 part = int(part)
             except ValueError:
-                try:
+                with contextlib.suppress(ValueError):
                     part = float(part)
-                except ValueError:
-                    pass
 
         args[f"arg{i}"] = part
 
@@ -374,7 +373,7 @@ class TemplateContext:
     Security: All context values are sanitized before use in _safe_eval().
     """
 
-    def __init__(self, args: Dict[str, Any] | None = None, data: Any = None,
+    def __init__(self, args: dict[str, Any] | None = None, data: Any = None,
                  item: Any = None, index: int | None = None):
         self._args = args or {}
         self._data = data

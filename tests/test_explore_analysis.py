@@ -1,19 +1,19 @@
 """Analysis 模块测试 — 端点分析、策略推断、URL 处理"""
-import pytest
 from types import SimpleNamespace
+
 from agent_browser.explore.analysis import (
-    url_to_pattern,
+    DiscoveredStore,
+    InferredCapability,
     classify_param,
+    detect_auth_indicators,
+    detect_site_name,
     has_pagination,
     has_search,
-    detect_auth_indicators,
+    infer_capabilities_from_endpoints,
+    infer_capability_name,
     infer_strategy,
     score_endpoint,
-    infer_capability_name,
-    infer_capabilities_from_endpoints,
-    detect_site_name,
-    InferredCapability,
-    DiscoveredStore,
+    url_to_pattern,
 )
 
 

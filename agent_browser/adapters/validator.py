@@ -4,7 +4,7 @@ Uses the actual STEPS registry as the sole data source for step names
 (won't drift). Called from loader.py's _ensure_loaded() for load-time validation.
 """
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ VALID_STRATEGIES = {"public", "cookie", "intercept", "ui", "store-action", "head
 VALID_ARG_TYPES = {"str", "int", "float", "bool"}
 
 
-def validate_adapter(adapter: Dict[str, Any]) -> List[str]:
+def validate_adapter(adapter: dict[str, Any]) -> list[str]:
     """
     Validate adapter dict structure completeness.
 
@@ -27,7 +27,7 @@ def validate_adapter(adapter: Dict[str, Any]) -> List[str]:
         4. strategy value is valid
         5. args type annotations are valid
     """
-    errors: List[str] = []
+    errors: list[str] = []
 
     if not adapter or not isinstance(adapter, dict):
         errors.append("Adapter is empty or not a dict")
@@ -87,13 +87,13 @@ def validate_adapter(adapter: Dict[str, Any]) -> List[str]:
     return errors
 
 
-def validate_all_adapters() -> Dict[str, List[str]]:
+def validate_all_adapters() -> dict[str, list[str]]:
     """Batch-validate all loaded adapters. Returns {adapter_key: errors} dict."""
     from .loader import list_adapters
 
     # Trigger loading
     adapters = list_adapters()
-    results: Dict[str, List[str]] = {}
+    results: dict[str, list[str]] = {}
 
     for adapter_meta in adapters:
         key = f"{adapter_meta['site']}/{adapter_meta['name']}"

@@ -1,11 +1,8 @@
 """Tests for extended config.yaml integration — precedence chain, DeployConfig→SkillConfig merge."""
 import os
-import sys
-import pytest
-from pathlib import Path
 from unittest import mock
 
-from agent_browser.config import SkillConfig, load_config, from_deploy_config
+from agent_browser.config import from_deploy_config, load_config
 from agent_browser.deploy_config import DeployConfig, load_deploy_config
 
 

@@ -1,6 +1,7 @@
 """模式1测试：本地开发模式"""
 import pytest
-from agent_browser.main import create_session, open_page, snapshot, click
+
+from agent_browser.main import click, create_session, open_page, snapshot
 
 
 @pytest.mark.asyncio

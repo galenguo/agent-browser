@@ -10,8 +10,9 @@ Verifies:
 - CSS selector injection blocked
 - Path traversal in adapter loading blocked
 """
-import pytest
 from unittest import mock
+
+import pytest
 
 
 def _make_config_with_stealth():
@@ -35,8 +36,8 @@ class TestSessionIsolation:
     @pytest.mark.asyncio
     async def test_different_sessions_get_different_handles(self):
         """create_session returns distinct handles for different session IDs."""
-        from agent_browser.stealth.middleware import StealthMiddleware
         from agent_browser.config import SkillConfig
+        from agent_browser.stealth.middleware import StealthMiddleware
 
         backend = mock.MagicMock()
         handle_a = mock.MagicMock()
@@ -60,8 +61,8 @@ class TestSessionIsolation:
     @pytest.mark.asyncio
     async def test_delete_one_session_doesnt_affect_other(self):
         """Deleting session A doesn't invalidate session B's circuit."""
-        from agent_browser.stealth.middleware import StealthMiddleware
         from agent_browser.core.stealth_enhancer import StealthEnhancer
+        from agent_browser.stealth.middleware import StealthMiddleware
 
         if StealthEnhancer is None:
             pytest.skip("StealthEnhancer not available")
@@ -92,8 +93,8 @@ class TestSessionCleanup:
     @pytest.mark.asyncio
     async def test_delete_removes_circuit_state(self):
         """After delete, circuit is gone (stealth ON)."""
-        from agent_browser.stealth.middleware import StealthMiddleware
         from agent_browser.core.stealth_enhancer import StealthEnhancer
+        from agent_browser.stealth.middleware import StealthMiddleware
 
         if StealthEnhancer is None:
             pytest.skip("StealthEnhancer not available")
@@ -113,8 +114,8 @@ class TestSessionCleanup:
     @pytest.mark.asyncio
     async def test_delete_nonexistent_is_safe(self):
         """Deleting already-deleted or never-created session doesn't crash."""
-        from agent_browser.stealth.middleware import StealthMiddleware
         from agent_browser.config import SkillConfig
+        from agent_browser.stealth.middleware import StealthMiddleware
 
         backend = mock.MagicMock()
         backend.delete_session = mock.AsyncMock()

@@ -1,15 +1,18 @@
 """Local CDP backend -- wraps BrowserController + BrowserDaemon for direct CDP access."""
 
 import asyncio
+import contextlib
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
-from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
+from playwright.async_api import Browser, Page, Playwright, async_playwright
+
+from agent_browser.config import SkillConfig
+from agent_browser.utils.refs_generator import generate_refs
 
 from . import BrowserBackend, BrowserPageHandle
-from agent_browser.config import SkillConfig
-from agent_browser.utils.refs_generator import generate_refs, COMBINED_SELECTOR
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +25,7 @@ class PlaywrightPageHandle(BrowserPageHandle):
 
     def __init__(self, page: Page):
         self._page = page
-        self._listeners: Dict[str, list] = {}
+        self._listeners: dict[str, list] = {}
 
     @property
     def raw_page(self) -> Page:
@@ -68,10 +71,8 @@ class PlaywrightPageHandle(BrowserPageHandle):
             self._listeners[event] = [h for h in self._listeners[event] if h != handler]
 
     async def close(self) -> None:
-        try:
+        with contextlib.suppress(Exception):
             await self._page.close()
-        except Exception:
-            pass
 
 
 @dataclass
@@ -79,8 +80,8 @@ class LocalSession:
     """Local session data container."""
     page_handle: PlaywrightPageHandle
     browser_context: Any  # BrowserContext
-    dom_indices: List[int]
-    snapshot_cache: Optional[Dict] = None
+    dom_indices: list[int]
+    snapshot_cache: dict | None = None
 
 
 class LocalCDPBackend(BrowserBackend):
@@ -94,9 +95,9 @@ class LocalCDPBackend(BrowserBackend):
 
     def __init__(self, config: SkillConfig):
         self._config = config
-        self._playwright: Optional[Playwright] = None
-        self._browser: Optional[Browser] = None
-        self._sessions: Dict[str, LocalSession] = {}
+        self._playwright: Playwright | None = None
+        self._browser: Browser | None = None
+        self._sessions: dict[str, LocalSession] = {}
         self._stealth = None
         self._daemon = None
         self._browser_process = None  # Auto-launched browser subprocess
@@ -149,7 +150,6 @@ class LocalCDPBackend(BrowserBackend):
             pass
 
         logger.info("CloakBrowser not installed, attempting auto-install...")
-        import subprocess
         import sys
 
         try:
@@ -177,7 +177,6 @@ class LocalCDPBackend(BrowserBackend):
     async def _launch_browser(self) -> None:
         """Auto-launch CloakBrowser as a subprocess."""
         import sys
-        import subprocess
 
         logger.info("Auto-starting CloakBrowser...")
 
@@ -195,7 +194,7 @@ class LocalCDPBackend(BrowserBackend):
             raise
 
         # Wait for CDP endpoint to become available (up to 30 seconds)
-        for attempt in range(30):
+        for _attempt in range(30):
             await asyncio.sleep(1)
             if await self._is_cdp_reachable():
                 logger.info("CloakBrowser CDP endpoint ready")
@@ -248,7 +247,7 @@ class LocalCDPBackend(BrowserBackend):
                 self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url)
                 logger.info(f"Connected to CDP: {cdp_url}")
                 return
-            except Exception as e:
+            except Exception:
                 if attempt < retries - 1:
                     await asyncio.sleep(0.3 * (attempt + 1))
                 else:
@@ -271,7 +270,7 @@ class LocalCDPBackend(BrowserBackend):
                 logger.info(f"Terminating auto-started browser process (PID: {self._browser_process.pid})")
                 self._browser_process.terminate()
                 await asyncio.wait_for(self._browser_process.wait(), timeout=5)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Browser process did not terminate gracefully, killing...")
                 self._browser_process.kill()
                 await self._browser_process.wait()
@@ -281,17 +280,13 @@ class LocalCDPBackend(BrowserBackend):
                 self._browser_process = None
 
         if self._browser:
-            try:
+            with contextlib.suppress(Exception):
                 await self._browser.close()
-            except Exception:
-                pass
             self._browser = None
 
         if self._playwright:
-            try:
+            with contextlib.suppress(Exception):
                 await self._playwright.stop()
-            except Exception:
-                pass
             self._playwright = None
 
     async def is_connected(self) -> bool:
@@ -360,14 +355,10 @@ class LocalCDPBackend(BrowserBackend):
             return
 
         # Non-daemon path
-        try:
+        with contextlib.suppress(Exception):
             await session.page_handle.close()
-        except Exception:
-            pass
-        try:
+        with contextlib.suppress(Exception):
             await session.browser_context.close()
-        except Exception:
-            pass
         logger.info(f"Session deleted: {session_id}")
 
     async def get_page(self, session_id: str) -> PlaywrightPageHandle:
@@ -378,7 +369,7 @@ class LocalCDPBackend(BrowserBackend):
 
     # -- Snapshot / refs methods (compatible with existing controller.py) --
 
-    async def snapshot(self, session_id: str, interactive_only: bool = False) -> Dict:
+    async def snapshot(self, session_id: str, interactive_only: bool = False) -> dict:
         """Get page snapshot (backward-compatible API)."""
         session = self._sessions.get(session_id)
         if not session:
@@ -418,7 +409,7 @@ class LocalCDPBackend(BrowserBackend):
         except Exception:
             session.snapshot_cache = None
 
-    def get_dom_indices(self, session_id: str) -> List[int]:
+    def get_dom_indices(self, session_id: str) -> list[int]:
         """Get DOM indices for a session."""
         session = self._sessions.get(session_id)
         return session.dom_indices if session else []
@@ -440,11 +431,11 @@ class LocalCDPBackend(BrowserBackend):
         session_id: str,
         task: str,
         intelligence: str = "agent",
-        llm_config: Optional[Dict] = None,
+        llm_config: dict | None = None,
         max_steps: int = 6,
         total_timeout: float = 300.0,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         """Execute Agent-mode task (local CDP).
 
         Uses browser-use Agent via existing CDP URL to autonomously complete tasks.
@@ -487,7 +478,6 @@ class LocalCDPBackend(BrowserBackend):
         )
 
         all_results = []
-        last_result_text = ""
         stuck_count = 0
         total_steps = 0
         MAX_CHUNKS = 2
@@ -504,6 +494,7 @@ class LocalCDPBackend(BrowserBackend):
                 if self._stealth:
                     try:
                         from browser_use.tools.service import Tools
+
                         from agent_browser.stealth.actions import register_stealth_actions
 
                         controller = Tools(browser_session)
@@ -512,6 +503,8 @@ class LocalCDPBackend(BrowserBackend):
                     except Exception as e:
                         logger.warning(f"Failed to register stealth actions: {e} (using default actions)")
 
+                last_result_text = ""
+                total_steps = 0
                 for chunk_num in range(1, MAX_CHUNKS + 1):
                     if chunk_num == 1:
                         current_task = f"{task}\nAfter completion output TASK_COMPLETE: <result summary>"
@@ -574,7 +567,7 @@ class LocalCDPBackend(BrowserBackend):
             if total_timeout > 0:
                 try:
                     return await asyncio.wait_for(_run_chunks(), timeout=total_timeout)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return {
                         "status": "timeout",
                         "error": f"Task exceeded {total_timeout}s limit",
@@ -583,12 +576,10 @@ class LocalCDPBackend(BrowserBackend):
             else:
                 return await _run_chunks()
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 await browser_session.close()
-            except Exception:
-                pass
 
-    def _create_llm(self, llm_config: Optional[Dict] = None):
+    def _create_llm(self, llm_config: dict | None = None):
         """Create a browser-use compatible LLM instance."""
         import os
         if not llm_config:

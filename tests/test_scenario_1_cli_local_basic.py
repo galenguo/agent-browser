@@ -14,7 +14,10 @@
   4. interact click/input → {"status":"success","data":{...,"trace":{...}}}
   5. session destroy → {"status":"destroyed"}
 """
+import contextlib
+
 import pytest
+
 from tests.helpers.cli_runner import CLIRunner
 
 
@@ -29,10 +32,8 @@ class TestScenario1CLILocalBasic:
 
     def teardown_method(self):
         """清理会话"""
-        try:
+        with contextlib.suppress(Exception):
             self.cli.session_destroy(self.session_name)
-        except Exception:
-            pass
 
     def test_session_create(self):
         """测试会话创建"""

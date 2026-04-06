@@ -20,26 +20,58 @@ Usage::
         # auto-cleanup on exit
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .config import SkillConfig
 from .main import (
-    configure as _configure,
-    create_session as _create_session,
-    debug_pipeline as _debug_pipeline,
-    delete_session as _delete_session,
-    fill as _fill,
-    go_back as _go_back,
-    hover as _hover,
-    open_page as _open_page,
-    press_key as _press_key,
-    reset as _reset,
-    run_task as _run_task,
-    scroll as _scroll,
-    select_option as _select_option,
-    setup as _setup,
-    snapshot as _snapshot,
     click as _click,
+)
+from .main import (
+    configure as _configure,
+)
+from .main import (
+    create_session as _create_session,
+)
+from .main import (
+    debug_pipeline as _debug_pipeline,
+)
+from .main import (
+    delete_session as _delete_session,
+)
+from .main import (
+    fill as _fill,
+)
+from .main import (
+    go_back as _go_back,
+)
+from .main import (
+    hover as _hover,
+)
+from .main import (
+    open_page as _open_page,
+)
+from .main import (
+    press_key as _press_key,
+)
+from .main import (
+    reset as _reset,
+)
+from .main import (
+    run_task as _run_task,
+)
+from .main import (
+    scroll as _scroll,
+)
+from .main import (
+    select_option as _select_option,
+)
+from .main import (
+    setup as _setup,
+)
+from .main import (
+    snapshot as _snapshot,
+)
+from .main import (
     wait_for_selector as _wait_for_selector,
 )
 
@@ -55,7 +87,7 @@ class AgentBrowser:
     established until the first operation is invoked.
     """
 
-    def __init__(self, config: Optional[SkillConfig] = None, session_id: Optional[str] = None):
+    def __init__(self, config: SkillConfig | None = None, session_id: str | None = None):
         """Create an AgentBrowser instance.
 
         Args:
@@ -65,17 +97,17 @@ class AgentBrowser:
                 skipping the need to call :meth:`create_session`.
         """
         self._config = config
-        self._session_id: Optional[str] = session_id
+        self._session_id: str | None = session_id
 
     # ── properties ──────────────────────────────────────────────
 
     @property
-    def session_id(self) -> Optional[str]:
+    def session_id(self) -> str | None:
         """The current session ID (set by :meth:`create_session` or constructor)."""
         return self._session_id
 
     @session_id.setter
-    def session_id(self, value: Optional[str]) -> None:
+    def session_id(self, value: str | None) -> None:
         self._session_id = value
 
     # ── context manager ─────────────────────────────────────────
@@ -109,7 +141,7 @@ class AgentBrowser:
         self._session_id = sid
         return sid
 
-    async def delete_session(self, session_id: Optional[str] = None) -> None:
+    async def delete_session(self, session_id: str | None = None) -> None:
         """Delete a browser session.
 
         Args:
@@ -125,7 +157,7 @@ class AgentBrowser:
 
     # ── navigation ──────────────────────────────────────────────
 
-    async def open_page(self, url: str, session_id: Optional[str] = None) -> None:
+    async def open_page(self, url: str, session_id: str | None = None) -> None:
         """Navigate the browser to *url*.
 
         Args:
@@ -134,7 +166,7 @@ class AgentBrowser:
         """
         await _open_page(self._resolve(session_id), url)
 
-    async def go_back(self, session_id: Optional[str] = None) -> None:
+    async def go_back(self, session_id: str | None = None) -> None:
         """Navigate back in history.
 
         Args:
@@ -145,7 +177,7 @@ class AgentBrowser:
     # ── inspection ──────────────────────────────────────────────
 
     async def snapshot(
-        self, session_id: Optional[str] = None, interactive_only: bool = False
+        self, session_id: str | None = None, interactive_only: bool = False
     ) -> dict:
         """Return a snapshot of the current page DOM.
 
@@ -160,7 +192,7 @@ class AgentBrowser:
 
     # ── interaction ─────────────────────────────────────────────
 
-    async def click(self, ref: str, session_id: Optional[str] = None) -> None:
+    async def click(self, ref: str, session_id: str | None = None) -> None:
         """Click an element by its data-ab-ref (e.g. ``"@e0"``).
 
         Args:
@@ -170,7 +202,7 @@ class AgentBrowser:
         await _click(self._resolve(session_id), ref)
 
     async def fill(
-        self, ref: str, text: str, session_id: Optional[str] = None
+        self, ref: str, text: str, session_id: str | None = None
     ) -> None:
         """Fill an input element with *text*.
 
@@ -185,7 +217,7 @@ class AgentBrowser:
         self,
         amount: int = 300,
         direction: str = "down",
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
     ) -> None:
         """Scroll the page.
 
@@ -197,7 +229,7 @@ class AgentBrowser:
         await _scroll(self._resolve(session_id), direction=direction, amount=amount)
 
     async def select_option(
-        self, ref: str, value: str, session_id: Optional[str] = None
+        self, ref: str, value: str, session_id: str | None = None
     ) -> None:
         """Select an option in a ``<select>`` element.
 
@@ -208,7 +240,7 @@ class AgentBrowser:
         """
         await _select_option(self._resolve(session_id), ref, value)
 
-    async def hover(self, ref: str, session_id: Optional[str] = None) -> None:
+    async def hover(self, ref: str, session_id: str | None = None) -> None:
         """Move the mouse over an element.
 
         Args:
@@ -217,7 +249,7 @@ class AgentBrowser:
         """
         await _hover(self._resolve(session_id), ref)
 
-    async def press_key(self, key: str, session_id: Optional[str] = None) -> None:
+    async def press_key(self, key: str, session_id: str | None = None) -> None:
         """Press a keyboard key.
 
         Args:
@@ -230,7 +262,7 @@ class AgentBrowser:
         self,
         selector: str,
         timeout: int = 10000,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
     ) -> None:
         """Wait for a CSS selector to appear in the DOM.
 
@@ -247,7 +279,7 @@ class AgentBrowser:
         self,
         task: str,
         intelligence: str = "agent",
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
         **kwargs,
     ) -> dict:
         """Execute a natural-language task using LLM/Agent intelligence.
@@ -273,9 +305,9 @@ class AgentBrowser:
         self,
         site: str,
         command: str,
-        args: Optional[dict] = None,
-        breakpoints: Optional[list] = None,
-        session_id: Optional[str] = None,
+        args: dict | None = None,
+        breakpoints: list | None = None,
+        session_id: str | None = None,
         **kwargs,
     ) -> Any:
         """Debug-mode pipeline execution with breakpoint support.
@@ -311,7 +343,7 @@ class AgentBrowser:
 
     # ── internal helpers ────────────────────────────────────────
 
-    def _resolve(self, session_id: Optional[str]) -> str:
+    def _resolve(self, session_id: str | None) -> str:
         """Return the explicit *session_id* or fall back to the tracked one."""
         if session_id is not None:
             return session_id

@@ -1,9 +1,11 @@
 """Cascade 测试 — DOM 级联探索与策略探测"""
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+
 from agent_browser.explore.cascade import (
-    cascade,
     STRATEGY_LEVELS,
+    cascade,
 )
 
 
@@ -121,8 +123,9 @@ class TestPrivateHelpers:
         assert isinstance(fields, dict)
 
     def test_get_test_urls_filters_json(self):
-        from agent_browser.explore.cascade import _get_test_urls
         from types import SimpleNamespace
+
+        from agent_browser.explore.cascade import _get_test_urls
         eps = [
             SimpleNamespace(is_json=True, url="https://api.example.com/a"),
             SimpleNamespace(is_json=False, url="https://example.com/page"),  # not JSON

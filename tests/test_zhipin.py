@@ -10,7 +10,6 @@ Boss 直聘端到端测试。
 import asyncio
 import logging
 import os
-import sys
 
 os.environ.setdefault("REBROWSER_PATCHES_RUNTIME_FIX_MODE", "addBinding")
 

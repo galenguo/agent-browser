@@ -7,11 +7,12 @@ Design inspired by the daemon + IdleManager dual-condition pattern:
 """
 
 import asyncio
+import contextlib
 import json
-import time
 import logging
+import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
 
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 class ExtensionCommand:
     """Command sent to Chrome Extension."""
 
-    def __init__(self, method: str, params: Dict[str, Any] | None = None):
+    def __init__(self, method: str, params: dict[str, Any] | None = None):
         self.id = f"cmd_{time.time_ns()}"
         self.method = method
         self.params = params or {}
@@ -47,11 +48,11 @@ class ExtensionBridge:
 
     def __init__(self, port: int = 19825):
         self._port = port
-        self._server: Optional[Any] = None  # websockets.serve
-        self._ws: Optional[Any] = None  # WebSocket connection
-        self._commands: Dict[str, ExtensionCommand] = {}  # id -> Command
+        self._server: Any | None = None  # websockets.serve
+        self._ws: Any | None = None  # WebSocket connection
+        self._commands: dict[str, ExtensionCommand] = {}  # id -> Command
         self._connected = False
-        self._heartbeat_task: Optional[asyncio.Task] = None
+        self._heartbeat_task: asyncio.Task | None = None
         self._missed_pongs = 0
 
     @property
@@ -129,10 +130,8 @@ class ExtensionBridge:
             self._heartbeat_task.cancel()
             self._heartbeat_task = None
         if self._ws:
-            try:
+            with contextlib.suppress(Exception):
                 await self._ws.close()
-            except Exception:
-                pass
             self._ws = None
         self._connected = False
         if self._server:
@@ -140,7 +139,7 @@ class ExtensionBridge:
             await self._server.wait_closed()
             self._server = None
 
-    async def send_command(self, method: str, params: Dict[str, Any] | None = None, timeout: float = 30.0) -> Any:
+    async def send_command(self, method: str, params: dict[str, Any] | None = None, timeout: float = 30.0) -> Any:
         """Send command to Extension and wait for response."""
         if not self._connected or not self._ws:
             raise ConnectionError("Extension not connected")
@@ -152,7 +151,7 @@ class ExtensionBridge:
             payload = {"id": cmd.id, "method": cmd.method, "params": cmd.params}
             await self._ws.send(json.dumps(payload))
             return await asyncio.wait_for(cmd.future, timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._commands.pop(cmd.id, None)
             raise TimeoutError(f"Extension command '{method}' timed out after {timeout}s")
         except Exception:
@@ -194,15 +193,15 @@ class BrowserDaemon:
 
     def __init__(self, config: SkillConfig):
         self._config = config
-        self._playwright: Optional[Playwright] = None
-        self._browser: Optional[Browser] = None
+        self._playwright: Playwright | None = None
+        self._browser: Browser | None = None
         self._connected = False
-        self._sessions: Dict[str, Dict[str, Any]] = {}  # session_id -> {context, page, created_at}
+        self._sessions: dict[str, dict[str, Any]] = {}  # session_id -> {context, page, created_at}
         self._last_activity = time.time()
-        self._idle_task: Optional[asyncio.Task] = None
+        self._idle_task: asyncio.Task | None = None
         self._state_path = Path(config.daemon_state_path).expanduser()
         # Extension Bridge (WebSocket server for Chrome Extension)
-        self._extension_bridge: Optional[ExtensionBridge] = None
+        self._extension_bridge: ExtensionBridge | None = None
 
     @classmethod
     def get(cls, config: SkillConfig = None) -> "BrowserDaemon":
@@ -274,10 +273,8 @@ class BrowserDaemon:
             await self.destroy_context(sid)
 
         if self._browser:
-            try:
+            with contextlib.suppress(Exception):
                 await self._browser.close()
-            except Exception:
-                pass
             self._browser = None
 
         self._connected = False
@@ -288,17 +285,15 @@ class BrowserDaemon:
         """Full shutdown including Playwright."""
         await self.disconnect()
         if self._playwright:
-            try:
+            with contextlib.suppress(Exception):
                 await self._playwright.stop()
-            except Exception:
-                pass
             self._playwright = None
         BrowserDaemon._instance = None
         logger.info("Daemon shutdown complete")
 
     # -- Session management --
 
-    async def create_context(self, session_id: str) -> Tuple[BrowserContext, Page]:
+    async def create_context(self, session_id: str) -> tuple[BrowserContext, Page]:
         """Create a new context + page on the persistent browser connection."""
         await self.ensure_connected()
         context = await self._browser.new_context()
@@ -317,28 +312,24 @@ class BrowserDaemon:
         """Close context + page but keep browser connection alive."""
         session = self._sessions.pop(session_id, None)
         if session:
-            try:
+            with contextlib.suppress(Exception):
                 await session["page"].close()
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 await session["context"].close()
-            except Exception:
-                pass
         self._touch_activity()
         self._persist_state()
 
-    def get_page(self, session_id: str) -> Optional[Page]:
+    def get_page(self, session_id: str) -> Page | None:
         """Get the Playwright Page for a session."""
         session = self._sessions.get(session_id)
         return session["page"] if session else None
 
     @property
-    def browser(self) -> Optional[Browser]:
+    def browser(self) -> Browser | None:
         return self._browser
 
     @property
-    def playwright(self) -> Optional[Playwright]:
+    def playwright(self) -> Playwright | None:
         return self._playwright
 
     @property
@@ -350,7 +341,7 @@ class BrowserDaemon:
         return len(self._sessions)
 
     @property
-    def extension_bridge(self) -> Optional[ExtensionBridge]:
+    def extension_bridge(self) -> ExtensionBridge | None:
         """Extension Bridge (WebSocket server for Chrome Extension)."""
         return self._extension_bridge
 
@@ -406,7 +397,7 @@ class BrowserDaemon:
         except Exception as e:
             logger.debug(f"Failed to persist daemon state: {e}")
 
-    def _load_state(self) -> Dict:
+    def _load_state(self) -> dict:
         """Restore state from JSON file."""
         try:
             if self._state_path.exists():

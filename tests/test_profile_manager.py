@@ -1,10 +1,9 @@
 """
 测试 ProfileManager 核心功能（单元测试）
 """
-import sys
 import os
-import tempfile
 import shutil
+import tempfile
 
 from agent_browser.session.profile_manager import ProfileManager
 

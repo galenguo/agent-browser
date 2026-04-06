@@ -23,16 +23,17 @@ Steps Registry:
 """
 import asyncio
 import json
-import re
-import os
 import logging
-from typing import Any, Callable, Dict
+import os
+import re
+from collections.abc import Callable
+from typing import Any
 
 from .template import resolve
 
 logger = logging.getLogger(__name__)
 
-STEPS: Dict[str, Callable] = {}
+STEPS: dict[str, Callable] = {}
 
 # CSS selector allowed characters (prevent injection)
 _CSS_SELECTOR_RE = re.compile(r'^[a-zA-Z0-9_\-#\.\[\]\(\)=*~^$|:\',"+> ]+$')
@@ -439,7 +440,7 @@ async def step_snapshot(session_id: str, params: Any, data: Any,
 
     elif isinstance(params, dict):
         selector = params.get("selector", "*")
-        fields = params.get("fields", [])
+        params.get("fields", [])
         page = await _get_handle(session_id)
         safe_sel = json.dumps(selector)
         js = f"""
@@ -496,7 +497,7 @@ async def step_evaluate(session_id: str, params: Any, data: Any,
             page.evaluate(js_code),
             timeout=eval_timeout,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise ValueError(
             f"JavaScript execution timed out after {eval_timeout}s. "
             "Use _timeout param to increase limit."
@@ -667,10 +668,7 @@ async def step_tap(session_id: str, params: Any, data: Any,
     # Build action call JS
     safe_store = json.dumps(store_name)
     safe_action = json.dumps(action_name)
-    if args_js:
-        action_call = f"store[{safe_action}]({args_js})"
-    else:
-        action_call = f"store[{safe_action}]()"
+    action_call = f"store[{safe_action}]({args_js})" if args_js else f"store[{safe_action}]()"
 
     # Generate tap interceptor
     if capture_pattern:
@@ -909,7 +907,7 @@ async def step_fetch(session_id: str, params: Any, data: Any,
     # Append query params from _query_params to URL
     query_params = params.get("_query_params")
     if query_params:
-        from urllib.parse import urlencode, urlparse, parse_qs
+        from urllib.parse import parse_qs, urlencode, urlparse
         parsed = urlparse(url)
         existing = parse_qs(parsed.query)
         if isinstance(query_params, dict):
@@ -965,13 +963,12 @@ async def step_fetch(session_id: str, params: Any, data: Any,
         result = await page.evaluate(js)
     else:
         import aiohttp
-        async with aiohttp.ClientSession() as http:
-            async with http.request(method, url, headers=headers) as resp:
-                text = await resp.text()
-                try:
-                    result = json.loads(text)
-                except json.JSONDecodeError:
-                    result = text
+        async with aiohttp.ClientSession() as http, http.request(method, url, headers=headers) as resp:
+            text = await resp.text()
+            try:
+                result = json.loads(text)
+            except json.JSONDecodeError:
+                result = text
 
     return result
 
@@ -1158,10 +1155,7 @@ async def step_sort(session_id: str, params: Any, data: Any,
 async def step_limit(session_id: str, params: Any, data: Any,
                      context: dict, stealth: dict) -> Any:
     """Truncate array to N items."""
-    if isinstance(params, str):
-        n = int(resolve(params, **context))
-    else:
-        n = int(params)
+    n = int(resolve(params, **context)) if isinstance(params, str) else int(params)
 
     if isinstance(data, list):
         return data[:n]

@@ -1,7 +1,6 @@
 """Element reference generator -- uses batch JS evaluation + visibility detection + data-ab-ref injection."""
-from typing import List, Dict, Tuple
-from playwright.async_api import Page
 
+from playwright.async_api import Page
 
 COMBINED_SELECTOR = "button, a, input, textarea, select"
 
@@ -12,10 +11,10 @@ _COMBINED_JS = """(()=>{const e=document.querySelectorAll('%s'),r=[];let refInde
 async def generate_refs(
     page: Page,
     interactive_only: bool = False,
-) -> Tuple[List[Dict], List[int], Dict]:
+) -> tuple[list[dict], list[int], dict]:
     """Generate element references + DOM index list + page info (single JS evaluation, injects data-ab-ref attributes)."""
-    dom_indices: List[int] = []
-    elements: List[Dict] = []
+    dom_indices: list[int] = []
+    elements: list[dict] = []
 
     try:
         result = await page.evaluate(_COMBINED_JS % COMBINED_SELECTOR)

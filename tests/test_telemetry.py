@@ -1,11 +1,8 @@
 """Telemetry 测试 — 本地统计收集"""
-import json
-import os
-import time
-from pathlib import Path
 
 import pytest
-from agent_browser.pipeline.telemetry import Telemetry, _TEL_FILE, _TEL_DIR
+
+from agent_browser.pipeline.telemetry import _TEL_FILE, Telemetry
 
 
 @pytest.fixture(autouse=True)
@@ -59,7 +56,6 @@ class TestRecord:
     def test_record_non_blocking(self):
         """telemetry 失败不应抛异常"""
         # 即使目录不可写也不应崩溃
-        old_dir = _TEL_DIR
         try:
             Telemetry.record("safe/test", True, 10, 1, 1)
         except Exception:

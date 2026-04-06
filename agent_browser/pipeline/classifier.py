@@ -9,13 +9,13 @@ Classification dimensions:
   - UNKNOWN: Cannot auto-classify
 """
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from .errors import (
     PipelineError,
     PipelineStepError,
-    StepTimeoutError,
     SelectorNotFoundError,
+    StepTimeoutError,
     URLError,
 )
 
@@ -42,7 +42,7 @@ NAVIGATION_KEYWORDS = ("url", "navigate", "dns", "connection refused",
                      "connection reset", "ssl", "certificate", "blocked")
 
 
-def _extract_status_code(message: str) -> Optional[int]:
+def _extract_status_code(message: str) -> int | None:
     """Extract HTTP status code from error message."""
     import re
     match = re.search(_STATUS_CODE_RE, message)
@@ -51,7 +51,7 @@ def _extract_status_code(message: str) -> Optional[int]:
     return None
 
 
-def classify(error: PipelineError) -> Tuple[ErrorCategory, Dict[str, Any]]:
+def classify(error: PipelineError) -> tuple[ErrorCategory, dict[str, Any]]:
     """
     Classify a PipelineError into an ErrorCategory + metadata.
 
@@ -60,7 +60,7 @@ def classify(error: PipelineError) -> Tuple[ErrorCategory, Dict[str, Any]]:
         metadata contains context info needed by strategy execution.
     """
     msg_lower = str(error).lower()
-    meta: Dict[str, Any] = {
+    meta: dict[str, Any] = {
         "step_name": error.step_name,
         "step_index": error.step_index,
         "adapter_name": error.adapter_name,

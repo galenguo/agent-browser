@@ -4,8 +4,10 @@ Lightweight CLI layer that uses ConfigManager for configuration and
 CLISessionManager for cross-process session persistence.
 """
 import asyncio
-import click
 from pathlib import Path
+
+import click
+
 from agent_browser.cli.session_manager import CLISessionManager
 from agent_browser.config import ConfigManager
 from agent_browser.llm.factory import LLMFactory
@@ -24,9 +26,8 @@ def init():
     """Initialize configuration file"""
     config_path = Path.home() / ".agent-browser" / "config.yaml"
 
-    if config_path.exists():
-        if not click.confirm(f"Configuration file already exists: {config_path}\nOverwrite?"):
-            return
+    if config_path.exists() and not click.confirm(f"Configuration file already exists: {config_path}\nOverwrite?"):
+        return
 
     config_mgr.save_config()
     click.echo(f"Configuration file created: {config_path}")
@@ -51,7 +52,6 @@ def run(task, session, url, max_steps, headless, llm_provider, llm_model, llm_ba
 
 
 async def _run_task(task, session_name, url, max_steps, headless, llm_provider, llm_model, llm_base_url, remote_host, remote_port, cdp_url):
-    from agent_browser.browser.stealth_launcher import launch_stealth_launcher
     from agent_browser.agent.runner import run_agent_task
 
     cli_config = config_mgr.get_cli_config()
@@ -115,7 +115,7 @@ async def _run_task(task, session_name, url, max_steps, headless, llm_provider, 
 
         result = await run_agent_task(browser=browser, task=task, llm=llm, max_steps=max_steps)
 
-        click.echo(f"\nTask completed")
+        click.echo("\nTask completed")
         click.echo(f"Result: {result}")
 
         if session_name:
@@ -150,8 +150,8 @@ async def _session_start(name, headless):
         click.echo(f"Session '{name}' already exists", err=True)
         return
 
-    browser = await launch_stealth_browser(headless=headless)
-    cdp_url = f"http://localhost:19222"
+    await launch_stealth_browser(headless=headless)
+    cdp_url = "http://localhost:19222"
     profile_path = str(Path.home() / ".agent-browser" / "profiles" / name)
 
     session_mgr.create(session_id=name, cdp_url=cdp_url, mode='local', profile_path=profile_path)

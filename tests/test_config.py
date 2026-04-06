@@ -13,8 +13,6 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
-import pytest
-
 # 使用 skill_loader 助手加载模块
 from helpers.skill_loader import load_skill_module
 

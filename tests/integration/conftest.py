@@ -9,9 +9,9 @@ Three fixture tiers:
 CRITICAL: autouse reset clears ALL module-level singletons between tests.
 Without this, tests leak state through _config, _middleware, _registry, etc.
 """
-import asyncio
 from pathlib import Path
 from unittest import mock
+
 import pytest
 
 # ── Path setup (mirrors parent conftest) ──
@@ -192,8 +192,8 @@ def patched_get_handle(mock_page_for_steps):
     Used by pipeline execution and security tests that call step handlers directly.
     Also covers step_snapshot which calls _ensure_middleware() directly.
     """
-    from agent_browser.pipeline import steps
     from agent_browser import main as skill_main
+    from agent_browser.pipeline import steps
 
     async def _fake_handle(sid):
         return mock_page_for_steps

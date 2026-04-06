@@ -12,9 +12,12 @@
   3. session destroy → 自动调用 Gateway /release
   4. Gateway quota 检查：超出限额时返回适当错误
 """
-import pytest
 import asyncio
-from unittest.mock import patch, AsyncMock
+import contextlib
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from tests.helpers.api_client import APIClient
 
 
@@ -29,10 +32,8 @@ class TestScenario5APIRemoteGateway:
     async def teardown_method_async(self):
         """清理会话"""
         for session_id in self.session_ids:
-            try:
+            with contextlib.suppress(Exception):
                 await self.api.delete_session(session_id)
-            except Exception:
-                pass
 
     def teardown_method(self):
         asyncio.run(self.teardown_method_async())

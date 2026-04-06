@@ -11,9 +11,10 @@
 """
 
 import asyncio
-import httpx
 import subprocess
 import time
+
+import httpx
 
 BASE_URL = "http://localhost:8000"
 
@@ -73,7 +74,7 @@ def test_browser_container_running(session_id: str):
         print(f"✅ 浏览器容器正在运行: browser_{session_id}")
         return True
     else:
-        print(f"❌ 浏览器容器未运行")
+        print("❌ 浏览器容器未运行")
         return False
 
 
@@ -118,20 +119,20 @@ async def test_delete_session(session_id: str):
     async with httpx.AsyncClient() as client:
         response = await client.delete(f"{BASE_URL}/sessions/{session_id}")
         assert response.status_code == 200
-        print(f"✅ 会话删除成功")
+        print("✅ 会话删除成功")
 
 
 def test_browser_container_stopped(session_id: str):
     """测试浏览器容器是否已停止"""
-    print(f"\n8. 检查浏览器容器是否已清理...")
+    print("\n8. 检查浏览器容器是否已清理...")
     time.sleep(5)  # 等待容器停止
 
     output = run_command(f"docker ps -a | grep browser_{session_id}")
     if f"browser_{session_id}" not in output:
-        print(f"✅ 浏览器容器已清理")
+        print("✅ 浏览器容器已清理")
         return True
     else:
-        print(f"⚠️  浏览器容器仍然存在（可能是 auto_remove 延迟）")
+        print("⚠️  浏览器容器仍然存在（可能是 auto_remove 延迟）")
         return False
 
 

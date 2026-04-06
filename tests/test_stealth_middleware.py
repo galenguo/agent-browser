@@ -9,10 +9,10 @@ StealthMiddleware + StealthPageHandle 单元测试
   - ref 格式验证回归
   - stealth_mode 配置选项
 """
-import asyncio
-import pytest
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
+
+import pytest
 
 # ── Fixtures ───────────────────────────────────────────────
 
@@ -408,6 +408,7 @@ class TestRegressionFixes:
     async def test_total_timeout_parameter_exists(self):
         """run_task 签名包含 total_timeout 参数"""
         from inspect import signature
+
         from agent_browser.browser.local import LocalCDPBackend
 
         sig = signature(LocalCDPBackend.run_task)
@@ -428,7 +429,7 @@ class TestRegressionFixes:
     @pytest.mark.asyncio
     async def test_middleware_exports(self):
         """agent_browser.stealth 模块正确导出核心类"""
-        from agent_browser.stealth import StealthMiddleware, StealthPageHandle, CircuitState
+        from agent_browser.stealth import CircuitState, StealthMiddleware, StealthPageHandle
 
         assert StealthMiddleware is not None
         assert StealthPageHandle is not None

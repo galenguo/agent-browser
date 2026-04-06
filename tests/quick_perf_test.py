@@ -6,6 +6,7 @@
 """
 import asyncio
 import time
+
 import httpx
 
 
@@ -63,7 +64,7 @@ async def test_sequential_tasks(num_tasks=5):
                 await asyncio.sleep(5)
 
         # 统计
-        print(f"\n=== 测试结果 ===")
+        print("\n=== 测试结果 ===")
         completed = sum(1 for r in results if r["status"] == "completed")
         total_time = sum(r["elapsed"] for r in results)
         avg_time = total_time / len(results) if results else 0
@@ -77,7 +78,7 @@ async def test_sequential_tasks(num_tasks=5):
 
 async def test_memory_stress():
     """内存压力测试"""
-    print(f"\n=== 内存压力测试 ===")
+    print("\n=== 内存压力测试 ===")
 
     base_url = "http://localhost:8000"
 

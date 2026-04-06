@@ -11,12 +11,11 @@ Config precedence:
   4. Auto-detection (localhost:8000, 127.0.0.1:19222)
   5. Hardcoded defaults
 """
-import os
-import asyncio
 import logging
-from dataclasses import dataclass, field
-from typing import Literal, Optional, Any
+import os
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Literal
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +62,8 @@ class LLMConfig:
     """LLM provider configuration."""
     provider: str
     model: str
-    api_key: Optional[str]
-    base_url: Optional[str]
+    api_key: str | None
+    base_url: str | None
     temperature: float
 
 
@@ -104,7 +103,7 @@ class CLIConfig:
 class ConfigManager:
     """Unified configuration manager with YAML file support and env var resolution."""
 
-    def __init__(self, config_path: Optional[Path] = None):
+    def __init__(self, config_path: Path | None = None):
         self.config_path = config_path or Path.home() / ".agent-browser" / "config.yaml"
         self._config = self._load_config()
 
@@ -153,7 +152,7 @@ class ConfigManager:
             "api": {"host": "0.0.0.0", "port": 8000, "max_sessions": 10, "idle_timeout_seconds": 1800, "browser_mode": "local"}
         }
 
-    def get_llm_config(self, provider: Optional[str] = None, **overrides) -> LLMConfig:
+    def get_llm_config(self, provider: str | None = None, **overrides) -> LLMConfig:
         """Get LLM configuration with parameter override support."""
         provider = provider or self._config["llm"]["default_provider"]
         llm_cfg = self._config["llm"][provider]
@@ -176,7 +175,7 @@ class ConfigManager:
             default_timeout=overrides.get("default_timeout", 30000)
         )
 
-    def get_browser_remote_config(self) -> Optional[dict]:
+    def get_browser_remote_config(self) -> dict | None:
         """Get remote browser configuration."""
         remote_cfg = self._config.get("browser", {}).get("remote", {})
         if not remote_cfg.get("enabled"):
@@ -342,9 +341,8 @@ def _apply_env_overrides(cfg: SkillConfig) -> SkillConfig:
         cfg.daemon_idle_timeout = int(v)
     if v := os.getenv("AGENT_BROWSER_STEALTH_ENABLED"):
         cfg.stealth_enabled = v.lower() in ("1", "true", "yes")
-    if v := os.getenv("AGENT_BROWSER_STEALTH_MODE"):
-        if v in ("full", "vanilla"):
-            cfg.stealth_mode = v
+    if (v := os.getenv("AGENT_BROWSER_STEALTH_MODE")) and v in ("full", "vanilla"):
+        cfg.stealth_mode = v
     return cfg
 
 
@@ -418,31 +416,29 @@ async def detect_mode() -> SkillConfig:
     if not os.getenv("AGENT_BROWSER_CALLING_MODE") and not yaml_data.get("skill", {}).get("calling_mode"):
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as s:
-                async with s.get(
-                    "http://localhost:8000/health",
-                    timeout=aiohttp.ClientTimeout(total=1),
-                ) as r:
-                    if r.status == 200:
-                        cfg.calling_mode = "api"
-                        cfg.api_url = "http://localhost:8000"
-                        logger.info("Auto-detected: API mode (FastAPI reachable)")
-                        return cfg
+            async with aiohttp.ClientSession() as s, s.get(
+                "http://localhost:8000/health",
+                timeout=aiohttp.ClientTimeout(total=1),
+            ) as r:
+                if r.status == 200:
+                    cfg.calling_mode = "api"
+                    cfg.api_url = "http://localhost:8000"
+                    logger.info("Auto-detected: API mode (FastAPI reachable)")
+                    return cfg
         except Exception:
             pass
 
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as s:
-                async with s.get(
-                    f"http://127.0.0.1:19222/json/version",
-                    timeout=aiohttp.ClientTimeout(total=1),
-                ) as r:
-                    if r.status == 200:
-                        cfg.calling_mode = "cli"
-                        cfg.browser_mode = "local"
-                        logger.info("Auto-detected: CLI mode (CDP reachable)")
-                        return cfg
+            async with aiohttp.ClientSession() as s, s.get(
+                "http://127.0.0.1:19222/json/version",
+                timeout=aiohttp.ClientTimeout(total=1),
+            ) as r:
+                if r.status == 200:
+                    cfg.calling_mode = "cli"
+                    cfg.browser_mode = "local"
+                    logger.info("Auto-detected: CLI mode (CDP reachable)")
+                    return cfg
         except Exception:
             pass
 

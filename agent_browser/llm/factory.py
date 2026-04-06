@@ -2,12 +2,11 @@
 
 Wraps browser-use's ChatOpenAI for OpenAI/GLM models (native output_format support)
 and LangChain's ChatAnthropic for Anthropic models.
+
+All optional dependencies are imported lazily so that ``pip install agent-browser``
+works without ``[full]`` extra.
 """
 import os
-from typing import Optional
-
-from browser_use.llm.openai.chat import ChatOpenAI as BrowserUseChatOpenAI
-from langchain_anthropic import ChatAnthropic
 
 
 class LLMFactory:
@@ -16,9 +15,9 @@ class LLMFactory:
     @staticmethod
     def create(
         provider: str = "openai",
-        model: Optional[str] = None,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        model: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
         temperature: float = 0.1,
         **kwargs,
     ):
@@ -36,25 +35,32 @@ class LLMFactory:
 
         Raises:
             ValueError: If provider is not supported
+            ImportError: If provider's dependencies are not installed
         """
         if provider == "openai":
-            # Check if model is glm-5-turbo (needs special config)
+            from browser_use.llm.openai.chat import ChatOpenAI as BrowserUseChatOpenAI
+
             model_name = model or os.getenv("LLM_MODEL") or "gpt-4"
             is_glm = "glm" in model_name.lower()
 
-            # Use browser-use's ChatOpenAI (native output_format support)
             llm = BrowserUseChatOpenAI(
                 model=model_name,
                 api_key=api_key or os.getenv("OPENAI_API_KEY"),
                 base_url=base_url or os.getenv("OPENAI_BASE_URL"),
                 temperature=temperature,
-                # GLM-5-turbo compatibility config
                 remove_min_items_from_schema=is_glm,
                 remove_defaults_from_schema=is_glm,
             )
             return llm
         elif provider == "anthropic":
-            # Anthropic uses LangChain wrapper
+            try:
+                from langchain_anthropic import ChatAnthropic
+            except ImportError:
+                raise ImportError(
+                    "anthropic provider requires 'langchain-anthropic'. "
+                    "Install with: pip install agent-browser[full]"
+                )
+
             llm = ChatAnthropic(
                 model=model or "claude-3-5-sonnet-20241022",
                 api_key=api_key or os.getenv("ANTHROPIC_API_KEY"),

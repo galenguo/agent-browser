@@ -12,8 +12,6 @@ Phase 2: LocalCDPBackend 集成测试
 前置条件：CloakBrowser 运行在 127.0.0.1:19222
 """
 import asyncio
-import uuid
-from pathlib import Path
 
 import pytest
 
@@ -27,14 +25,13 @@ class TestCloakBrowserConnection:
         """CDP 端点可达"""
         import aiohttp
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                "http://127.0.0.1:19222/json/version",
-                timeout=aiohttp.ClientTimeout(total=5)
-            ) as resp:
-                assert resp.status == 200
-                data = await resp.json()
-                assert "webSocketDebuggerUrl" in data
+        async with aiohttp.ClientSession() as session, session.get(
+            "http://127.0.0.1:19222/json/version",
+            timeout=aiohttp.ClientTimeout(total=5)
+        ) as resp:
+            assert resp.status == 200
+            data = await resp.json()
+            assert "webSocketDebuggerUrl" in data
 
     @pytest.mark.asyncio
     async def test_playwright_can_connect(self):

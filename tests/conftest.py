@@ -15,16 +15,17 @@ Real browser fixtures (headed CloakBrowser):
 - browser_page: Per-test page (real CDP)
 - docker_api_url: FastAPI gateway URL (if Docker running)
 """
-import pytest
 import asyncio
+import contextlib
 import json
 import os
-import sys
+import socket
 import tempfile
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from unittest import mock
 
+import pytest
 
 # pytest-asyncio 配置
 pytest_plugins = ('pytest_asyncio',)
@@ -62,7 +63,7 @@ def mock_page():
     page.mouse.wheel = mock.AsyncMock()
     page.keyboard = mock.MagicMock()
     page.keyboard.type = mock.AsyncMock()
-    keyboard.press = mock.AsyncMock()
+    page.keyboard.press = mock.AsyncMock()
     page.viewport_size = {"width": 1920, "height": 1080}
     page.add_init_script = mock.AsyncMock()
     page.locator = mock.MagicMock()
@@ -75,7 +76,7 @@ def mock_context(mock_page):
     """Mock BrowserContext"""
     context = mock.MagicMock()
     context.new_page = mock.AsyncMock(return_value=mock_page)
-    context.close = AsyncMock()
+    context.close = mock.AsyncMock()
     return context
 
 
@@ -84,7 +85,7 @@ def mock_browser(mock_context):
     """Mock Playwright Browser"""
     browser = mock.MagicMock()
     browser.new_context = mock.AsyncMock(return_value=mock_context)
-    browser.close = AsyncMock()
+    browser.close = mock.AsyncMock()
     browser.contexts = []
     return browser
 
@@ -107,7 +108,6 @@ def reset_daemon():
 @pytest.fixture
 def clean_env():
     """清理环境变量"""
-    import os
     env_keys = [k for k in os.environ if k.startswith("AGENT_BROWSER_")]
     original_values = {k: os.environ.get(k) for k in env_keys}
 
@@ -125,13 +125,7 @@ def clean_env():
             os.environ.pop(k, None)
 
 
-# pytest-asyncio 配置
-pytest_plugins = ("pytest_asyncio",)
-
-
-# ── Tier 3: CloakBrowser 生命周期管理 ──
-
-import socket
+# ── Tier 3: CloakBrowser lifecycle management ──
 
 _CDP_PORT = 19222
 _CDP_URL = f"http://127.0.0.1:{_CDP_PORT}"
@@ -170,7 +164,7 @@ def cdp_url(request):
     # 端口空闲 — 通过 Playwright 启动有头模式（macOS 兼容）
     print(f"\n[CloakBrowser] Port {_CDP_PORT} free, launching headed browser...")
     try:
-        from agent_browser.browser.stealth_launcher import launch_stealth_browser, close_browser
+        from agent_browser.browser.stealth_launcher import close_browser, launch_stealth_browser
 
         loop = asyncio.new_event_loop()
         try:
@@ -189,17 +183,15 @@ def cdp_url(request):
 
     finally:
         if _we_started_it and _session_browser is not None:
-            print(f"\n[CloakBrowser] Closing browser (session teardown)...")
+            print("\n[CloakBrowser] Closing browser (session teardown)...")
             loop = asyncio.new_event_loop()
             try:
                 async def _force_close():
-                    try:
+                    with contextlib.suppress(TimeoutError, Exception):
                         await asyncio.wait_for(
                             close_browser(_session_pw, _session_browser),
                             timeout=15
                         )
-                    except (asyncio.TimeoutError, Exception):
-                        pass  # 超时或异常：强制关闭
                 loop.run_until_complete(_force_close())
             except Exception as e:
                 print(f"[CloakBrowser] Warning during close: {e}")
@@ -207,8 +199,8 @@ def cdp_url(request):
                 loop.close()
             # 确保进程被杀（有头模式可能阻塞 browser.close()）
             import subprocess
-            result = subprocess.run(
-                ["pkill", "-f", "Chromium.*remote-debugging-port=%d" % _CDP_PORT],
+            subprocess.run(
+                ["pkill", "-f", f"Chromium.*remote-debugging-port={_CDP_PORT}"],
                 capture_output=True, timeout=5
             )
             _session_pw = None
@@ -241,20 +233,14 @@ async def browser_context(cdp_url):
         yield context
     finally:
         if context:
-            try:
+            with contextlib.suppress(Exception):
                 await context.close()
-            except Exception:
-                pass
         if browser:
-            try:
+            with contextlib.suppress(Exception):
                 await browser.close()
-            except Exception:
-                pass
         if pw:
-            try:
+            with contextlib.suppress(Exception):
                 await pw.stop()
-            except Exception:
-                pass
 
 
 @pytest.fixture
@@ -269,10 +255,8 @@ async def browser_page(browser_context):
         yield page
     finally:
         if page:
-            try:
+            with contextlib.suppress(Exception):
                 await page.close()
-            except Exception:
-                pass
 
 
 # ══════════════════════════════════════════
@@ -339,13 +323,12 @@ async def docker_api_url():
     import aiohttp
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                "http://localhost:8000/health",
-                timeout=aiohttp.ClientTimeout(total=3),
-            ) as resp:
-                if resp.status == 200:
-                    return "http://localhost:8000"
+        async with aiohttp.ClientSession() as session, session.get(
+            "http://localhost:8000/health",
+            timeout=aiohttp.ClientTimeout(total=3),
+        ) as resp:
+            if resp.status == 200:
+                return "http://localhost:8000"
     except Exception:
         pass
     return None
@@ -406,8 +389,8 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         for line in _collected_skips:
             terminalreporter.write_line(line)
         anti_det_skips = [
-            l for l in _collected_skips
-            if "anti_detection" in l or "zhipin" in l.lower()
+            entry for entry in _collected_skips
+            if "anti_detection" in entry or "zhipin" in entry.lower()
         ]
         if anti_det_skips:
             terminalreporter.write_sep("=", "WARNING: Anti-detection tests were skipped!")
@@ -418,7 +401,3 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 "Install CloakBrowser to enable them."
             )
         _collected_skips.clear()
-
-
-# pytest-asyncio 配置
-pytest_plugins = ("pytest_asyncio",)

@@ -1,15 +1,15 @@
 """Intelligence mode routing — Delegates to StealthMiddleware.run_task()."""
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 
 async def run_task(
     session_id: str,
     task: str,
     intelligence: str = "agent",
-    llm_config: Optional[Dict] = None,
+    llm_config: dict | None = None,
     max_steps: int = 6,
     **kwargs,
-) -> Dict:
+) -> dict:
     """
     Unified task entry point. Delegates to StealthMiddleware backend.
 

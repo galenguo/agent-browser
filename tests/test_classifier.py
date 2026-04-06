@@ -1,16 +1,14 @@
 """Classifier 测试 — 错误分类逻辑"""
-import pytest
 from agent_browser.pipeline.classifier import (
     ErrorCategory,
-    classify,
-    category_description,
     _extract_status_code,
+    category_description,
+    classify,
 )
 from agent_browser.pipeline.errors import (
-    PipelineError,
     PipelineStepError,
-    StepTimeoutError,
     SelectorNotFoundError,
+    StepTimeoutError,
     URLError,
 )
 

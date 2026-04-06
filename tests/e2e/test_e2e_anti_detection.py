@@ -25,9 +25,7 @@ Prerequisites:
 """
 import asyncio
 import json
-import os
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 
@@ -233,7 +231,7 @@ class TestBossZhipinAntiDetection:
         from tests.conftest import save_screenshot
 
         try:
-            response = await browser_page.goto(
+            await browser_page.goto(
                 _ZHIPIN_URL,
                 wait_until="domcontentloaded",
                 timeout=_ZHIPIN_TIMEOUT,
@@ -364,7 +362,7 @@ class TestBossZhipinAntiDetection:
     @pytest.mark.asyncio
     async def test_zhipin_screenshot_captured(self, browser_page, scorecard_writer):
         """截图保存成功且文件非空"""
-        from tests.conftest import save_screenshot, ensure_screenshot_dir
+        from tests.conftest import save_screenshot
 
         try:
             await browser_page.goto(
@@ -497,7 +495,7 @@ class TestScorecardOutput:
         assert path is not None, "scorecard writer.flush() 返回 None"
 
         assert path.exists(), f"scorecard 文件不存在: {path}"
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
 
         # 验证结构
@@ -516,7 +514,7 @@ class TestScorecardOutput:
     @pytest.mark.asyncio
     async def test_screenshot_file_valid(self, browser_page):
         """截图保存到磁盘且文件大小合理"""
-        from tests.conftest import save_screenshot, ensure_screenshot_dir
+        from tests.conftest import save_screenshot
 
         await browser_page.goto("https://example.com", wait_until="domcontentloaded", timeout=30000)
         path = await save_screenshot(browser_page, "infrastructure-test")

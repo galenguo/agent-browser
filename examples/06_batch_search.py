@@ -9,8 +9,8 @@
 """
 import asyncio
 import json
-from skills.agent_browser.adapters.runner import run_adapter
-from skills.agent_browser.main import create_session
+from agent_browseradapters.runner import run_adapter
+from agent_browsermain import create_session
 
 
 # ── 配置：修改这里来搜索不同关键词 ──

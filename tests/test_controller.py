@@ -1,7 +1,7 @@
 """Tests for BrowserController and ActionResult."""
-import pytest
-from unittest.mock import AsyncMock, MagicMock
-from agent_browser.stealth.browser_controller import BrowserController, ActionResult
+from unittest.mock import MagicMock
+
+from agent_browser.stealth.browser_controller import ActionResult, BrowserController
 
 
 class TestActionResult:

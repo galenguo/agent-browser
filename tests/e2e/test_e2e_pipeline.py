@@ -14,19 +14,15 @@ Run:
 Prerequisites:
   - CloakBrowser 运行在 127.0.0.1:19222（conftest 自动管理）
 """
-import asyncio
 import json
-import os
 from datetime import datetime
 
 import pytest
 
-from agent_browser.pipeline.executor import execute_pipeline
 from agent_browser.pipeline.errors import (
-    PipelineStepError,
     SelectorNotFoundError,
 )
-
+from agent_browser.pipeline.executor import execute_pipeline
 
 # ════════════════════════════════════════════
 #  Tier 2A: Basic Pipeline Operations on Real Pages
@@ -53,7 +49,7 @@ class TestPipelineBasicNavigation:
         # 通过 monkey-patch _get_handle 返回我们的真实 page
         import agent_browser.pipeline.steps as steps_module
 
-        original_get = getattr(steps_module, "_get_handle", None)
+        getattr(steps_module, "_get_handle", None)
 
         class RealPageHandle:
             """包装真实 Playwright Page 为 Pipeline 兼容的 handle"""
@@ -116,7 +112,7 @@ class TestPipelineBasicNavigation:
         url = browser_page.url
         title = await browser_page.title()
         assert "example.com" in url, f"Pipeline 未正确导航: {url}"
-        assert len(title) > 0, f"页面无标题"
+        assert len(title) > 0, "页面无标题"
         await save_screenshot(browser_page, "pipeline-after-navigate")
 
         scorecard_writer.record({
@@ -202,9 +198,7 @@ class TestPipelineFormInteraction:
 
         # snapshot 步骤返回的数据格式需要与 select/map 兼容
         # 这里我们简化：snapshot string 参数 → evaluate querySelectorAll
-        snapshot_data = {"elements": []}
 
-        original_goto = real_handle.goto
         original_eval = real_handle.evaluate
 
         async def intercept_eval(expr, **kw):
@@ -224,7 +218,7 @@ class TestPipelineFormInteraction:
             return real_handle
         monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
         try:
-            data = await execute_pipeline(
+            await execute_pipeline(
                 pipeline,
                 session_id="pipe_form",
                 args={},
@@ -273,8 +267,6 @@ class TestPipelineScrollAndExtract:
 
         import agent_browser.pipeline.steps as steps_module
 
-        links_before = []
-        links_after = []
 
         class RealPageHandle:
             def __init__(self, page):
@@ -335,7 +327,7 @@ class TestPipelineScrollAndExtract:
             return real_handle
         monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
         try:
-            data = await execute_pipeline(
+            await execute_pipeline(
                 pipeline,
                 session_id="pipe_scroll",
                 args={},
@@ -452,7 +444,7 @@ class TestPipelineErrorHandling:
         monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
         # fail_fast: executor 捕获异常并停止，不 re-raise
         # 验证：pipeline 执行了 navigate 但在 click 处停止（未执行 snapshot）
-        data = await execute_pipeline(
+        await execute_pipeline(
             pipeline,
             session_id="pipe_ff",
             args={},
@@ -556,14 +548,14 @@ class TestPipelineErrorHandling:
         monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
         # fail_fast=False 应该不抛异常（或返回部分数据）
         try:
-            data = await execute_pipeline(
+            await execute_pipeline(
                 pipeline,
                 session_id="pipe_fs",
                 args={},
                 fail_fast=False,
             )
         except Exception:
-                data = None  # 也允许异常，关键是 snapshot 是否被执行
+                pass  # 也允许异常，关键是 snapshot 是否被执行
 
         # 关键断言：即使 click 失败，snapshot 步骤仍执行了
         status = "PASS" if snapshot_executed else "FAIL"
@@ -588,7 +580,7 @@ class TestPipelineTemplates:
     @pytest.mark.asyncio
     async def test_template_variable_url(self, browser_page, scorecard_writer):
         """Pipeline 中使用 ${{ args.url }} 变量渲染 URL"""
-        from agent_browser.pipeline.template import render_value, TemplateContext
+        from agent_browser.pipeline.template import TemplateContext, render_value
 
         ctx = TemplateContext(args={"host": "example.com", "path": "/"})
         rendered = render_value("${{ args.host }}${{ args.path }}", ctx)
@@ -683,7 +675,7 @@ class TestPipelineTemplates:
         async def _fake_get_handle(sid=None):
             return real_handle
         monkeypatch.setattr(steps_module, "_get_handle", _fake_get_handle)
-        data = await execute_pipeline(
+        await execute_pipeline(
                 pipeline,
                 session_id="pipe_multi",
                 args={},
@@ -712,8 +704,8 @@ class TestPipelineTelemetry:
     @pytest.mark.asyncio
     async def test_telemetry_written_after_pipeline(self, browser_page, tmp_path, scorecard_writer, monkeypatch):
         """Pipeline 执行后 telemetry.jsonl 有记录"""
-        from agent_browser.pipeline import telemetry as tel_module
         import agent_browser.pipeline.steps as steps_module
+        from agent_browser.pipeline import telemetry as tel_module
 
         tel_file = tmp_path / "tel_test.jsonl"
         original_tel_file = tel_module._TEL_FILE

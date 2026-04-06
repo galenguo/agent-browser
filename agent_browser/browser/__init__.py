@@ -4,7 +4,8 @@ Defines BrowserBackend and BrowserPageHandle ABCs that all backend
 implementations must follow.
 """
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any, Dict, Optional
 
 
 class BrowserPageHandle(ABC):
@@ -117,8 +118,8 @@ class BrowserBackend(ABC):
         session_id: str,
         task: str,
         intelligence: str = "agent",
-        llm_config: Optional[Dict] = None,
+        llm_config: dict | None = None,
         max_steps: int = 6,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         """Execute intelligent task (agent mode: browser-use; llm mode: tool descriptions)."""

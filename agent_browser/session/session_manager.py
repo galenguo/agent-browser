@@ -18,7 +18,6 @@ import os
 import random
 import time
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,7 @@ class SessionProfile:
     def __init__(
         self,
         profile_id: str,
-        proxy_ip: Optional[str] = None,
+        proxy_ip: str | None = None,
         country_code: str = "CN",
     ):
         self.profile_id = profile_id
@@ -139,7 +138,7 @@ class SessionProfileManager:
     def get_or_create(
         self,
         key: str,
-        proxy_ip: Optional[str] = None,
+        proxy_ip: str | None = None,
         country_code: str = "CN",
     ) -> SessionProfile:
         """Get existing profile or create a new one."""
@@ -157,7 +156,7 @@ class SessionProfileManager:
     def _create(
         self,
         key: str,
-        proxy_ip: Optional[str] = None,
+        proxy_ip: str | None = None,
         country_code: str = "CN",
     ) -> SessionProfile:
         profile_id = f"{key}_{int(time.time())}_{random.randint(1000, 9999)}"
@@ -174,7 +173,7 @@ class SessionProfileManager:
     def rotate(
         self,
         key: str,
-        proxy_ip: Optional[str] = None,
+        proxy_ip: str | None = None,
         country_code: str = "CN",
     ) -> SessionProfile:
         """Rotate profile (keep cookie logic but change fingerprint)."""
@@ -194,9 +193,7 @@ class SessionProfileManager:
             return True
         if profile.request_count >= self.MAX_REQUESTS_PER_PROFILE:
             return True
-        if time.time() - profile.created_at >= self.MAX_PROFILE_AGE_SECONDS:
-            return True
-        return False
+        return time.time() - profile.created_at >= self.MAX_PROFILE_AGE_SECONDS
 
     def record_request(self, key: str) -> None:
         """Record a request (used for rotation decisions)."""

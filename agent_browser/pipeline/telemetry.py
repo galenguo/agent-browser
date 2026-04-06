@@ -11,9 +11,9 @@ Usage:
 """
 import json
 import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional
 from collections import defaultdict
+from pathlib import Path
+from typing import Any
 
 _TEL_DIR = Path.home() / ".agent-browser"
 _TEL_FILE = _TEL_DIR / "telemetry.jsonl"
@@ -29,11 +29,11 @@ class Telemetry:
         duration_ms: int,
         steps_executed: int,
         steps_total: int,
-        error_category: Optional[str] = None,
-        session_id: Optional[str] = None,
+        error_category: str | None = None,
+        session_id: str | None = None,
     ) -> None:
         """Record a pipeline execution."""
-        entry: Dict[str, Any] = {
+        entry: dict[str, Any] = {
             "ts": time.time(),
             "adapter": adapter,
             "success": success,
@@ -54,7 +54,7 @@ class Telemetry:
             pass  # telemetry must never block main flow
 
     @staticmethod
-    def get_stats(adapter: Optional[str] = None) -> Dict[str, Any]:
+    def get_stats(adapter: str | None = None) -> dict[str, Any]:
         """
         Get statistics summary.
 
@@ -76,13 +76,13 @@ class Telemetry:
         total_duration = sum(e.get("duration_ms", 0) for e in entries)
 
         # Error category statistics
-        categories: Dict[str, int] = defaultdict(int)
+        categories: dict[str, int] = defaultdict(int)
         for e in entries:
             cat = e.get("error_category", "none")
             categories[cat] += 1
 
         # Breakdown by adapter (global stats only)
-        by_adapter: Dict[str, Dict[str, Any]] = {}
+        by_adapter: dict[str, dict[str, Any]] = {}
         if not adapter:
             for e in entries:
                 a = e.get("adapter", "unknown")
@@ -97,7 +97,7 @@ class Telemetry:
             for a, s in by_adapter.items():
                 s["success_rate"] = s["success"] / s["total"] if s["total"] > 0 else 0
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "total": total,
             "success_count": successes,
             "failure_count": total - successes,
@@ -111,7 +111,7 @@ class Telemetry:
         return result
 
     @staticmethod
-    def get_recent(n: int = 20) -> List[Dict[str, Any]]:
+    def get_recent(n: int = 20) -> list[dict[str, Any]]:
         """Get the N most recent records (newest first)."""
         entries = Telemetry._load_entries()
         return entries[-n:] if n > 0 else []
@@ -126,13 +126,13 @@ class Telemetry:
         return count
 
     @staticmethod
-    def _load_entries() -> List[Dict[str, Any]]:
+    def _load_entries() -> list[dict[str, Any]]:
         """Load all records."""
-        entries: List[Dict[str, Any]] = []
+        entries: list[dict[str, Any]] = []
         if not _TEL_FILE.exists():
             return entries
         try:
-            with open(_TEL_FILE, "r", encoding="utf-8") as f:
+            with open(_TEL_FILE, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line:

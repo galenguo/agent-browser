@@ -13,9 +13,12 @@
   4. session destroy → Gateway 释放资源（验证 /release 调用）
   5. 无效 API Key → 返回错误（401）
 """
-import pytest
+import contextlib
 import os
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from tests.helpers.cli_runner import CLIRunner
 
 
@@ -32,10 +35,8 @@ class TestScenario4CLIRemoteGateway:
 
     def teardown_method(self):
         """清理会话和环境变量"""
-        try:
+        with contextlib.suppress(Exception):
             self.cli.session_destroy(self.session_name)
-        except Exception:
-            pass
         os.environ.pop("BROWSER_GATEWAY_URL", None)
         os.environ.pop("BROWSER_GATEWAY_KEY", None)
 

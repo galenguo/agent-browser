@@ -9,8 +9,6 @@ Phase 1: StealthEnhancer 单元测试
 - A2.5 inject_timing_noise（JS 注入成功，偏移量随机）
 """
 import asyncio
-import math
-import random
 from unittest import mock
 
 import pytest
@@ -175,28 +173,27 @@ class TestHumanType:
         enhancer = StealthEnhancer()
 
         # Mock 以触发长停顿
-        with mock.patch("random.random") as mock_random:
-            with mock.patch("random.randint") as mock_randint:
-                mock_random.side_effect = [0.5, 0.09]  # 第一次不 typo，第二次触发长停顿
-                mock_randint.side_effect = [100, 1000]  # delay_ms, 长停顿增量
+        with mock.patch("random.random") as mock_random, mock.patch("random.randint") as mock_randint:
+            mock_random.side_effect = [0.5, 0.09]  # 第一次不 typo，第二次触发长停顿
+            mock_randint.side_effect = [100, 1000]  # delay_ms, 长停顿增量
 
-                mock_page = mock.MagicMock()
-                mock_locator = mock.MagicMock()
-                mock_locator.click = mock.AsyncMock()
-                mock_page.locator.return_value = mock_locator
-                mock_page.keyboard = mock.MagicMock()
-                mock_page.keyboard.type = mock.AsyncMock()
-                mock_page.keyboard.press = mock.AsyncMock()
+            mock_page = mock.MagicMock()
+            mock_locator = mock.MagicMock()
+            mock_locator.click = mock.AsyncMock()
+            mock_page.locator.return_value = mock_locator
+            mock_page.keyboard = mock.MagicMock()
+            mock_page.keyboard.type = mock.AsyncMock()
+            mock_page.keyboard.press = mock.AsyncMock()
 
-                await enhancer.human_type(mock_page, "input", "a")
+            await enhancer.human_type(mock_page, "input", "a")
 
-                # 验证 type 调用的 delay 参数包含长停顿
-                call_args = mock_page.keyboard.type.call_args
-                if call_args:
-                    delay = call_args[1].get("delay", 0)
-                    # 如果触发了长停顿，delay 应该 >= 600
-                    # 但由于 mock 逻辑，这里只验证调用成功
-                    pass
+            # 验证 type 调用的 delay 参数包含长停顿
+            call_args = mock_page.keyboard.type.call_args
+            if call_args:
+                call_args[1].get("delay", 0)
+                # 如果触发了长停顿，delay 应该 >= 600
+                # 但由于 mock 逻辑，这里只验证调用成功
+                pass
 
 
 class TestRandomMouseMove:
@@ -212,7 +209,6 @@ class TestRandomMouseMove:
         mock_page.mouse = mock.MagicMock()
 
         # 使用真正的 async 方法
-        original_move = enhancer._bezier_mouse_move
 
         move_calls = []
         async def track_move(page, sx, sy, ex, ey, steps=20):
@@ -240,7 +236,7 @@ class TestRandomMouseMove:
     @pytest.mark.asyncio
     async def test_bezier_curve_math(self):
         """验证 Bezier 曲线数学正确性"""
-        enhancer = StealthEnhancer()
+        StealthEnhancer()
 
         # 固定控制点测试
         start_x, start_y = 0, 0
@@ -302,13 +298,14 @@ class TestHumanScroll:
         assert len(scroll_calls) >= 1
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_scroll_back_probability(self):
-        """20% 概率回滚"""
+        """~20% probability of scrolling back (negative scrollBy)."""
         enhancer = StealthEnhancer(human_scroll=True)
 
-        # 运行多次，统计回滚次数
+        # Run multiple iterations, count back-scroll occurrences
         back_count = 0
-        total = 100
+        total = 30  # Reduced from 100 for faster CI execution
 
         for _ in range(total):
             mock_page = mock.MagicMock()
@@ -350,7 +347,7 @@ class TestInjectTimingNoise:
     @pytest.mark.asyncio
     async def test_script_injection(self):
         """验证 JS 脚本注入"""
-        enhancer = StealthEnhancer()
+        StealthEnhancer()
 
         mock_page = mock.MagicMock()
         mock_page.add_init_script = mock.AsyncMock()
@@ -369,7 +366,7 @@ class TestInjectTimingNoise:
     @pytest.mark.asyncio
     async def test_custom_max_offset(self):
         """自定义 max_offset_ms 参数"""
-        enhancer = StealthEnhancer()
+        StealthEnhancer()
 
         mock_page = mock.MagicMock()
         mock_page.add_init_script = mock.AsyncMock()

@@ -11,9 +11,15 @@ Advantages:
 Fallback: when no Extension is available, automatically falls back to LocalCDPBackend (CloakBrowser)
 """
 
-import asyncio
+from __future__ import annotations
+
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .daemon import ExtensionBridge
+from typing import Any
 
 from . import BrowserBackend, BrowserPageHandle
 
@@ -27,12 +33,12 @@ class ExtensionPageHandle(BrowserPageHandle):
     to the Chrome Extension.
     """
 
-    def __init__(self, bridge: "ExtensionBridge", session_id: str):
+    def __init__(self, bridge: ExtensionBridge, session_id: str):
         self._bridge = bridge
         self._session_id = session_id
-        self._listeners: Dict[str, List[Callable]] = {}
+        self._listeners: dict[str, list[Callable]] = {}
 
-    async def _send(self, method: str, params: Dict[str, Any] | None = None, timeout: float = 30.0) -> Any:
+    async def _send(self, method: str, params: dict[str, Any] | None = None, timeout: float = 30.0) -> Any:
         """Send command to Extension and return result."""
         return await self._bridge.send_command(method, params, timeout)
 
@@ -124,11 +130,11 @@ class ExtensionBackend(BrowserBackend):
     """
 
     def __init__(self, config):
-        from agent_browser.browser.daemon import BrowserDaemon, ExtensionBridge
+        from agent_browser.browser.daemon import BrowserDaemon
         self._config = config
-        self._daemon: Optional[BrowserDaemon] = None
-        self._bridge: Optional[ExtensionBridge] = None
-        self._sessions: Dict[str, ExtensionPageHandle] = {}
+        self._daemon: BrowserDaemon | None = None
+        self._bridge: ExtensionBridge | None = None
+        self._sessions: dict[str, ExtensionPageHandle] = {}
 
     async def connect(self) -> None:
         """Connect to Daemon and ensure Extension Bridge is ready."""
@@ -183,11 +189,11 @@ class ExtensionBackend(BrowserBackend):
         session_id: str,
         task: str,
         intelligence: str = "agent",
-        llm_config: Optional[Dict] = None,
+        llm_config: dict | None = None,
         max_steps: int = 6,
         total_timeout: float = 300.0,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         """Extension mode does not support browser-use Agent (requires direct Playwright connection).
 
         Returns LLM-mode tool descriptions so the caller can use atomic operations.

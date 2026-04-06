@@ -1,10 +1,10 @@
 """Synthesizer 测试 — YAML pipeline 生成"""
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock
+
 from agent_browser.explore.synthesizer import (
-    distill_trace,
-    detect_strategy,
     build_adapter,
+    detect_strategy,
+    distill_trace,
     synthesize,
 )
 

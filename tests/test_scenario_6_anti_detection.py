@@ -16,11 +16,13 @@
   7. 持久化会话：多次操作不重新创建 CDP 连接
   8. CLI 和 API 模式反侦测等同性验证
 """
-import pytest
 import asyncio
+import contextlib
 import time
-from helpers.cli_runner import CLIRunner
+
+import pytest
 from helpers.api_client import APIClient
+from helpers.cli_runner import CLIRunner
 
 
 @pytest.mark.integration
@@ -36,10 +38,8 @@ class TestScenario6AntiDetection:
 
     def teardown_method(self):
         """清理会话"""
-        try:
+        with contextlib.suppress(Exception):
             self.cli.session_destroy(self.cli_session)
-        except Exception:
-            pass
 
         if self.api_session:
             asyncio.run(self.api.delete_session(self.api_session))
@@ -146,7 +146,7 @@ class TestScenario6AntiDetection:
         """验证 warmup_browsing() 被调用（通过日志或时间验证）"""
         # 创建会话（应触发 warmup_browsing）
         t0 = time.time()
-        result = self.cli.session_create(self.cli_session)
+        self.cli.session_create(self.cli_session)
         elapsed = time.time() - t0
 
         # warmup_browsing 访问 3 个 URL，每个 3-8s，总计 9-24s

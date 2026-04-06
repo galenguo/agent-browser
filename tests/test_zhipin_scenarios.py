@@ -1,6 +1,7 @@
 """Boss直聘场景测试"""
 import pytest
-from agent_browser.main import create_session, open_page, snapshot, click, fill
+
+from agent_browser.main import click, create_session, fill, open_page, snapshot
 
 
 @pytest.mark.asyncio

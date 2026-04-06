@@ -14,10 +14,9 @@ Features:
   - Progress logging with step index
 """
 import asyncio
-import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .steps import STEPS
 from .template import TemplateContext, render_value
@@ -47,17 +46,17 @@ class PipelineResult:
         self.data: Any = None
         self.steps_executed: int = 0
         self.steps_total: int = 0
-        self.errors: List[Dict[str, Any]] = []
+        self.errors: list[dict[str, Any]] = []
         self.duration_ms: int = 0
         self.success: bool = True
 
 
 async def execute_pipeline(
-    steps: List[dict],
+    steps: list[dict],
     session_id: str,
     args: dict,
-    stealth_config: Optional[dict] = None,
-    timeout_per_step: Optional[float] = None,
+    stealth_config: dict | None = None,
+    timeout_per_step: float | None = None,
     fail_fast: bool = True,
 ) -> Any:
     """
@@ -76,7 +75,7 @@ async def execute_pipeline(
     """
     start_time = time.time()
     data: Any = None
-    context: Dict[str, Any] = {"args": args, "data": data}
+    context: dict[str, Any] = {"args": args, "data": data}
     stealth = stealth_config or {}
 
     parsed_steps = [PipelineStep(s) for s in steps]
@@ -132,7 +131,7 @@ async def execute_pipeline(
 
             result.steps_executed = i + 1
 
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             from .errors import StepTimeoutError
             te = StepTimeoutError(
                 message=f"Step '{step.op}' timed out after {step_timeout}s",
@@ -196,7 +195,6 @@ async def execute_pipeline(
     # Telemetry: record execution (non-blocking, never fails pipeline)
     try:
         from .telemetry import Telemetry
-        from .classifier import classify
         error_cat = None
         if not result.success and result.errors:
             # Use first error's category
@@ -229,6 +227,6 @@ async def execute_pipeline(
     return data
 
 
-def list_registered_steps() -> List[str]:
+def list_registered_steps() -> list[str]:
     """Return names of all registered pipeline steps."""
     return sorted(STEPS.keys())

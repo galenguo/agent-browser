@@ -8,13 +8,9 @@ Validates:
 These are integration-level tests for shell scripts. They run the actual scripts
 via subprocess but mock/skip parts that require real infrastructure (Docker, etc.).
 """
-import os
 import re
 import subprocess
-import tempfile
-import pytest
 from pathlib import Path
-from unittest import mock
 
 PROJECT_ROOT = Path(__file__).parent.parent
 INSTALL_SH = PROJECT_ROOT / "scripts" / "install.sh"
@@ -292,7 +288,7 @@ docker:
             lines = content.split("\n")
 
             in_docker_section = False
-            for i, line in enumerate(lines):
+            for _i, line in enumerate(lines):
                 stripped = line.strip()
                 if stripped.startswith("docker:") or stripped == "docker:":
                     in_docker_section = True

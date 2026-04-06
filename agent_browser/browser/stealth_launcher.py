@@ -13,9 +13,8 @@ Integration approach:
   - The two work at different layers and do not interfere with each other
 """
 import asyncio
-import os
 import logging
-from typing import Optional, Tuple
+import os
 
 os.environ.setdefault("REBROWSER_PATCHES_RUNTIME_FIX_MODE", "addBinding")
 
@@ -28,10 +27,10 @@ except ImportError:
 
 # Conditional patchright import (fallback to playwright)
 try:
-    from patchright.async_api import async_playwright, Playwright, Browser
+    from patchright.async_api import Browser, Playwright, async_playwright
     _HAS_PATCHRIGHT = True
 except ImportError:
-    from playwright.async_api import async_playwright, Playwright, Browser
+    from playwright.async_api import Browser, Playwright, async_playwright
     _HAS_PATCHRIGHT = False
 
 logger = logging.getLogger(__name__)
@@ -65,8 +64,8 @@ def get_cloakbrowser_path() -> str:
 
 def _build_launch_args(
     cdp_port: int = None,
-    proxy: Optional[str] = None,
-    extra_args: Optional[list] = None
+    proxy: str | None = None,
+    extra_args: list | None = None
 ) -> list:
     if cdp_port is None:
         cdp_port = CDP_PORT
@@ -133,11 +132,11 @@ def _build_launch_args(
 
 async def launch_stealth_browser(
     headless: bool = False,
-    proxy: Optional[str] = None,
-    extra_args: Optional[list] = None,
-    user_data_dir: Optional[str] = None,
-    cdp_port: Optional[int] = None,
-) -> Tuple[Playwright, Browser, str]:
+    proxy: str | None = None,
+    extra_args: list | None = None,
+    user_data_dir: str | None = None,
+    cdp_port: int | None = None,
+) -> tuple[Playwright, Browser, str]:
     """Launch CloakBrowser (C++ fingerprint) via patchright (driver-level patches).
 
     Supports persistent Profile (optional):
@@ -258,9 +257,9 @@ async def close_browser(pw: Playwright, browser: Browser) -> None:
 
 async def launch_cloakbrowser_cdp(
     cdp_port: int,
-    profile_dir: Optional[str] = None,
+    profile_dir: str | None = None,
     headless: bool = False,
-    proxy: Optional[str] = None
+    proxy: str | None = None
 ):
     """Launch CloakBrowser process and return the process object (for Session Pool).
 

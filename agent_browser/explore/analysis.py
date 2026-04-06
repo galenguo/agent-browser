@@ -9,11 +9,11 @@ Provides:
   - Endpoint scoring (relevance ranking)
   - Capability naming and confidence inference
 """
-import re
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+import re
 from dataclasses import dataclass
-from urllib.parse import urlparse, parse_qs, unquote
+from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ class DiscoveredStore:
     """A discovered client-side state store (Pinia/Vuex/Redux)."""
     store_type: str           # 'pinia', 'vuex', 'redux', 'unknown'
     id: str                  # Store identifier
-    actions: List[str]        # Available action names
-    state_keys: List[str]     # Observable state keys
+    actions: list[str]        # Available action names
+    state_keys: list[str]     # Observable state keys
 
 
 @dataclass
@@ -36,11 +36,11 @@ class InferredCapability:
     description: str                 # What it does
     strategy: str                    # 'public', 'intercept', 'ui', 'store-action'
     confidence: float                # 0.0-1.0
-    endpoint: Optional[str] = None   # Primary endpoint URL
-    item_path: Optional[str] = None  # Path to items in response (e.g., "data.list")
-    recommended_columns: List[str] = None  # Suggested output columns
-    recommended_args: Dict[str, str] = None  # Suggested input arguments
-    store_hint: Optional[str] = None     # Store info if store-action
+    endpoint: str | None = None   # Primary endpoint URL
+    item_path: str | None = None  # Path to items in response (e.g., "data.list")
+    recommended_columns: list[str] = None  # Suggested output columns
+    recommended_args: dict[str, str] = None  # Suggested input arguments
+    store_hint: str | None = None     # Store info if store-action
 
 
 # ── URL Normalization ──
@@ -69,9 +69,7 @@ def url_to_pattern(url: str) -> str:
 
     normalized_path = []
     for part in path_parts:
-        if _ID_PATTERN.match(part):
-            normalized_path.append("{id}")
-        elif _NUMERIC_PARAM.match(part) and len(part) > 2:
+        if _ID_PATTERN.match(part) or _NUMERIC_PARAM.match(part) and len(part) > 2:
             normalized_path.append("{id}")
         else:
             normalized_path.append(part)
@@ -81,9 +79,7 @@ def url_to_pattern(url: str) -> str:
     normalized_params = []
     for key, values in params.items():
         for val in values:
-            if _NUMERIC_PARAM.match(val):
-                normalized_params.append(f"{key}={{{key}}}")
-            elif len(val) > 20:  # Likely an ID or token
+            if _NUMERIC_PARAM.match(val) or len(val) > 20:
                 normalized_params.append(f"{key}={{{key}}}")
             else:
                 normalized_params.append(f"{key}={val}")  # Keep search terms as-is
@@ -128,12 +124,12 @@ def classify_param(name: str) -> str:
     return "unknown"
 
 
-def has_pagination(params: Dict[str, str]) -> bool:
+def has_pagination(params: dict[str, str]) -> bool:
     """Check if params contain known pagination indicators."""
     return any(classify_param(k) == "pagination" for k in params)
 
 
-def has_search(params: Dict[str, str]) -> bool:
+def has_search(params: dict[str, str]) -> bool:
     """Check if params contain known search indicators."""
     return any(classify_param(k) == "search" for k in params)
 
@@ -149,9 +145,9 @@ _AUTH_HEADERS = {
 def detect_auth_indicators(
     url: str,
     status_code: int,
-    headers: Dict[str, str],
-    query_params: Dict[str, str],
-) -> List[str]:
+    headers: dict[str, str],
+    query_params: dict[str, str],
+) -> list[str]:
     """
     Detect authentication indicators from request/response metadata.
 
@@ -182,7 +178,7 @@ def detect_auth_indicators(
 
 
 def infer_strategy(
-    endpoints: List[Any],
+    endpoints: list[Any],
     url: str,
 ) -> str:
     """
@@ -306,9 +302,9 @@ _CAPABILITY_TEMPLATES = {
 def infer_capability_name(
     site: str,
     endpoint_url: str,
-    fields: Dict[str, str],
+    fields: dict[str, str],
     goal: str = "",
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """
     Infer a human-readable capability name and description.
 
@@ -333,10 +329,10 @@ def infer_capability_name(
 
 def infer_capabilities_from_endpoints(
     site: str,
-    endpoints: List[Any],
+    endpoints: list[Any],
     goal: str = "",
     min_score: float = 5.0,
-) -> List[InferredCapability]:
+) -> list[InferredCapability]:
     """
     Infer capabilities from scored endpoints.
 
@@ -367,7 +363,7 @@ def infer_capabilities_from_endpoints(
 
         # Detect fields
         fields = {}
-        for key, value in sample_item.items():
+        for key, _value in sample_item.items():
             kl = key.lower()
             for pattern, canonical in _FIELD_NAME_MAP:
                 if re.search(pattern, kl):
@@ -399,7 +395,7 @@ def infer_capabilities_from_endpoints(
     return capabilities
 
 
-def _detect_item_path(sample: dict) -> Optional[str]:
+def _detect_item_path(sample: dict) -> str | None:
     """Detect the path to the items array in a response."""
     for candidate in ("data", "result", "items", "list", "data.list", "data.data"):
         parts = candidate.split(".")

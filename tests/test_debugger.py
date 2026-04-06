@@ -1,8 +1,9 @@
 """Debugger 测试 — 单步执行和状态检查"""
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from agent_browser.pipeline.debugger import DebugSession, StepRecord, debug_pipeline, _summarize
+import pytest
+
+from agent_browser.pipeline.debugger import DebugSession, StepRecord, _summarize, debug_pipeline
 
 
 class TestSummarize:
@@ -11,7 +12,7 @@ class TestSummarize:
 
     def test_list(self):
         result = _summarize([1, 2, 3])
-        assert "[3 items] [1, 2, 3]" == result
+        assert result == "[3 items] [1, 2, 3]"
 
     def test_dict(self):
         result = _summarize({"a": 1, "b": 2})

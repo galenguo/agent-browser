@@ -14,10 +14,12 @@
   4. 任务完成时间 < 30s
   5. 使用 mock LLM
 """
-import pytest
 import asyncio
+import contextlib
 import time
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from helpers.api_client import APIClient
 
 
@@ -33,10 +35,8 @@ class TestScenario3APILocalAgent:
     async def teardown_method_async(self):
         """清理会话"""
         if self.session_id:
-            try:
+            with contextlib.suppress(Exception):
                 await self.api.delete_session(self.session_id)
-            except Exception:
-                pass
 
     def teardown_method(self):
         asyncio.run(self.teardown_method_async())

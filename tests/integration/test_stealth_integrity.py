@@ -9,11 +9,9 @@ Two tiers:
   Tier 2 (Tests 13-15): Behavioral — actual delay ranges, timing distributions.
           Use mocked StealthEnhancer (no real browser needed).
 """
-import pytest
-import asyncio
 from unittest import mock
-from dataclasses import dataclass
 
+import pytest
 
 # ══════════════════════════════════════════════
 #  Helpers
@@ -59,8 +57,8 @@ class TestMiddlewareInit:
 
     def test_init_stealth_on_with_enhancer(self, mock_backend_for_stealth):
         """With stealth_enabled=True and Enhancer available, _stealth is set."""
-        from agent_browser.stealth.middleware import StealthMiddleware
         from agent_browser.core.stealth_enhancer import StealthEnhancer
+        from agent_browser.stealth.middleware import StealthMiddleware
 
         if StealthEnhancer is None:
             pytest.skip("StealthEnhancer not available (CloakBrowser not installed)")
@@ -87,7 +85,7 @@ class TestCDPLeakCheck:
 
     def test_no_playwright_binding_in_ops(self):
         """_STEALTH_OPS and _PASSTHROUGH_OPS don't include dangerous ops."""
-        from agent_browser.stealth.middleware import _STEALTH_OPS, _PASSTHROUGH_OPS
+        from agent_browser.stealth.middleware import _PASSTHROUGH_OPS, _STEALTH_OPS
 
         # These are read-only operations that should NOT trigger stealth delays
         assert "evaluate" in _PASSTHROUGH_OPS
@@ -168,8 +166,8 @@ class TestCircuitBreaker:
         from agent_browser.stealth.middleware import _PerSessionCircuit
 
         circuit = _PerSessionCircuit(threshold=3)
-        for i in range(3):
-            opened = circuit.record_failure()
+        for _i in range(3):
+            circuit.record_failure()
 
         # The 3rd failure should trigger OPEN
         assert circuit.state.value == "open"
@@ -229,7 +227,6 @@ class TestStealthPageHandleWrapping:
     def test_wrapped_handle_preserves_interface(self):
         """StealthPageHandle has all BrowserPageHandle methods."""
         from agent_browser.stealth.middleware import StealthPageHandle
-        from agent_browser.browser import BrowserPageHandle
 
         expected_methods = [
             "goto", "go_back", "evaluate", "wait_for_selector",
@@ -401,8 +398,8 @@ class TestStealthOffSessionLifecycle:
     @pytest.mark.asyncio
     async def test_delete_session_clears_circuit(self, mock_backend_for_stealth):
         """delete_session removes per-session circuit state (stealth ON)."""
-        from agent_browser.stealth.middleware import StealthMiddleware
         from agent_browser.core.stealth_enhancer import StealthEnhancer
+        from agent_browser.stealth.middleware import StealthMiddleware
 
         if StealthEnhancer is None:
             pytest.skip("StealthEnhancer not available")

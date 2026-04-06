@@ -18,9 +18,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 try:
     from agent_browser.stealth.enhancer import StealthEnhancer
@@ -69,7 +69,7 @@ class _PerSessionCircuit:
 # ── Operation classification ──────────────────────────────────
 
 # Interactive operations that need stealth wrapping (mapped to StealthEnhancer delay types)
-_STEALTH_OPS: Dict[str, str] = {
+_STEALTH_OPS: dict[str, str] = {
     "goto": "navigate",
     "go_back": "navigate",
     "mouse_wheel": "scroll",
@@ -244,8 +244,8 @@ class StealthMiddleware:
         """
         self._backend = backend
         self._config = config
-        self._stealth: Optional[StealthEnhancer] = None
-        self._circuits: Dict[str, _PerSessionCircuit] = {}
+        self._stealth: StealthEnhancer | None = None
+        self._circuits: dict[str, _PerSessionCircuit] = {}
 
         # Only initialize StealthEnhancer when enabled
         stealth_enabled = getattr(config, "stealth_enabled", True)
@@ -321,7 +321,7 @@ class StealthMiddleware:
 
     # ── Snapshot/refs (delegate to backend) ──
 
-    async def snapshot(self, session_id: str, interactive_only: bool = False) -> Dict:
+    async def snapshot(self, session_id: str, interactive_only: bool = False) -> dict:
         if hasattr(self._backend, "snapshot"):
             return await self._backend.snapshot(session_id, interactive_only)
         raise NotImplementedError("snapshot() not supported by current backend")
@@ -361,11 +361,11 @@ class StealthMiddleware:
         session_id: str,
         task: str,
         intelligence: str = "agent",
-        llm_config: Optional[Dict] = None,
+        llm_config: dict | None = None,
         max_steps: int = 6,
         total_timeout: float = 300.0,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         """
         Execute an Agent task (delegates to backend run_task).
 
@@ -388,7 +388,7 @@ class StealthMiddleware:
                     ),
                     timeout=total_timeout,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return {
                     "status": "timeout",
                     "error": f"Task exceeded {total_timeout}s limit",
@@ -411,11 +411,11 @@ class StealthMiddleware:
         return self._backend
 
     @property
-    def stealth(self) -> Optional[StealthEnhancer]:
+    def stealth(self) -> StealthEnhancer | None:
         """Access the StealthEnhancer instance."""
         return self._stealth
 
     @property
-    def circuits(self) -> Dict[str, _PerSessionCircuit]:
+    def circuits(self) -> dict[str, _PerSessionCircuit]:
         """Access per-session circuit states (for monitoring/debugging)."""
         return dict(self._circuits)  # Return a copy

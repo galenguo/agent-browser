@@ -9,9 +9,10 @@ Test 6 uses a real CloakBrowser instance (Tier 2, @slow @requires_browser).
 
 All tests go through main.py facade API — proving the full path works.
 """
-import pytest
+import contextlib
 from unittest import mock
 
+import pytest
 
 # ══════════════════════════════════════════════
 #  Helper: inject mock backend into facade
@@ -235,7 +236,7 @@ class TestRealBrowserCycle:
         """
         from agent_browser import main as skill_main
 
-        cfg = skill_main.configure(
+        skill_main.configure(
             cdp_url=real_cdp_url,
             calling_mode="cli",
             browser_mode="local",
@@ -254,10 +255,8 @@ class TestRealBrowserCycle:
             await skill_main.delete_session(sid)
         except Exception:
             # Best-effort cleanup on failure
-            try:
+            with contextlib.suppress(Exception):
                 await skill_main.reset()
-            except Exception:
-                pass
             raise
 
 

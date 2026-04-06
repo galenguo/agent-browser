@@ -3,9 +3,8 @@
 Supports both native and compatible format YAML adapters.
 Compatible top-level fields are accepted and normalized internally.
 """
-import os
 import logging
-from typing import Dict, List, Optional
+import os
 from pathlib import Path
 
 import yaml
@@ -13,7 +12,7 @@ import yaml
 logger = logging.getLogger(__name__)
 
 # In-memory registry: {(site, name): adapter_dict}
-_registry: Dict[tuple, dict] = {}
+_registry: dict[tuple, dict] = {}
 
 # Default adapter directory (adapters/ under project root)
 # File is at: agent_browser/adapters/loader.py
@@ -70,7 +69,7 @@ def _ensure_loaded():
         logger.warning(f"Adapter directory not found: {adapter_dir}")
         return
 
-    for root, dirs, files in os.walk(adapter_dir):
+    for root, _dirs, files in os.walk(adapter_dir):
         if "_shared" in root:
             continue
         for fname in files:
@@ -78,7 +77,7 @@ def _ensure_loaded():
                 continue
             fpath = os.path.join(root, fname)
             try:
-                with open(fpath, "r", encoding="utf-8") as f:
+                with open(fpath, encoding="utf-8") as f:
                     adapter = yaml.safe_load(f)
                 # Normalize format to internal
                 adapter = _normalize_adapter(adapter)
@@ -104,7 +103,7 @@ def _ensure_loaded():
     logger.info(f"Loaded {len(_registry)} adapters from {adapter_dir}")
 
 
-def list_adapters() -> List[dict]:
+def list_adapters() -> list[dict]:
     """List all registered adapters."""
     _ensure_loaded()
     return [
@@ -120,7 +119,7 @@ def list_adapters() -> List[dict]:
     ]
 
 
-def get_adapter(site: str, name: str) -> Optional[dict]:
+def get_adapter(site: str, name: str) -> dict | None:
     """Get a specific adapter by site and name."""
     _ensure_loaded()
     return _registry.get((site, name))

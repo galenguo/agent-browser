@@ -4,9 +4,6 @@ Adapter Loading Tests — YAML parse → normalize → register → execute.
 Tests adapter discovery, OpenCLI format normalization, validation,
 and that adapters produce correct structured configs.
 """
-import pytest
-import tempfile
-import os
 
 
 # ══════════════════════════════════════════════
@@ -31,7 +28,7 @@ class TestAdapterDiscovery:
         assert adapter is not None
         assert adapter["site"] == "baidu"
         assert adapter["name"] == "search"
-        assert "description" in adapter or True  # description optional
+        assert True  # description optional
 
     def test_adapter_has_pipeline(self):
         """Each registered adapter has a pipeline list."""

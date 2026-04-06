@@ -9,22 +9,33 @@ Multi-user isolation core:
 - Atomic operations: navigate, snapshot, click, fill, evaluate JS, etc.
 """
 
+import asyncio
+import contextlib
+import logging
 import os
 import time
-import asyncio
-import logging
+from typing import Literal
 from uuid import uuid4
-from typing import Dict, Optional, Literal, List, Any
 
-from playwright.async_api import async_playwright, Browser, Page, BrowserContext
-from browser_use import Agent, BrowserSession, BrowserProfile
-from agent_browser.models import (
-    UserSession, ResourceExhaustedError, SessionNotFoundError, DockerBrowserInstance,
-    NavigateRequest, ClickRequest, FillRequest, EvaluateRequest, ScrollRequest, WaitRequest,
-    ElementInfo, SnapshotResponse, LocalBrowserInstance
-)
+from browser_use import Agent, BrowserProfile, BrowserSession
+from playwright.async_api import Page, async_playwright
+
 from agent_browser.browser.instance_pool import BrowserInstancePool
 from agent_browser.core.stealth_enhancer import StealthEnhancer
+from agent_browser.models import (
+    ClickRequest,
+    DockerBrowserInstance,
+    ElementInfo,
+    EvaluateRequest,
+    FillRequest,
+    NavigateRequest,
+    ResourceExhaustedError,
+    ScrollRequest,
+    SessionNotFoundError,
+    SnapshotResponse,
+    UserSession,
+    WaitRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +49,7 @@ class SessionPoolManager:
         idle_timeout: int = 1800,
         browser_mode: Literal["local", "docker"] = "local",
     ):
-        self.sessions: Dict[str, UserSession] = {}
+        self.sessions: dict[str, UserSession] = {}
         self.max_concurrent = max_concurrent
         self.idle_timeout = idle_timeout
 
@@ -64,7 +75,7 @@ class SessionPoolManager:
         self._health_check_task = None
         self._create_lock = asyncio.Lock()
         # Docker mode CDP connection cache: session_id -> (playwright, browser)
-        self._docker_connections: Dict[str, tuple] = {}
+        self._docker_connections: dict[str, tuple] = {}
 
         logger.info(
             f"SessionPoolManager initialized: "
@@ -81,7 +92,7 @@ class SessionPoolManager:
     async def create_session(
         self,
         user_id: str,
-        profile_config: Optional[Dict] = None,
+        profile_config: dict | None = None,
         browser_type: str = "chromium",
     ) -> str:
         """Create a new session."""
@@ -128,7 +139,7 @@ class SessionPoolManager:
         logger.info(f"Session created: {session_id}")
         return session_id, self._build_browser_node_info(browser_instance)
 
-    def _build_browser_node_info(self, instance) -> Optional[Dict]:
+    def _build_browser_node_info(self, instance) -> dict | None:
         """Build browser node public access info (DockerBrowserInstance returns VNC info)."""
         if not isinstance(instance, DockerBrowserInstance):
             return None
@@ -150,7 +161,7 @@ class SessionPoolManager:
         self,
         session_id: str,
         task: str,
-        llm_config: Dict,
+        llm_config: dict,
         max_steps: int = 50,
     ) -> str:
         """Submit a task to the specified session."""
@@ -224,7 +235,6 @@ class SessionPoolManager:
 
         async with session.task_lock:
             MAX_CDP_RETRIES = 3
-            last_error = None
             current_agent = agent
             current_bs = browser_session
 
@@ -255,7 +265,6 @@ class SessionPoolManager:
                         return  # Success
 
                     except Exception as e:
-                        last_error = e
                         error_str = str(e).lower()
                         error_type = type(e).__name__.lower()
 
@@ -272,10 +281,8 @@ class SessionPoolManager:
                         )
 
                         # Close failed browser session
-                        try:
+                        with contextlib.suppress(Exception):
                             await current_bs.close()
-                        except Exception:
-                            pass
 
                         if not is_cdp_error or attempt >= MAX_CDP_RETRIES - 1:
                             # Non-CDP error or retries exhausted
@@ -313,12 +320,10 @@ class SessionPoolManager:
 
             finally:
                 # Close the last BrowserSession
-                try:
+                with contextlib.suppress(Exception):
                     await current_bs.close()
-                except Exception:
-                    pass
 
-    def _create_llm(self, llm_config: Dict):
+    def _create_llm(self, llm_config: dict):
         """Create LLM instance (using browser-use's ChatOpenAI wrapper)."""
         from browser_use.llm import ChatOpenAI
 
@@ -331,7 +336,7 @@ class SessionPoolManager:
             dont_force_structured_output=True,
         )
 
-    async def get_task_status(self, session_id: str, task_id: str) -> Dict:
+    async def get_task_status(self, session_id: str, task_id: str) -> dict:
         """Get task status."""
         session = self.sessions.get(session_id)
         if not session:
@@ -345,7 +350,7 @@ class SessionPoolManager:
         result["browser_node"] = self._build_browser_node_info(session.browser_instance)
         return result
 
-    async def get_session_status(self, session_id: str) -> Dict:
+    async def get_session_status(self, session_id: str) -> dict:
         """Get session status."""
         session = self.sessions.get(session_id)
         if not session:
@@ -381,14 +386,10 @@ class SessionPoolManager:
         conn = self._docker_connections.pop(session_id, None)
         if conn:
             pw, browser = conn
-            try:
+            with contextlib.suppress(Exception):
                 await browser.close()
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 await pw.stop()
-            except Exception:
-                pass
 
         # Release browser instance
         await self.browser_pool.release(session_id)
@@ -520,15 +521,11 @@ class SessionPoolManager:
                 # Connection broken, clean up and reconnect
                 old_pw, old_browser = self._docker_connections.pop(session_id, (None, None))
                 if old_browser:
-                    try:
+                    with contextlib.suppress(Exception):
                         await old_browser.close()
-                    except Exception:
-                        pass
                 if old_pw:
-                    try:
+                    with contextlib.suppress(Exception):
                         await old_pw.stop()
-                    except Exception:
-                        pass
 
         # Establish new CDP connection (with retry, Docker containers may need extra time)
         last_error = None
@@ -554,16 +551,14 @@ class SessionPoolManager:
                             await failed_browser.close()
                     except Exception:
                         pass
-                    try:
+                    with contextlib.suppress(Exception):
                         await pw.stop()
-                    except Exception:
-                        pass
                 if attempt < 2:
                     await asyncio.sleep(3 * (attempt + 1))  # 3s, 6s backoff
 
         raise ConnectionError(f"Failed to connect to Docker CDP at {instance.cdp_url} after 3 attempts: {last_error}")
 
-    async def navigate(self, session_id: str, request: NavigateRequest) -> Dict:
+    async def navigate(self, session_id: str, request: NavigateRequest) -> dict:
         """Page navigation."""
         page = await self._get_page(session_id)
 
@@ -650,7 +645,7 @@ class SessionPoolManager:
             elements=[ElementInfo(**el) for el in result["elements"]]
         )
 
-    async def click(self, session_id: str, request: ClickRequest) -> Dict:
+    async def click(self, session_id: str, request: ClickRequest) -> dict:
         """Click element."""
         page = await self._get_page(session_id)
 
@@ -679,7 +674,7 @@ class SessionPoolManager:
 
         return {"status": "ok", "ref": request.ref}
 
-    async def fill(self, session_id: str, request: FillRequest) -> Dict:
+    async def fill(self, session_id: str, request: FillRequest) -> dict:
         """Fill input field."""
         page = await self._get_page(session_id)
 
@@ -705,7 +700,7 @@ class SessionPoolManager:
 
         return {"status": "ok", "ref": request.ref, "text": request.text}
 
-    async def evaluate(self, session_id: str, request: EvaluateRequest) -> Dict:
+    async def evaluate(self, session_id: str, request: EvaluateRequest) -> dict:
         """Execute JavaScript."""
         page = await self._get_page(session_id)
 
@@ -717,7 +712,7 @@ class SessionPoolManager:
 
         return {"status": "ok", "result": result}
 
-    async def scroll(self, session_id: str, request: ScrollRequest) -> Dict:
+    async def scroll(self, session_id: str, request: ScrollRequest) -> dict:
         """Scroll page."""
         page = await self._get_page(session_id)
 
@@ -733,7 +728,7 @@ class SessionPoolManager:
 
         return {"status": "ok", "direction": request.direction, "amount": request.amount}
 
-    async def wait_for_selector(self, session_id: str, request: WaitRequest) -> Dict:
+    async def wait_for_selector(self, session_id: str, request: WaitRequest) -> dict:
         """Wait for selector."""
         page = await self._get_page(session_id)
 
@@ -759,7 +754,7 @@ class SessionPoolManager:
         page = await self._get_page(session_id)
         return page.url
 
-    async def go_back(self, session_id: str, wait_until: str = "domcontentloaded", timeout: int = 10000) -> Dict:
+    async def go_back(self, session_id: str, wait_until: str = "domcontentloaded", timeout: int = 10000) -> dict:
         """Go back to previous page."""
         page = await self._get_page(session_id)
         await page.go_back(wait_until=wait_until, timeout=timeout)
@@ -770,7 +765,7 @@ class SessionPoolManager:
 
         return {"status": "ok", "url": page.url}
 
-    async def mouse_move(self, session_id: str, x: float, y: float) -> Dict:
+    async def mouse_move(self, session_id: str, x: float, y: float) -> dict:
         """Move mouse."""
         page = await self._get_page(session_id)
         await page.mouse.move(x, y)
@@ -781,7 +776,7 @@ class SessionPoolManager:
 
         return {"status": "ok", "x": x, "y": y}
 
-    async def keyboard_press(self, session_id: str, key: str) -> Dict:
+    async def keyboard_press(self, session_id: str, key: str) -> dict:
         """Press key."""
         page = await self._get_page(session_id)
         await page.keyboard.press(key)

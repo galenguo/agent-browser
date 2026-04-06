@@ -4,9 +4,9 @@ Mode Matrix Tests — all 8 mode combinations + CLI+remote fallback.
 Each test verifies: configure(mode) → create_session() → valid session_id → delete_session().
 Uses parametrize for 8 combos with skipif when infrastructure unavailable.
 """
-import pytest
 from unittest import mock
 
+import pytest
 
 # ══════════════════════════════════════════════
 #  Mode Combinations (8 total)

@@ -1,18 +1,13 @@
 """Tests for deploy_config.py — DeployConfig dataclass, validation, I/O."""
 import os
-import sys
-import pytest
-from pathlib import Path
 from unittest import mock
-from datetime import datetime
 
 from agent_browser.deploy_config import (
     DeployConfig,
-    ConfigIssue,
-    validate_config,
     detect_environment,
-    load_deploy_config,
     generate_config,
+    load_deploy_config,
+    validate_config,
 )
 
 

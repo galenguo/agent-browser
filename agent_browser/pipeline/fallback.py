@@ -12,11 +12,10 @@ Design constraints:
   - Each step retries at most once (avoid infinite loops)
   - On fallback failure, return original error without losing information
 """
-import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
-from .classifier import ErrorCategory, classify, category_description
+from .classifier import ErrorCategory, category_description, classify
 from .errors import PipelineStepError
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,7 @@ _MAX_RETRIES = 1
 async def _retry_with_fresh_selector(
     session_id: str,
     error: PipelineStepError,
-    context: Dict[str, Any],
+    context: dict[str, Any],
 ) -> bool:
     """
     Selector Drift recovery: re-fetch page snapshot, verify element exists.
@@ -69,7 +68,7 @@ async def _retry_with_fresh_selector(
 async def _retry_with_longer_timeout(
     session_id: str,
     error: PipelineStepError,
-    context: Dict[str, Any],
+    context: dict[str, Any],
 ) -> bool:
     """
     Timeout recovery: increase wait time then retry.
@@ -117,7 +116,7 @@ async def _retry_with_longer_timeout(
 async def _require_reauth(
     session_id: str,
     error: PipelineStepError,
-    context: Dict[str, Any],
+    context: dict[str, Any],
 ) -> bool:
     """Auth Failure recovery: mark as needing re-authentication. Cannot auto-fix."""
     logger.warning(
@@ -149,7 +148,7 @@ def _get_fallback_handler(category: ErrorCategory):
 async def attempt_fallback(
     session_id: str,
     error: PipelineStepError,
-    context: Dict[str, Any],
+    context: dict[str, Any],
     max_retries: int = _MAX_RETRIES,
 ) -> bool:
     """

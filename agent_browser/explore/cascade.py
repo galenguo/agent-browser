@@ -8,7 +8,7 @@ import asyncio
 import json
 import logging
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +25,9 @@ async def _get_handle(session_id: str):
 async def cascade(
     session_id: str,
     url: str,
-    endpoints: Optional[List[Any]] = None,
+    endpoints: list[Any] | None = None,
     goal: str = "",
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Progressive auth strategy detection: PUBLIC → COOKIE → HEADER → INTERCEPT
 
@@ -40,7 +40,7 @@ async def cascade(
     await handle.goto(url, wait_until="domcontentloaded", timeout=20000)
     await asyncio.sleep(random.uniform(1, 3))
 
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     test_urls = _get_test_urls(endpoints, url)
 
     # Level 1: PUBLIC (no cookie, pure API)
@@ -83,13 +83,13 @@ async def cascade(
     return results
 
 
-def _get_test_urls(endpoints: Optional[List[Any]], base_url: str) -> List[str]:
+def _get_test_urls(endpoints: list[Any] | None, base_url: str) -> list[str]:
     if endpoints:
         return [ep.url for ep in endpoints if ep.is_json][:5]
     return []
 
 
-async def _try_public(test_urls: List[str], base_url: str) -> Dict[str, Any]:
+async def _try_public(test_urls: list[str], base_url: str) -> dict[str, Any]:
     """Level 1: Public API (no authentication)."""
     if not test_urls:
         return {"strategy": "public", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "No endpoints to test"}
@@ -117,7 +117,7 @@ async def _try_public(test_urls: List[str], base_url: str) -> Dict[str, Any]:
     return {"strategy": "public", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "All endpoints require auth"}
 
 
-async def _try_cookie(handle, test_urls: List[str]) -> Dict[str, Any]:
+async def _try_cookie(handle, test_urls: list[str]) -> dict[str, Any]:
     """Level 2: Cookie auth (browser-side fetch)."""
     for url in test_urls:
         try:
@@ -148,7 +148,7 @@ async def _try_cookie(handle, test_urls: List[str]) -> Dict[str, Any]:
     return {"strategy": "cookie", "success": False, "endpoint": "", "sample_size": 0, "fields": None, "notes": "Cookie auth insufficient"}
 
 
-async def _try_header(handle, test_urls: List[str], base_url: str) -> Dict[str, Any]:
+async def _try_header(handle, test_urls: list[str], base_url: str) -> dict[str, Any]:
     """Level 3: Specific Headers needed (Referer, X-Token, etc.)."""
     parsed_base = base_url.split("?")[0]
 
@@ -204,11 +204,11 @@ def _extract_items(data: Any) -> list:
     return []
 
 
-def _infer_fields(item: dict) -> Dict[str, str]:
+def _infer_fields(item: dict) -> dict[str, str]:
     fields = {}
     if not isinstance(item, dict):
         return fields
-    for key, value in item.items():
+    for key, _value in item.items():
         kl = key.lower()
         if any(t in kl for t in ["title", "name"]):
             fields["title"] = key

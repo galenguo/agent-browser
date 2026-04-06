@@ -8,11 +8,10 @@ Records complete information for every atomic operation:
 
 Used for the "step traceability" guarantee in core features.
 """
-import time
 import json
 import logging
-from typing import Any, Optional
-from dataclasses import dataclass, field, asdict
+import time
+from dataclasses import asdict, dataclass, field
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +24,10 @@ class TraceStep:
     params: dict
     result: dict
     status: str  # success / error
-    error: Optional[str] = None
+    error: str | None = None
     duration_ms: float = 0.0
     timestamp: float = field(default_factory=time.time)
-    session_id: Optional[str] = None
+    session_id: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -48,7 +47,7 @@ class ActionTracer:
     Supports querying and exporting the full trace.
     """
 
-    def __init__(self, session_id: Optional[str] = None):
+    def __init__(self, session_id: str | None = None):
         self.session_id = session_id
         self._steps: list[TraceStep] = []
         self._step_counter: int = 0
@@ -59,7 +58,7 @@ class ActionTracer:
         params: dict,
         result: dict,
         status: str = "success",
-        error: Optional[str] = None,
+        error: str | None = None,
         duration_ms: float = 0.0,
     ) -> TraceStep:
         """
@@ -109,7 +108,7 @@ class ActionTracer:
         """Get all steps."""
         return list(self._steps)
 
-    def get_step(self, step_num: int) -> Optional[TraceStep]:
+    def get_step(self, step_num: int) -> TraceStep | None:
         """Get a specific step by number."""
         for s in self._steps:
             if s.step == step_num:

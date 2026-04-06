@@ -15,13 +15,8 @@ Phase 3: E2E Local 模式测试
 通过 skill API 进行端到端测试，验证完整工作流。
 """
 import asyncio
-import json
 import os
-import sys
-import uuid
 from pathlib import Path
-from typing import Dict, List, Any
-from unittest import mock
 
 import pytest
 
@@ -154,7 +149,7 @@ class TestE2ELocalLLMMode:
             await page.goto("https://news.ycombinator.com", wait_until="domcontentloaded", timeout=30000)
 
             # 2. 获取初始高度
-            initial_height = await page.evaluate("document.body.scrollHeight")
+            await page.evaluate("document.body.scrollHeight")
 
             # 3. 滚动到底部
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -206,7 +201,7 @@ class TestE2ELocalLLMMode:
                 url_after_back = page.url
                 # 验证后退成功（可能回到第一个 URL）
                 assert url_after_back != url2
-            except Exception as e:
+            except Exception:
                 # 某些浏览器配置可能不支持后退，跳过验证
                 pass
 

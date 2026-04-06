@@ -5,10 +5,10 @@ This helper provides convenient access to core classes for tests that
 need them without importing the full package at module level.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 
-def get_skill_classes() -> Dict[str, Any]:
+def get_skill_classes() -> dict[str, Any]:
     """Get core classes from the agent_browser package.
 
     Returns:
@@ -27,10 +27,10 @@ def get_skill_classes() -> Dict[str, Any]:
 
 
 # Pre-loaded cache
-_skill_classes: Dict[str, Any] | None = None
+_skill_classes: dict[str, Any] | None = None
 
 
-def _ensure_loaded() -> Dict[str, Any]:
+def _ensure_loaded() -> dict[str, Any]:
     """Ensure skill modules are loaded."""
     global _skill_classes
     if _skill_classes is None:

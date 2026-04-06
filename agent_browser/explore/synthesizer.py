@@ -31,10 +31,11 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import yaml
 
+from .analysis import InferredCapability, detect_site_name
 from .explorer import ExplorationResult
 
 logger = logging.getLogger(__name__)
@@ -60,10 +61,10 @@ _FIELD_SELECTOR_HINTS = {
 
 def synthesize_from_trace(
     site: str,
-    trace: List[Dict[str, Any]],
-    exploration: Optional[ExplorationResult] = None,
+    trace: list[dict[str, Any]],
+    exploration: ExplorationResult | None = None,
     command_name: str = "list",
-    adapter_dir: Optional[str] = None,
+    adapter_dir: str | None = None,
 ) -> dict:
     """
     Main entry point: synthesize YAML adapter from browser-use AgentHistoryList.
@@ -126,7 +127,7 @@ def synthesize(
     site: str,
     exploration: ExplorationResult,
     command_name: str = "list",
-    adapter_dir: Optional[str] = None,
+    adapter_dir: str | None = None,
 ) -> dict:
     """Backward-compatible: generate from ExplorationResult only (no trace).
 
@@ -174,7 +175,7 @@ def synthesize(
 # ══════════════════════════════════════════════
 
 
-def distill_trace(trace: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def distill_trace(trace: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Distill noisy browser-use trace into clean action sequence.
 
@@ -235,7 +236,7 @@ def distill_trace(trace: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return cleaned
 
 
-def _get_action_type(step: Dict) -> str:
+def _get_action_type(step: dict) -> str:
     """Extract action type from a browser-use history step."""
     if isinstance(step, dict):
         # browser-use format: {"action": [...]} or direct keys
@@ -253,7 +254,7 @@ def _get_action_type(step: Dict) -> str:
     return "unknown"
 
 
-def _extract_wait_value(step: Dict) -> Optional[float]:
+def _extract_wait_value(step: dict) -> float | None:
     """Extract wait duration from a wait step."""
     params = step.get("params", step)
     if isinstance(params, (int, float)):
@@ -273,7 +274,7 @@ def _extract_wait_value(step: Dict) -> Optional[float]:
     return None
 
 
-def _normalize_action(step: Dict) -> Dict:
+def _normalize_action(step: dict) -> dict:
     """Normalize a trace step to standard {action, params} format."""
     action_type = _get_action_type(step)
     params = {}
@@ -291,7 +292,7 @@ def _normalize_action(step: Dict) -> Dict:
     return {"action": action_type, "params": params}
 
 
-def _actions_equal(a: Dict, b: Dict) -> bool:
+def _actions_equal(a: dict, b: dict) -> bool:
     """Check if two actions are functionally identical."""
     return (_get_action_type(a) == _get_action_type(b) and
             json.dumps(_normalize_action(a).get("params", {}), sort_keys=True) ==
@@ -304,9 +305,9 @@ def _actions_equal(a: Dict, b: Dict) -> bool:
 
 
 def resolve_selectors(
-    distilled: List[Dict],
-    exploration: Optional[ExplorationResult] = None,
-) -> List[Dict]:
+    distilled: list[dict],
+    exploration: ExplorationResult | None = None,
+) -> list[dict]:
     """
     Resolve element references to robust CSS selectors.
 
@@ -334,9 +335,9 @@ def resolve_selectors(
 
 
 def _resolve_element_selector(
-    params: Dict,
-    exploration: Optional[ExplorationResult] = None,
-) -> Optional[str]:
+    params: dict,
+    exploration: ExplorationResult | None = None,
+) -> str | None:
     """
     Resolve an element reference to a CSS selector.
 
@@ -356,7 +357,7 @@ def _resolve_element_selector(
 
     # Text-based lookup -> generate attribute selector
     if "text" in params and params["text"]:
-        text = params["text"]
+        params["text"]
         # Note: pure CSS doesn't support :contains(), use data attribute approach
         return None  # Will need JS-based resolution at runtime
 
@@ -401,8 +402,8 @@ def _xpath_to_css(xpath: str) -> str:
 
 
 def generate_extraction_js(
-    actions: List[Dict],
-    exploration: Optional[ExplorationResult] = None,
+    actions: list[dict],
+    exploration: ExplorationResult | None = None,
 ) -> str:
     """
     Generate deterministic JavaScript extraction code from browser-use extract results.
@@ -438,13 +439,13 @@ def generate_extraction_js(
     return _generate_query_based_extraction_js(query, exploration)
 
 
-def _generate_generic_extraction_js(exploration: Optional[ExplorationResult]) -> str:
+def _generate_generic_extraction_js(exploration: ExplorationResult | None) -> str:
     """Generate generic DOM extraction when no specific extract result available."""
     if exploration and exploration.capabilities:
         cap = exploration.capabilities[0]
         fields = cap.get("fields", {})
         field_selectors = []
-        for field_name, dom_key in fields.items():
+        for field_name, _dom_key in fields.items():
             hints = _FIELD_SELECTOR_HINTS.get(field_name, [f"[class*='{field_name}']"])
             selector = hints[0] if hints else f"[class*='{field_name}']"
             field_selectors.append(f"""
@@ -480,13 +481,13 @@ def _generate_generic_extraction_js(exploration: Optional[ExplorationResult]) ->
     })()"""
 
 
-def _generate_structured_extraction_js(parsed_data: List[Dict], exploration: Optional[ExplorationResult]) -> str:
+def _generate_structured_extraction_js(parsed_data: list[dict], exploration: ExplorationResult | None) -> str:
     """Generate extraction JS from parsed structured data (gold standard)."""
     sample = parsed_data[0]
     fields = []
 
-    for key in sample.keys():
-        value = sample[key]
+    for key in sample:
+        sample[key]
         # Try to infer CSS selector from field name
         hints = _FIELD_SELECTOR_HINTS.get(key, [])
         selector = hints[0] if hints else f"[class*='{key}']"
@@ -506,7 +507,7 @@ def _generate_structured_extraction_js(parsed_data: List[Dict], exploration: Opt
     }})()"""
 
 
-def _generate_query_based_extraction_js(query: str, exploration: Optional[ExplorationResult]) -> str:
+def _generate_query_based_extraction_js(query: str, exploration: ExplorationResult | None) -> str:
     """Generate extraction JS from natural language query."""
     # Parse common patterns from query text
     query_lower = query.lower()
@@ -556,8 +557,8 @@ def _guess_container_selector(url: str) -> str:
 
 
 def detect_strategy(
-    distilled: List[Dict],
-    exploration: Optional[ExplorationResult] = None,
+    distilled: list[dict],
+    exploration: ExplorationResult | None = None,
 ) -> str:
     """
     Choose best execution strategy for the synthesized YAML.
@@ -604,9 +605,9 @@ def build_adapter(
     site: str,
     name: str,
     strategy: str,
-    actions: List[Dict],
+    actions: list[dict],
     extraction_js: str,
-    exploration: Optional[ExplorationResult] = None,
+    exploration: ExplorationResult | None = None,
 ) -> dict:
     """
     Build complete YAML adapter dict from synthesized components.
@@ -636,10 +637,10 @@ def build_adapter(
 
 def _build_pipeline(
     strategy: str,
-    actions: List[Dict],
+    actions: list[dict],
     extraction_js: str,
-    exploration: Optional[ExplorationResult],
-) -> List[Dict]:
+    exploration: ExplorationResult | None,
+) -> list[dict]:
     """Build pipeline step list based on detected strategy."""
     base_url = exploration.url if exploration else ""
 
@@ -703,7 +704,7 @@ def _build_pipeline(
         ]
 
 
-def _extract_columns_from_js(js_code: str) -> List[str]:
+def _extract_columns_from_js(js_code: str) -> list[str]:
     """Extract column names from generated extraction JS."""
     columns = []
     # Match pattern: fieldname: el.querySelector...
@@ -716,7 +717,7 @@ def _extract_columns_from_js(js_code: str) -> List[str]:
     return columns
 
 
-def _detect_store_name(exploration: Optional[ExplorationResult]) -> str:
+def _detect_store_name(exploration: ExplorationResult | None) -> str:
     """Detect Pinia/Vuex store name from exploration."""
     if exploration and exploration.capabilities:
         for cap in exploration.capabilities:
@@ -727,7 +728,7 @@ def _detect_store_name(exploration: Optional[ExplorationResult]) -> str:
     return "mainStore"
 
 
-def _detect_getter_name(exploration: Optional[ExplorationResult]) -> str:
+def _detect_getter_name(exploration: ExplorationResult | None) -> str:
     """Detect Pinia getter name from exploration."""
     if exploration and exploration.capabilities:
         for cap in exploration.capabilities:
@@ -738,7 +739,7 @@ def _detect_getter_name(exploration: Optional[ExplorationResult]) -> str:
     return "items"
 
 
-def _detect_action_name(exploration: Optional[ExplorationResult]) -> str:
+def _detect_action_name(exploration: ExplorationResult | None) -> str:
     """Detect likely store action name from exploration data."""
     if exploration and exploration.capabilities:
         for cap in exploration.capabilities:
@@ -751,7 +752,7 @@ def _detect_action_name(exploration: Optional[ExplorationResult]) -> str:
     return "fetchData"
 
 
-def _detect_capture_pattern(exploration: Optional[ExplorationResult]) -> Optional[str]:
+def _detect_capture_pattern(exploration: ExplorationResult | None) -> str | None:
     """Detect URL capture pattern for tap interceptor from exploration endpoints."""
     if not exploration or not exploration.endpoints:
         return None
@@ -770,7 +771,7 @@ def _detect_capture_pattern(exploration: Optional[ExplorationResult]) -> Optiona
     return None
 
 
-def _infer_args(actions: List[Dict], exploration: Optional[ExplorationResult]) -> Dict:
+def _infer_args(actions: list[dict], exploration: ExplorationResult | None) -> dict:
     """Infer user-facing arguments from trace actions."""
     args = {
         "limit": {"type": "int", "default": 20, "description": "Number of results"},
@@ -852,7 +853,7 @@ def _generate_cookie_adapter(site, name, cap, exploration) -> dict:
 def _generate_dom_adapter(site, name, exploration) -> dict:
     """DOM scraping strategy: navigate -> wait -> evaluate -> limit"""
     from urllib.parse import urlparse
-    parsed = urlparse(exploration.url)
+    urlparse(exploration.url)
     return {
         "site": site, "name": name,
         "description": f"Auto-generated: {site} {name} (DOM)",
@@ -884,9 +885,9 @@ def _generate_dom_adapter(site, name, exploration) -> dict:
 
 def synthesize_from_artifacts(
     artifact_dir: str,
-    site: Optional[str] = None,
+    site: str | None = None,
     command_name: str = "list",
-    adapter_dir: Optional[str] = None,
+    adapter_dir: str | None = None,
 ) -> dict:
     """
     Generate YAML adapter from persisted exploration artifacts on disk.
@@ -901,7 +902,7 @@ def synthesize_from_artifacts(
     if not _os.path.isfile(manifest_path):
         raise FileNotFoundError(f"No exploration artifacts found at {artifact_dir} (missing manifest.json)")
 
-    with open(manifest_path, "r", encoding="utf-8") as f:
+    with open(manifest_path, encoding="utf-8") as f:
         manifest = json.load(f)
 
     endpoints_path = _os.path.join(artifact_dir, "endpoints.json")
@@ -909,12 +910,12 @@ def synthesize_from_artifacts(
 
     endpoints = []
     if _os.path.isfile(endpoints_path):
-        with open(endpoints_path, "r") as f:
+        with open(endpoints_path) as f:
             endpoints = json.load(f)
 
     capabilities = []
     if _os.path.isfile(capabilities_path):
-        with open(capabilities_path, "r") as f:
+        with open(capabilities_path) as f:
             raw_caps = json.load(f)
         for rc in raw_caps:
             capabilities.append(InferredCapability(

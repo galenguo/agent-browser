@@ -5,8 +5,8 @@
   2. 已有 Boss 直聘登录 Cookie
 """
 import asyncio
-from skills.agent_browser.adapters.runner import run_adapter
-from skills.agent_browser.main import create_session
+from agent_browseradapters.runner import run_adapter
+from agent_browsermain import create_session
 
 
 async def main():

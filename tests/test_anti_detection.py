@@ -8,7 +8,6 @@
 import asyncio
 import logging
 import os
-import sys
 
 # 激活 rebrowser Runtime.Enable addBinding 修复（环境变量方式）
 os.environ.setdefault("REBROWSER_PATCHES_RUNTIME_FIX_MODE", "addBinding")
@@ -69,10 +68,7 @@ async def test_with_patchright(browser_path: str | None = None):
                 # navigator.webdriver 应该是 None/undefined/False
                 # automation bindings 应该是 False
                 # chrome.runtime 应该是 True
-                if name == "chrome.runtime":
-                    passed = result is True
-                else:
-                    passed = not result
+                passed = result is True if name == "chrome.runtime" else not result
 
                 status = "✅ PASS" if passed else "❌ FAIL"
                 if not passed:

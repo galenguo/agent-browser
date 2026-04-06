@@ -20,7 +20,6 @@ Run:
       本文件中标记为需要 Docker 才运行。
 """
 import asyncio
-import json
 import os
 from datetime import datetime
 
@@ -115,20 +114,19 @@ class TestModeMatrixNavigation:
 
         # 先检查 FastAPI 是否运行
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"{api_base}/health",
-                    timeout=aiohttp.ClientTimeout(total=3),
-                ) as resp:
-                    if resp.status != 200:
-                        scorecard_writer.record({
-                            "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
-                            "test": "api_navigate",
-                            "status": "BLOCKED",
-                            "reason": f"FastAPI not running (status={resp.status})",
-                            "timestamp": datetime.now().isoformat(),
-                        })
-                        pytest.skip(f"FastAPI 未启动，跳过 API 模式测试")
+            async with aiohttp.ClientSession() as session, session.get(
+                f"{api_base}/health",
+                timeout=aiohttp.ClientTimeout(total=3),
+            ) as resp:
+                if resp.status != 200:
+                    scorecard_writer.record({
+                        "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
+                        "test": "api_navigate",
+                        "status": "BLOCKED",
+                        "reason": f"FastAPI not running (status={resp.status})",
+                        "timestamp": datetime.now().isoformat(),
+                    })
+                    pytest.skip("FastAPI 未启动，跳过 API 模式测试")
         except (aiohttp.ClientError, OSError) as e:
             scorecard_writer.record({
                 "mode": f"{calling_mode}/{browser_mode}/{intelligence}",
@@ -270,11 +268,9 @@ class TestModeMatrixCleanup:
     async def test_mode_session_cleanup(self, calling_mode, browser_mode, intelligence, browser_page, scorecard_writer):
         """Session 创建后能正确清理，不残留状态"""
         # 在真实页面上模拟 session 生命周期
-        start_url = browser_page.url or "about:blank"
 
         # Navigate to a page (simulating session usage)
         await browser_page.goto("https://example.com", wait_until="domcontentloaded", timeout=30000)
-        mid_url = browser_page.url
 
         # Navigate away (simulating cleanup / new context)
         await browser_page.goto("about:blank", timeout=10000)
@@ -351,13 +347,12 @@ class TestAPIRemoteWithoutDocker:
             # Docker 可用：验证远程连接实际工作
             import aiohttp
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"{docker_api_url}/health",
-                    timeout=aiohttp.ClientTimeout(total=5),
-                ) as resp:
-                    assert resp.status == 200, "Gateway health check failed"
-                    data = await resp.json()
+            async with aiohttp.ClientSession() as session, session.get(
+                f"{docker_api_url}/health",
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as resp:
+                assert resp.status == 200, "Gateway health check failed"
+                await resp.json()
 
             scorecard_writer.record({
                 "mode": "api/remote/*",

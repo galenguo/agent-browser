@@ -20,11 +20,10 @@
 - API + remote: Agent → HTTP → FastAPI → Gateway /allocate → Docker CDP
 """
 import asyncio
-import sys
 import os
+import sys
 import time
 import traceback
-from pathlib import Path
 
 from helpers.skill_loader import load_skill_module
 
@@ -79,7 +78,7 @@ async def check_fastapi():
         async with aiohttp.ClientSession() as session:
             async with session.get("http://localhost:8000/health", timeout=aiohttp.ClientTimeout(total=3)) as resp:
                 if resp.status == 200:
-                    print(f"  ✅ FastAPI: http://localhost:8000")
+                    print("  ✅ FastAPI: http://localhost:8000")
                     return True
         return False
     except Exception as e:
@@ -93,7 +92,7 @@ async def check_gateway():
         async with aiohttp.ClientSession() as session:
             async with session.get("http://localhost:8001/health", timeout=aiohttp.ClientTimeout(total=3)) as resp:
                 if resp.status == 200:
-                    print(f"  ✅ Gateway: http://localhost:8001")
+                    print("  ✅ Gateway: http://localhost:8001")
                     return True
         return False
     except Exception as e:
@@ -107,7 +106,7 @@ def has_llm_key():
         provider = "OpenAI" if os.getenv("OPENAI_API_KEY") else "Anthropic"
         print(f"  ✅ LLM API Key: {provider}")
     else:
-        print(f"  ⚠️ LLM API Key: 未设置")
+        print("  ⚠️ LLM API Key: 未设置")
     return key_set
 
 # 环境依赖矩阵
@@ -176,7 +175,7 @@ async def test_cli_local_llm_mode(prompt_key: str) -> dict:
 
         # 提取页面内容
         if elements:
-            print(f"    前 3 个交互元素:")
+            print("    前 3 个交互元素:")
             for i, elem in enumerate(elements[:3]):
                 tag = elem.get("tag", "unknown")
                 text = elem.get("text", "")[:50]
@@ -184,7 +183,7 @@ async def test_cli_local_llm_mode(prompt_key: str) -> dict:
 
         # 清理
         await skill_main.delete_session(session_id)
-        print(f"    ✅ Session 已删除")
+        print("    ✅ Session 已删除")
 
         result["status"] = "PASS"
         result["elements_count"] = len(elements)
@@ -245,7 +244,7 @@ async def test_cli_local_agent_mode(prompt_key: str) -> dict:
 
         # 清理
         await skill_main.delete_session(session_id)
-        print(f"    ✅ Session 已删除")
+        print("    ✅ Session 已删除")
 
         result["status"] = "PASS" if status in ["completed", "done", "success"] else "PARTIAL"
         result["agent_result"] = agent_result
@@ -296,7 +295,7 @@ async def test_api_local_llm_mode(prompt_key: str) -> dict:
 
         # 清理
         await skill_main.delete_session(session_id)
-        print(f"    ✅ Session 已删除")
+        print("    ✅ Session 已删除")
 
         result["status"] = "PASS"
         result["elements_count"] = len(elements)
@@ -349,7 +348,7 @@ async def test_api_local_agent_mode(prompt_key: str) -> dict:
 
         # 清理
         await skill_main.delete_session(session_id)
-        print(f"    ✅ Session 已删除")
+        print("    ✅ Session 已删除")
 
         result["status"] = "PASS" if status in ["completed", "done", "success"] else "PARTIAL"
         result["agent_result"] = agent_result
@@ -394,7 +393,7 @@ async def test_api_remote_llm_mode(prompt_key: str) -> dict:
         # 创建 session (Gateway 自动分配 Docker 浏览器)
         session_id = await skill_main.create_session()
         print(f"    ✅ Session 创建成功: {session_id}")
-        print(f"    ✅ Gateway 已分配 Docker 浏览器")
+        print("    ✅ Gateway 已分配 Docker 浏览器")
 
         # 打开页面
         await skill_main.open_page(session_id, test["url"])
@@ -407,7 +406,7 @@ async def test_api_remote_llm_mode(prompt_key: str) -> dict:
 
         # 清理 (自动回收 Docker 容器)
         await skill_main.delete_session(session_id)
-        print(f"    ✅ Session 已删除，Docker 容器已回收")
+        print("    ✅ Session 已删除，Docker 容器已回收")
 
         result["status"] = "PASS"
         result["elements_count"] = len(elements)
@@ -464,7 +463,7 @@ async def test_api_remote_agent_mode(prompt_key: str) -> dict:
 
         # 清理
         await skill_main.delete_session(session_id)
-        print(f"    ✅ Session 已删除，Docker 容器已回收")
+        print("    ✅ Session 已删除，Docker 容器已回收")
 
         result["status"] = "PASS" if status in ["completed", "done", "success"] else "PARTIAL"
         result["agent_result"] = agent_result
@@ -621,15 +620,14 @@ async def main():
         # 过滤需要 LLM 但没有 key 的场景
         scenarios_to_run = []
         for scenario in batch["scenarios"]:
-            if scenario in batch.get("require_llm_for", []):
-                if not env_status.get("llm_key", False):
-                    print(f"  ⏭️ 跳过 {scenario}: 需要 LLM API Key")
-                    all_results.append({
-                        "scenario": scenario,
-                        "status": "SKIPPED",
-                        "reason": "No LLM API Key"
-                    })
-                    continue
+            if scenario in batch.get("require_llm_for", []) and not env_status.get("llm_key", False):
+                print(f"  ⏭️ 跳过 {scenario}: 需要 LLM API Key")
+                all_results.append({
+                    "scenario": scenario,
+                    "status": "SKIPPED",
+                    "reason": "No LLM API Key"
+                })
+                continue
             scenarios_to_run.append(scenario)
 
         if not scenarios_to_run:

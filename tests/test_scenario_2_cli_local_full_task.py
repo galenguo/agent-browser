@@ -13,8 +13,10 @@
   3. 提取到有效数据（非空）
   4. 会话自动清理（destroy 后验证 session 不存在）
 """
-import pytest
+import contextlib
 import time
+
+import pytest
 from helpers.cli_runner import CLIRunner
 
 
@@ -29,10 +31,8 @@ class TestScenario2CLILocalFullTask:
 
     def teardown_method(self):
         """清理会话"""
-        try:
+        with contextlib.suppress(Exception):
             self.cli.session_destroy(self.session_name)
-        except Exception:
-            pass
 
     def test_full_task_flow(self):
         """测试完整任务流程"""

@@ -12,8 +12,9 @@ Phase 5: 5层反检测栈验证测试
 前置条件：CloakBrowser 运行在 127.0.0.1:19222
 """
 import asyncio
-from playwright.async_api import async_playwright
+
 import pytest
+from playwright.async_api import async_playwright
 
 
 class TestLayer1CloakBrowser:
@@ -45,7 +46,7 @@ class TestLayer1CloakBrowser:
 
             await page.goto("chrome://version")
             # 在 chrome:// 页面上检查 runtime
-            runtime_exists = await page.evaluate("typeof chrome !== 'undefined' && typeof chrome.runtime !== 'undefined'")
+            await page.evaluate("typeof chrome !== 'undefined' && typeof chrome.runtime !== 'undefined'")
 
             # chrome.runtime 可能不在所有页面可用，这是可选检查
             # 主要验证浏览器是基于 Chromium
@@ -200,15 +201,14 @@ class TestLayer4NonStandardPort:
 
         # 检查 9222 端口（可能同时运行普通 Chrome）
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    "http://127.0.0.1:9222/json/version",
-                    timeout=aiohttp.ClientTimeout(total=2)
-                ) as resp:
-                    # 如果 9222 存在，确保它与 19222 是不同的浏览器
-                    # 这个测试主要是信息性的
-                    pass
-        except:
+            async with aiohttp.ClientSession() as session, session.get(
+                "http://127.0.0.1:9222/json/version",
+                timeout=aiohttp.ClientTimeout(total=2)
+            ):
+                # 如果 9222 存在，确保它与 19222 是不同的浏览器
+                # 这个测试主要是信息性的
+                pass
+        except Exception:
             # 9222 不可达是期望的
             pass
 
@@ -245,7 +245,7 @@ class TestLayer5PersistentCDP:
             page = await context.new_page()
 
             # 执行多个操作验证连接稳定
-            for i in range(5):
+            for _i in range(5):
                 await page.goto("https://example.com")
                 title = await page.title()
                 assert len(title) > 0

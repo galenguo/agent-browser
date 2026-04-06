@@ -9,7 +9,6 @@ Phase 1: BrowserDaemon 单元测试
 
 注意：Playwright 连接相关测试在集成测试 (test_local_backend.py) 中进行
 """
-import asyncio
 import json
 import tempfile
 from pathlib import Path

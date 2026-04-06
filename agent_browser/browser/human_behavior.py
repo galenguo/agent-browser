@@ -17,7 +17,6 @@ import asyncio
 import logging
 import math
 import random
-from typing import Optional
 
 # Conditional patchright import (fallback to playwright)
 try:
@@ -40,7 +39,7 @@ class HumanBehaviorSimulator:
     async def warmup_browsing(
         self,
         page: Page,
-        urls: Optional[list[str]] = None,
+        urls: list[str] | None = None,
     ) -> None:
         """Warmup browsing: establish a "normal user" baseline in Akamai/Tongdun behavior models.
 
@@ -127,7 +126,7 @@ class HumanBehaviorSimulator:
     async def _random_scroll(
         self,
         page: Page,
-        scroll_count: Optional[int] = None,
+        scroll_count: int | None = None,
     ) -> None:
         """Non-uniform scrolling: variable speed + random pauses + 20% chance of scroll-back."""
         count = scroll_count or random.randint(2, 5)

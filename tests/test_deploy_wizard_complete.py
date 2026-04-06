@@ -8,36 +8,30 @@ Validates that:
 
 Covers P0 (critical) + P1 (important) gaps found in CEO/Eng review.
 """
-import asyncio
 import os
-import sys
-import pytest
 import threading
-import tempfile
 from pathlib import Path
 from unittest import mock
-from dataclasses import asdict
+
+import pytest
+
+from agent_browser.config import SkillConfig, from_deploy_config, load_config
 
 # agent_browser is now a proper installable package -- no sys.path hacks needed
-
 from agent_browser.deploy_config import (
-    DeployConfig,
     ConfigIssue,
-    validate_config,
-    detect_environment,
-    load_deploy_config,
+    DeployConfig,
     generate_config,
+    load_deploy_config,
+    validate_config,
 )
 from agent_browser.main import (
-    setup,
-    detect_missing_deps,
     DepStatus,
-    RecoveryReport,
     FirstSessionError,
-    _format_recovery_for_claude,
+    RecoveryReport,
+    detect_missing_deps,
+    setup,
 )
-from agent_browser.config import SkillConfig, load_config, from_deploy_config
-
 
 # ════════════════════════════════════════════════════════════════════
 # A. YAML Path Consistency & Roundtrip [P0-CRITICAL]
@@ -140,7 +134,7 @@ another_unknown: yes
         generate_config(cfg, path=target)
 
         with mock.patch("agent_browser.config.Path.home", return_value=tmp_path):
-            loaded = load_config()
+            load_config()
 
         # Verify key fields survived roundtrip through BOTH systems
         with mock.patch("agent_browser.deploy_config.CONFIG_PATH", target):
@@ -165,7 +159,7 @@ another_unknown: yes
         assert skill["stealth"]["mode"] == "vanilla", \
             f"skill.stealth.mode should be vanilla, got {skill.get('stealth', {}).get('mode')}"
         assert skill["browser"]["headless"] is False, \
-            f"skill.browser.headless should be False"
+            "skill.browser.headless should be False"
 
     def test_mode_switch_roundtrip(self, tmp_path):
         """local -> docker-aio -> local doesn't orphan docker/k8s sections."""
@@ -293,7 +287,6 @@ class TestGenerateConfigEdgeCases:
         content2 = target.read_text()
 
         # All other content should match (strip timestamps for comparison)
-        import re
         lines1 = [l for l in content1.split('\n') if 'configured_at' not in l]
         lines2 = [l for l in content2.split('\n') if 'configured_at' not in l]
         assert lines1 == lines2, "non-timestamp content should be identical"
@@ -414,7 +407,7 @@ class TestEnsureMiddlewareRecovery:
                 with mock.patch("agent_browser.main.detect_missing_deps", return_value=non_ready_report):
 
                     with pytest.raises(FirstSessionError) as exc_info:
-                        from agent_browser.main import _ensure_middleware, SkillConfig
+                        from agent_browser.main import SkillConfig, _ensure_middleware
                         config = SkillConfig()
                         # Reset global state
                         import agent_browser.main as main_mod
@@ -674,7 +667,7 @@ class TestToDictFalseFiltering:
 
     def test_headless_false_dropped(self):
         cfg = DeployConfig(headless=False)
-        d = cfg.to_dict()
+        cfg.to_dict()
         # headless=False is the default so it may or may not appear
         # The bug is that False values are filtered, not that defaults are excluded
 
@@ -735,7 +728,7 @@ class TestGoldenMasters:
 
         # Check skill namespace has required keys
         skill_actual = actual_stripped["skill"]
-        skill_expected = expected_stripped["skill"]
+        expected_stripped["skill"]
         for key in ["calling_mode", "cdp_url", "api_url", "stealth"]:
             assert key in skill_actual, f"skill.{key} missing from generated config"
 

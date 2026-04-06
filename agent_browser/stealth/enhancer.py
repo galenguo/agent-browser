@@ -12,9 +12,8 @@ stealth interface for BrowserController:
 Corresponds to the "anti-detection (stealth)" guarantee in core features.
 """
 import asyncio
-import random
 import logging
-from typing import Optional
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +173,7 @@ class StealthEnhancer:
     # Human scrolling
     # ──────────────────────────────────────────
 
-    async def human_scroll(self, page, scroll_count: Optional[int] = None) -> None:
+    async def human_scroll(self, page, scroll_count: int | None = None) -> None:
         """
         Non-uniform scrolling: variable speed + random pauses + 20% chance of rollback.
         Counters Tongdun Technology's scroll pattern analysis.
@@ -214,7 +213,7 @@ class StealthEnhancer:
         "https://www.163.com",
     ]
 
-    async def warmup_browsing(self, page, urls: Optional[list[str]] = None) -> None:
+    async def warmup_browsing(self, page, urls: list[str] | None = None) -> None:
         """
         Warmup browsing: establish a "normal user" baseline in anti-bot models.
         """

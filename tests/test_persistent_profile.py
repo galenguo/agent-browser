@@ -8,10 +8,9 @@
 4. 验证 profile 目录存在
 5. 验证登录状态保留
 """
-import asyncio
-import requests
 import time
-import os
+
+import requests
 
 BASE_URL = "http://localhost:8001"
 API_KEY = "sk-test-persistent-profile-001"
@@ -31,14 +30,14 @@ def test_create_session_first_time():
     print(f"响应: {data}")
 
     assert response.status_code == 200
-    assert data["profile_exists"] == False, "首次创建应该是新 profile"
+    assert not data["profile_exists"], "首次创建应该是新 profile"
 
     session_id = data["session_id"]
     profile_id = data["profile_id"]
 
     print(f"✅ Session ID: {session_id}")
     print(f"✅ Profile ID: {profile_id}")
-    print(f"✅ Profile 是新创建的")
+    print("✅ Profile 是新创建的")
 
     return session_id, profile_id
 
@@ -56,7 +55,7 @@ def test_destroy_session(session_id):
     print(f"响应: {response.json()}")
 
     assert response.status_code == 200
-    print(f"✅ Session 已销毁")
+    print("✅ Session 已销毁")
 
 
 def test_create_session_second_time(expected_profile_id):
@@ -73,14 +72,14 @@ def test_create_session_second_time(expected_profile_id):
     print(f"响应: {data}")
 
     assert response.status_code == 200
-    assert data["profile_exists"] == True, "第二次创建应该复用已有 profile"
+    assert data["profile_exists"], "第二次创建应该复用已有 profile"
     assert data["profile_id"] == expected_profile_id, "Profile ID 应该相同"
 
     session_id = data["session_id"]
 
     print(f"✅ Session ID: {session_id}")
     print(f"✅ Profile ID: {data['profile_id']} (复用)")
-    print(f"✅ Profile 已复用，登录状态应该保留")
+    print("✅ Profile 已复用，登录状态应该保留")
 
     return session_id
 
@@ -109,7 +108,7 @@ def test_profile_stats():
             print(f"    空闲天数: {profile['idle_days']:.2f}")
 
     assert response.status_code == 200
-    print(f"✅ Profile 统计正常")
+    print("✅ Profile 统计正常")
 
 
 def test_health_check():
@@ -124,7 +123,7 @@ def test_health_check():
 
     assert response.status_code == 200
     assert data["status"] == "ok"
-    print(f"✅ 健康检查通过")
+    print("✅ 健康检查通过")
 
 
 def test_execute_task(session_id):
@@ -162,7 +161,7 @@ def test_execute_task(session_id):
 
         if status_data["status"] in ["completed", "failed"]:
             if status_data["status"] == "completed":
-                print(f"✅ 任务完成")
+                print("✅ 任务完成")
                 print(f"结果: {status_data.get('result')}")
             else:
                 print(f"❌ 任务失败: {status_data.get('error')}")
