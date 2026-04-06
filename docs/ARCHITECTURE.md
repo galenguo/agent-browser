@@ -26,7 +26,7 @@
               └──────────────────────┼────────────────────────┘
                                      │
 ┌────────────────────────────────────▼────────────────────────────────────┐
-│                    StealthMiddleware (src/stealth/middleware.py)         │
+│                    StealthMiddleware (agent_browser/stealth/middleware.py)         │
 │     pre/post 延迟 + 贝塞尔鼠标 + 人类打字 + 熔断器 (per-session)         │
 └────────────────────────────────────────┬───────────────────────────────┘
                                      │
@@ -54,13 +54,13 @@
 
 | 层 | 组件 | 功能 | 实现位置 |
 |---|------|------|----------|
-| 1 | CloakBrowser | C++ 编译级指纹伪装（33 项补丁） | `src/browser/stealth_launcher.py` |
-| 2 | patchright | 驱动级 CDP 修补（移除 `__playwright__binding__`） | `src/browser/stealth_launcher.py` |
+| 1 | CloakBrowser | C++ 编译级指纹伪装（33 项补丁） | `agent_browser/browser/stealth_launcher.py` |
+| 2 | patchright | 驱动级 CDP 修补（移除 `__playwright__binding__`） | `agent_browser/browser/stealth_launcher.py` |
 | 3 | rebrowser-patches | Runtime.Enable 泄漏修复（addBinding 模式） | 环境变量 `REBROWSER_PATCHES_RUNTIME_FIX_MODE` |
-| 4 | 非标准端口 19222 | 绑定 127.0.0.1，连接隐匿 | `src/browser/stealth_launcher.py` |
-| 5 | BrowserDaemon | 持久单 CDP 会话，禁止频繁 attach/detach | `src/browser/daemon.py` |
-| 6 | StealthEnhancer | 人类延迟 + 贝塞尔鼠标 + 逐字输入 + 定时器噪声 | `src/core/stealth_enhancer.py` |
-| 7 | **StealthMiddleware** | **集中隐匿层：自动 pre/post 延迟 + 熔断器** | `src/stealth/middleware.py` |
+| 4 | 非标准端口 19222 | 绑定 127.0.0.1，连接隐匿 | `agent_browser/browser/stealth_launcher.py` |
+| 5 | BrowserDaemon | 持久单 CDP 会话，禁止频繁 attach/detach | `agent_browser/browser/daemon.py` |
+| 6 | StealthEnhancer | 人类延迟 + 贝塞尔鼠标 + 逐字输入 + 定时器噪声 | `agent_browser/stealth/enhancer.py` |
+| 7 | **StealthMiddleware** | **集中隐匿层：自动 pre/post 延迟 + 熔断器** | `agent_browser/stealth/middleware.py` |
 
 ## 模式矩阵
 
@@ -74,7 +74,7 @@
 
 ## 核心组件
 
-### 1. 数据模型 (src/models.py)
+### 1. 数据模型 (agent_browser/models.py)
 
 ```python
 class BrowserMode(str, Enum):

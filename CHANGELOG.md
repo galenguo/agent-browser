@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **SECURITY.md**: Vulnerability reporting policy, supported versions, security best practices for API keys, browser profiles, and CDP ports
+- **CODE_OF_CONDUCT.md**: Contributor Covenant v2.1 for community governance
+
+### Changed
+
+- **Project restructure**: Consolidated deployment configs (`docker/` + `k8s/` + `helm/` -> `deploy/`), renamed `scripts/` -> `bin/`, organized 55 flat tests into `unit/`, `stealth/`, `browser/`, `scenarios/`, `skill/` subdirectories (868 tests, all discoverable)
+- **Removed dead files**: 14 stale scripts/tests/docs deleted (30MB Chrome profile data, one-off benchmark scripts, redundant requirements.txt)
+- **README.md rewritten**: Badge line (Python/license/PyPI/CI), quickstart-first structure, feature grid, mode matrix table, comparison with browser-use
+- **Updated .gitignore**: Removed stale rules for moved directories, added runtime data exclusions
+- **All documentation**: Fixed stale path references across INSTALL.md, TEST_GUIDE.md, ARCHITECTURE.md, deploy/README.md, AUTORESEARCH.md
+
+### Added
+
 - **`evaluate()` public API**: Execute JavaScript in page context via `await evaluate(session_id, "expression")`. Available on both functional API (`agent_browser.main`) and OOP interface (`AgentBrowser.evaluate()`)
 - **`AgentBrowser.evaluate()`**: OOP wrapper for JS evaluation with automatic session resolution
 - **E2E capability verification suite** (89 tests across 3 files):
@@ -36,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Test Summary
 
-- **885 total tests collected** (up from 789)
+- **868 total tests collected** across 9 test subdirectories (unit/stealth/browser/scenarios/skill/integration/e2e)
 - **234+ core tests pass in <20s** (unit + integration + installation + facade)
 - **74/75 E2E browser tests pass** with real CloakBrowser (1 flaky: session isolation race condition; FastAPI server gap closed, 6 api/local tests now pass)
 - **0 regressions** across all test suites

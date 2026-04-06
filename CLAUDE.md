@@ -110,7 +110,7 @@ agent-browser/                          # Project root
 ├── README.ja.md                       # Japanese translation
 ├── LICENSE                            # Apache 2.0
 ├── CONTRIBUTING.md                    # Contribution guidelines
-└── .gitignore                         # docs/, src/, skills/ gitignored
+└── .gitignore                         # docs/archive/, data/, profiles/ gitignored
 ```
 
 ### Architecture Diagram

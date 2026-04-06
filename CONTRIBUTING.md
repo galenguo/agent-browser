@@ -35,7 +35,7 @@ playwright install chromium
 pytest
 
 # Run specific test file
-pytest test_stealth_middleware.py -v
+pytest tests/stealth/test_stealth_middleware.py -v
 
 # Run with coverage
 pytest --cov=agent_browser --cov-report=term-missing
@@ -94,15 +94,22 @@ agent_browser/           # Package root (all source code here)
 ├── cli/                # CLI interface
 └── utils/              # Shared utilities
 
-tests/                  # Test suite
+tests/                  # Test suite (868 tests)
 ├── conftest.py         # Shared fixtures
-├── test_*.py           # Unit tests
+├── unit/               # Unit tests (~31 files)
+├── stealth/            # Anti-detection layer tests
+├── browser/            # Browser backend tests
+├── scenarios/          # Multi-step scenario tests (7 files)
+├── skill/              # Skill facade & deploy wizard tests
 ├── integration/        # Integration tests
 └── e2e/                # End-to-end tests
 
 adapters/               # Community-contributed site adapters (YAML)
 examples/              # Example scripts
-docs/                   # Local development reference (gitignored)
+│   └── getting_started/  # Basic usage examples (6 files)
+bin/                   # Dev/utility scripts (install, audit)
+deploy/                # Unified deployment (docker, k8s, helm)
+docs/                   # Architecture, install guide, test guide
 ```
 
 ## Making Changes

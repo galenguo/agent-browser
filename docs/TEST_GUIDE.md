@@ -6,20 +6,20 @@
 
 ### 1.1 测试状态
 
-| 类别 | 测试文件 | 测试数 | 状态 |
-|------|---------|--------|------|
-| 单元测试（核心） | `test_config`, `test_stealth`, `test_daemon`, `test_controller` | ~73 | ✅ 完成 |
-| 单元测试（Pipeline v2.3） | `test_classifier`, `test_fallback`, `test_debugger`, `test_telemetry`, `test_template_errors` | ~78 | ✅ 完成 |
-| 单元测试（Explore） | `test_explore_analysis`, `test_explore_cascade`, `test_explore_synthesizer` | ~30 | ✅ 完成 |
+| 类别 | 目录/文件 | 测试数 | 状态 |
+|------|----------|--------|------|
+| 单元测试（核心） | `unit/test_config`, `unit/test_stealth`, `unit/test_daemon`, `unit/test_controller` | ~73 | ✅ 完成 |
+| 单元测试（Pipeline v2.3） | `unit/test_classifier`, `unit/test_fallback`, `unit/test_debugger`, `unit/test_telemetry`, `unit/test_template_errors` | ~78 | ✅ 完成 |
+| 单元测试（Explore） | `unit/test_explore_analysis`, `unit/test_explore_cascade`, `unit/test_explore_synthesizer` | ~30 | ✅ 完成 |
 | 集成测试 | `integration/` (8 files) | ~50 | ✅ 完成 |
-| 中间件测试 | `test_stealth_middleware` | 19 | ✅ 完成 |
-| 安全测试 | `test_security_hardening`, `test_auth_ownership` | ~20 | ✅ 完成 |
-| 场景测试 | `test_scenario_*.py` (7 files) | ~26 | ⚠️ 需真实浏览器 |
-| E2E 测试（旧） | `e2e/` (2 files) | ~15 | ⚠️ 需 API 服务 |
-| **E2E 真实浏览器 (NEW)** | `e2e/test_e2e_*.py` (3 files) | **~28** | ✅ **需 CloakBrowser** |
-| 性能基准 | `benchmark_performance`, `quick_perf_test` | ~12 | ✅ 完成 |
+| 中间件测试 | `stealth/test_stealth_middleware` | 19 | ✅ 完成 |
+| 安全测试 | `unit/test_security_hardening`, `unit/test_auth_ownership` | ~20 | ✅ 完成 |
+| 场景测试 | `scenarios/test_scenario_*.py` (7 files) | ~26 | ⚠️ 需真实浏览器 |
+| 浏览器后端测试 | `browser/test_local_backend`, `browser/test_daemon`, `browser/test_anti_detection` | ~25 | ⚠️ 需 CDP 连接 |
+| Skill 测试 | `skill/test_skill_facade`, `skill/test_deploy_wizard_complete` | ~50 | ✅ 完成 |
+| E2E 测试 | `e2e/` (9+ files) | ~40+ | ⚠️ 需 API 服务或浏览器 |
 
-**总计: ~350+ 测试用例（含 ~28 个真实浏览器 E2E 测试）**
+**总计: ~868 测试用例（含 E2E 和真实浏览器测试）**
 
 ---
 
@@ -34,58 +34,75 @@ tests/
 │   ├── __init__.py                    # 导出 load_skill_module, get_skill_classes
 │   ├── cli_runner.py                  # CLIRunner (subprocess 执行)
 │   ├── api_client.py                  # APIClient (httpx AsyncClient)
-│   └── skill_loader.py               # 动态加载 skills/agent-browser
+│   └── skill_loader.py               # 动态加载 agent_browser 模块
 │
-├── integration/                       # ★ 集成测试套件（pytest-based）
+├── unit/                              # ★ 单元测试（~31 文件，无需浏览器）
+│   ├── test_config.py                 # 配置系统
+│   ├── test_basic.py                  # 基础功能
+│   ├── test_classifier.py             # 错误分类器
+│   ├── test_fallback.py               # 自动恢复策略
+│   ├── test_debugger.py               # 调试器
+│   ├── test_telemetry.py              # 遥测统计
+│   ├── test_template_errors.py        # 模板错误
+│   ├── test_explore_*.py              # 探索模块（3 文件）
+│   ├── test_security_hardening.py     # 安全加固
+│   ├── test_auth_ownership.py         # 所有权授权
+│   ├── test_adapter_validation.py    # 适配器校验
+│   ├── test_controller.py             # 控制器
+│   ├── test_deploy_config.py          # 部署配置
+│   ├── test_profile_manager.py        # Profile 管理
+│   ├── test_persistent_profile.py     # 持久化 Profile
+│   ├── test_setup_integration.py      # 安装集成
+│   ├── test_shell_scripts.py          # Shell 脚本
+│   ├── test_skill_installation.py     # Skill 安装
+│   ├── test_mode*.py                  # 模式矩阵（3 文件）
+│   ├── test_docker_smoke.py           # Docker 冒烟
+│   ├── test_distributed.py            # 分布式
+│   ├── test_comprehensive.py          # 综合测试
+│   ├── test_api.py                    # API 测试
+│   └── test_zhipin*.py / test_xiaohongshu_scenarios.py  # 站点特定
+│
+├── stealth/                           # ★ 反检测层测试
+│   ├── test_stealth.py                # StealthEnhancer（人类行为模拟）
+│   └── test_stealth_middleware.py     # StealthMiddleware（熔断器）
+│
+├── browser/                            # ★ 浏览器后端测试（需 CDP）
+│   ├── test_local_backend.py          # LocalCDPBackend
+│   ├── test_daemon.py                 # BrowserDaemon
+│   └── test_anti_detection.py         # 反检测验证
+│
+├── scenarios/                          # ★ 场景测试（需真实浏览器）
+│   ├── test_scenario_1_cli_local_basic.py
+│   ├── test_scenario_1_optimized.py
+│   ├── test_scenario_2_cli_local_full_task.py
+│   ├── test_scenario_3_api_local_agent.py
+│   ├── test_scenario_4_cli_remote_gateway.py
+│   ├── test_scenario_5_api_remote_gateway.py
+│   ├── test_scenario_6_anti_detection.py
+│   └── test_scenario_7_token_optimization.py
+│
+├── skill/                              # ★ Skill 层测试
+│   ├── test_skill_facade.py           # Facade 路由
+│   └── test_deploy_wizard_complete.py # 部署向导
+│
+├── integration/                        # ★ 集成测试套件（pytest-based）
 │   ├── __init__.py
-│   ├── conftest.py                   # 共享 fixtures (3 tiers: mock/browser/api)
+│   ├── conftest.py                    # 共享 fixtures (3 tiers: mock/browser/api)
 │   ├── test_session_lifecycle.py      # 会话生命周期 CRUD
-│   ├── test_pipeline_execution.py     # YAML pipeline 执行 + 数据转换
+│   ├── test_pipeline_execution.py     # YAML pipeline 执行
 │   ├── test_template_engine.py       # 模板引擎表达式边界测试
 │   ├── test_adapter_loading.py       # 适配器发现 + 加载 + 校验
-│   ├── test_stealth_integrity.py     # 隐匿完整性（结构+熔断器+行为）
+│   ├── test_stealth_integrity.py     # 隐匿完整性
 │   ├── test_mode_matrix.py           # 8 种模式组合参数化测试
-│   └── test_security_boundaries.py   # 安全边界（隔离/注入/JS 阻断）
+│   └── test_security_boundaries.py   # 安全边界
 │
-├── e2e/
-│   ├── test_e2e_local_llm.py          # 本地模式 E2E
-│   └── test_e2e_remote.py             # 远程 API 模式 E2E
-│
-├── test_stealth_middleware.py         # StealthMiddleware 测试（19 个）
-├── test_classifier.py                 # 错误分类器测试（16 个）
-├── test_fallback.py                   # 自动恢复策略测试（10 个）
-├── test_debugger.py                   # 调试器测试（16 个）
-├── test_telemetry.py                  # 遥测统计测试（16 个）
-├── test_template_errors.py            # 模板错误测试
-│
-├── test_explore_analysis.py           # DOM 分析测试
-├── test_explore_cascade.py            # 级联选择器生成测试
-├── test_explore_synthesizer.py        # 适配器合成测试
-│
-├── test_security_hardening.py         # 安全加固测试（11 类漏洞修复验证）
-├── test_auth_ownership.py             # 所有权授权测试
-│
-├── test_config.py                     # 配置系统测试
-├── test_stealth.py                    # StealthEnhancer 测试
-├── test_daemon.py                     # BrowserDaemon 测试
-├── test_controller.py                 # 控制器测试
-├── test_adapter_validation.py        # 适配器 YAML 校验测试
-├── test_local_backend.py              # LocalCDPBackend 集成测试
-├── test_persistent_profile.py         # 持久化 Profile 测试
-├── test_profile_manager.py            # ProfileManager 测试
-│
-├── test_scenario_1_cli_local_basic.py       # 场景 1: CLI 基本操作
-├── test_scenario_1_optimized.py           # 场景 1: 优化版
-├── test_scenario_2_cli_local_full_task.py # 场景 2: 完整任务流程
-├── test_scenario_3_api_local_agent.py    # 场景 3: API Agent
-├── test_scenario_4_cli_remote_gateway.py  # 场景 4: CLI 远程网关
-├── test_scenario_5_api_remote_gateway.py  # 场景 5: API 远程网关
-├── test_scenario_6_anti_detection.py      # 场景 6: 反检测验证
-├── test_scenario_7_token_optimization.py # 场景 7: Token 优化
-│
-├── verify_antidetection_stack.py      # 反检测栈完整验证
-├── benchmark_performance.py            # 性能基准测试
-├── quick_perf_test.py                # 快速性能测试
+└── e2e/                               # E2E 测试（需 CloakBrowser 或 API 服务）
+    ├── test_e2e_local_llm.py          # 本地模式 E2E
+    ├── test_e2e_remote.py             # 远程 API 模式 E2E
+    ├── test_e2e_pipeline.py           # Pipeline 真实 DOM
+    ├── test_e2e_mode_matrix.py        # 模式矩阵
+    ├── test_e2e_anti_detection.py     # 反检测验证
+    └── ...
 ```
 
 ### 2.2 Pytest 配置
@@ -276,22 +293,22 @@ markers = [
 
 ```bash
 # === 核心单元测试（无需浏览器，秒级） ===
-pytest tests/test_config.py tests/test_stealth.py tests/test_daemon.py \
-       tests/test_controller.py tests/test_adapter_validation.py -v
+pytest tests/unit/test_config.py tests/stealth/test_stealth.py tests/browser/test_daemon.py \
+       tests/unit/test_controller.py tests/unit/test_adapter_validation.py -v
 
 # === Pipeline 引擎测试（无需浏览器） ===
-pytest tests/test_classifier.py tests/test_fallback.py tests/test_debugger.py \
-       tests/test_telemetry.py tests/test_template_errors.py -v
+pytest tests/unit/test_classifier.py tests/unit/test_fallback.py tests/unit/test_debugger.py \
+       tests/unit/test_telemetry.py tests/unit/test_template_errors.py -v
 
 # === 探索模块测试（无需浏览器） ===
-pytest tests/test_explore_analysis.py tests/test_explore_cascade.py \
-       tests/test_explore_synthesizer.py -v
+pytest tests/unit/test_explore_analysis.py tests/unit/test_explore_cascade.py \
+       tests/unit/test_explore_synthesizer.py -v
 
 # === StealthMiddleware 测试（无需浏览器） ===
-pytest tests/test_stealth_middleware.py -v
+pytest tests/stealth/test_stealth_middleware.py -v
 
 # === 安全测试（无需浏览器） ===
-pytest tests/test_security_hardening.py tests/test_auth_ownership.py -v
+pytest tests/unit/test_security_hardening.py tests/unit/test_auth_ownership.py -v
 
 # === 集成测试（Tier 1: Mock，无需服务） ===
 pytest tests/integration/ -m "not slow and not api and not llm" -v
@@ -300,10 +317,10 @@ pytest tests/integration/ -m "not slow and not api and not llm" -v
 pytest tests/integration/ -m "not llm" -v
 
 # === 反检测验证（需 CloakBrowser） ===
-python tests/verify_antidetection_stack.py
+pytest tests/browser/test_anti_detection.py -v
 
-# === 性能基准 ===
-pytest tests/benchmark_performance.py -v
+# === 场景测试（需真实浏览器） ===
+pytest tests/scenarios/ -v
 ```
 
 ### 4.2 完整测试套件
@@ -325,17 +342,17 @@ pytest tests/ -v
 
 ```bash
 # 仅中间件
-pytest tests/test_stealth_middleware.py -v
+pytest tests/stealth/test_stealth_middleware.py -v
 
 # 仅 Pipeline 引擎
-pytest tests/test_classifier.py tests/test_fallback.py tests/test_debugger.py \
-       tests/test_telemetry.py -v
+pytest tests/unit/test_classifier.py tests/unit/test_fallback.py tests/unit/test_debugger.py \
+       tests/unit/test_telemetry.py -v
 
 # 仅探索模块
-pytest tests/test_explore_*.py -v
+pytest tests/unit/test_explore_*.py -v
 
 # 仅安全测试
-pytest tests/test_security_hardening.py tests/test_auth_ownership.py -v
+pytest tests/unit/test_security_hardening.py tests/unit/test_auth_ownership.py -v
 
 # 仅集成测试
 pytest tests/integration/ -v
@@ -354,7 +371,7 @@ python -m cloakbrowser --remote-debugging-port=19222 --user-data-dir=/tmp/cb-tes
 curl http://127.0.0.1:19222/json/version
 
 # 4. (可选) 启动 FastAPI (远程/API 模式测试)
-cd src && python -m uvicorn api:app --host 127.0.0.1 --port 8000 &
+python -m uvicorn agent_browser.api:app --host 127.0.0.1 --port 8000 &
 ```
 
 ---
@@ -445,8 +462,9 @@ classifier = load_skill_module("pipeline.classifier")
 @pytest.fixture(autouse=True)
 async def reset_global_state():
     """每个测试前重置全局状态"""
-    from skills.agent_browser import main, daemon
-    from skills.agent_browser.adapters import loader
+    from agent_browser import main
+    from agent_browser.browser import daemon
+    from agent_browser.adapters import loader
     main._config = None
     main._middleware = None
     main._middleware_lock = asyncio.Lock()
@@ -460,23 +478,22 @@ async def reset_global_state():
 
 | 文件 | 用途 | 关键类/函数 |
 |------|------|-----------|
-| `skills/agent-browser/config.py` | 配置系统 | `SkillConfig`, `load_config`, `detect_mode` |
-| `skills/agent-browser/stealth.py` | 隐匿增强（第6层） | `StealthEnhancer` |
-| `skills/agent-browser/daemon.py` | 浏览器守护 | `BrowserDaemon` |
-| `src/stealth/middleware.py` | 集中隐匿层（第7层） | `StealthMiddleware`, `_PerSessionCircuit` |
-| `skills/agent-browser/backends/local.py` | 本地后端 | `LocalCDPBackend` |
-| `skills/agent-browser/backends/remote.py` | 远程后端 | `RemoteAPIBackend` |
-| `src/browser/backends/extension.py` | Chrome 扩展后端 | `ExtensionBackend` |
-| `skills/agent-browser/pipeline/classifier.py` | 错误分类 | `ErrorCategory`, `classify_error` |
-| `skills/agent-browser/pipeline/fallback.py` | 自动恢复 | `attempt_fallback`, `FallbackResult` |
-| `skills/agent-browser/pipeline/debugger.py` | 调试器 | `DebugSession`, `debug_pipeline` |
-| `skills/agent-browser/pipeline/telemetry.py` | 遥测 | `record`, `get_stats`, `clear` |
-| `skills/agent-browser/pipeline/errors.py` | 类型化错误 | `PipelineError` 层次 |
-| `skills/agent-browser/pipeline/executor.py` | 执行器入口 | `execute_pipeline` |
-| `skills/agent-browser/explore/explorer.py` | 站点探索 | `explore_site` |
-| `skills/agent-browser/adapters/validator.py` | 适配器校验 | `validate_adapter` |
-| `src/api.py` | FastAPI 端点 | 原子操作端点 |
-| `src/gateway/api.py` | Gateway 端点 | 多用户路由 |
+| `agent_browser/config.py` | 配置系统 | `SkillConfig`, `load_config`, `detect_mode` |
+| `agent_browser/stealth/enhancer.py` | 隐匿增强（第6层） | `StealthEnhancer` |
+| `agent_browser/browser/daemon.py` | 浏览器守护 | `BrowserDaemon` |
+| `agent_browser/stealth/middleware.py` | 集中隐匿层（第7层） | `StealthMiddleware`, `_PerSessionCircuit` |
+| `agent_browser/browser/local.py` | 本地后端 | `LocalCDPBackend` |
+| `agent_browser/browser/remote.py` | 远程后端 | `RemoteAPIBackend` |
+| `agent_browser/browser/extension.py` | Chrome 扩展后端 | `ExtensionBackend` |
+| `agent_browser/pipeline/classifier.py` | 错误分类 | `ErrorCategory`, `classify_error` |
+| `agent_browser/pipeline/fallback.py` | 自动恢复 | `attempt_fallback`, `FallbackResult` |
+| `agent_browser/pipeline/debugger.py` | 调试器 | `DebugSession`, `debug_pipeline` |
+| `agent_browser/pipeline/telemetry.py` | 遥测 | `record`, `get_stats`, `clear` |
+| `agent_browser/pipeline/errors.py` | 类型化错误 | `PipelineError` 层次 |
+| `agent_browser/pipeline/executor.py` | 执行器入口 | `execute_pipeline` |
+| `agent_browser/explore/explorer.py` | 站点探索 | `explore_site` |
+| `agent_browser/adapters/validator.py` | 适配器校验 | `validate_adapter` |
+| `agent_browser/api.py` | FastAPI 端点 | 原子操作端点 |
 
 ---
 

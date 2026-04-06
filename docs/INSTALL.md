@@ -52,7 +52,7 @@ git clone https://github.com/your-org/agent-browser.git
 cd agent-browser
 
 # 运行安装脚本
-./scripts/install.sh
+./bin/install.sh
 ```
 
 安装脚本会：
@@ -82,7 +82,7 @@ cd agent-browser
 brew install python@3.11
 
 # 安装 Python 依赖
-python3 -m pip install -r requirements.txt
+python3 -m pip install -e ".[dev]"
 ```
 
 #### 2. 配置环境
@@ -102,7 +102,7 @@ nano .env
 mkdir -p /data/profiles /data/logs
 
 # 启动 API
-python3 -m uvicorn src.api:app --reload --port 8000
+python3 -m uvicorn agent_browser.api:app --reload --port 8000
 ```
 
 #### 4. 验证
@@ -123,7 +123,7 @@ sudo apt-get update
 sudo apt-get install -y python3.11 python3.11-venv python3-pip
 
 # 安装 Python 依赖
-python3 -m pip install -r requirements.txt
+python3 -m pip install -e ".[dev]"
 ```
 
 #### 2. 配置环境
@@ -144,7 +144,7 @@ sudo mkdir -p /data/profiles /data/logs
 sudo chown -R $USER:$USER /data
 
 # 启动 API
-python3 -m uvicorn src.api:app --reload --port 8000
+python3 -m uvicorn agent_browser.api:app --reload --port 8000
 ```
 
 ### Linux (CentOS/RHEL)
@@ -156,7 +156,7 @@ python3 -m uvicorn src.api:app --reload --port 8000
 sudo yum install -y python3.11 python3-pip
 
 # 安装 Python 依赖
-python3 -m pip install -r requirements.txt
+python3 -m pip install -e ".[dev]"
 ```
 
 #### 2-3. 配置和启动
@@ -184,30 +184,30 @@ docker-compose --version
 
 ```bash
 # 使用脚本构建多架构镜像
-./scripts/build-multiarch.sh --registry localhost:5000
+./deploy/docker/build-multiarch.sh --registry localhost:5000
 
 # 或手动构建
-docker build -f docker/Dockerfile -t agent-browser:latest .
+docker build -f deploy/docker/Dockerfile -t agent-browser:latest .
 ```
 
 #### 2. 配置环境
 
 ```bash
 # 复制环境变量模板
-cp docker/.env.example docker/.env
+cp deploy/docker/.env.example deploy/docker/.env
 
-# 编辑 docker/.env
-nano docker/.env
+# 编辑 deploy/docker/.env
+nano deploy/docker/.env
 ```
 
 #### 3. 启动服务
 
 ```bash
 # 使用脚本部署
-./scripts/deploy-docker.sh --mode aio
+./deploy/docker/deploy-docker.sh --mode aio
 
 # 或使用 docker-compose
-cd docker
+cd deploy/docker
 docker-compose --profile all-in-one up -d
 ```
 
@@ -232,14 +232,14 @@ open http://localhost:6080
 
 ```bash
 # 构建 API 和 Browser 镜像
-./scripts/build-multiarch.sh --registry localhost:5000
+./deploy/docker/build-multiarch.sh --registry localhost:5000
 ```
 
 #### 2. 配置环境
 
 ```bash
-cp docker/.env.example docker/.env
-nano docker/.env
+cp deploy/docker/.env.example deploy/docker/.env
+nano deploy/docker/.env
 
 # 设置部署模式
 # DEPLOYMENT_MODE=distributed
@@ -249,10 +249,10 @@ nano docker/.env
 
 ```bash
 # 使用脚本部署
-./scripts/deploy-docker.sh --mode distributed
+./deploy/docker/deploy-docker.sh --mode distributed
 
 # 或使用 docker-compose
-cd docker
+cd deploy/docker
 docker-compose --profile distributed up -d
 ```
 
@@ -272,7 +272,7 @@ export REGISTRY_USERNAME=your-username
 export REGISTRY_PASSWORD=your-password
 
 # 推送镜像
-./scripts/push-images.sh
+./deploy/docker/push-images.sh
 ```
 
 ---
@@ -291,42 +291,42 @@ export REGISTRY_PASSWORD=your-password
 
 ```bash
 # 复制 Secret 模板
-cp k8s/secret.yaml.example k8s/secret.yaml
+cp deploy/k8s/secret.yaml.example deploy/k8s/secret.yaml
 
 # 编辑 Secret，填写 API keys
-nano k8s/secret.yaml
+nano deploy/k8s/secret.yaml
 ```
 
 #### 2. 部署 All-in-One 模式
 
 ```bash
 # 使用脚本部署
-./scripts/deploy-k8s.sh --mode aio --registry registry.example.com
+./deploy/k8s/deploy-k8s.sh --mode aio --registry registry.example.com
 
 # 或手动部署
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/secret.yaml
-kubectl apply -f k8s/pvc.yaml
-kubectl apply -f k8s/aio-deployment.yaml
-kubectl apply -f k8s/aio-service.yaml
+kubectl apply -f deploy/k8s/namespace.yaml
+kubectl apply -f deploy/k8s/configmap.yaml
+kubectl apply -f deploy/k8s/secret.yaml
+kubectl apply -f deploy/k8s/pvc.yaml
+kubectl apply -f deploy/k8s/aio-deployment.yaml
+kubectl apply -f deploy/k8s/aio-service.yaml
 ```
 
 #### 3. 部署分布式模式
 
 ```bash
 # 使用脚本部署
-./scripts/deploy-k8s.sh --mode distributed --registry registry.example.com
+./deploy/k8s/deploy-k8s.sh --mode distributed --registry registry.example.com
 
 # 或手动部署
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/secret.yaml
-kubectl apply -f k8s/pvc.yaml
-kubectl apply -f k8s/api-deployment.yaml
-kubectl apply -f k8s/api-service.yaml
-kubectl apply -f k8s/browser-deployment.yaml
-kubectl apply -f k8s/browser-service.yaml
+kubectl apply -f deploy/k8s/namespace.yaml
+kubectl apply -f deploy/k8s/configmap.yaml
+kubectl apply -f deploy/k8s/secret.yaml
+kubectl apply -f deploy/k8s/pvc.yaml
+kubectl apply -f deploy/k8s/api-deployment.yaml
+kubectl apply -f deploy/k8s/api-service.yaml
+kubectl apply -f deploy/k8s/browser-deployment.yaml
+kubectl apply -f deploy/k8s/browser-service.yaml
 ```
 
 #### 4. 验证
@@ -361,7 +361,7 @@ curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
 ```bash
 # 复制 values 文件
-cp helm/agent-browser/values.yaml my-values.yaml
+cp deploy/helm/agent-browser/values.yaml my-values.yaml
 
 # 编辑配置
 nano my-values.yaml
@@ -371,8 +371,8 @@ nano my-values.yaml
 
 ```bash
 # All-in-One 模式
-helm install agent-browser ./helm/agent-browser \
-  -f helm/agent-browser/values-aio.yaml \
+helm install agent-browser ./deploy/helm/agent-browser \
+  -f deploy/helm/agent-browser/values-aio.yaml \
   --set secrets.anthropicApiKey=your-key \
   --set secrets.openaiApiKey=your-key \
   --set image.registry=registry.example.com \
@@ -380,8 +380,8 @@ helm install agent-browser ./helm/agent-browser \
   --create-namespace
 
 # 分布式模式
-helm install agent-browser ./helm/agent-browser \
-  -f helm/agent-browser/values-distributed.yaml \
+helm install agent-browser ./deploy/helm/agent-browser \
+  -f deploy/helm/agent-browser/values-distributed.yaml \
   --set secrets.anthropicApiKey=your-key \
   --set secrets.openaiApiKey=your-key \
   --set image.registry=registry.example.com \
@@ -405,7 +405,7 @@ kubectl get svc -n agent-browser
 #### 5. 升级
 
 ```bash
-helm upgrade agent-browser ./helm/agent-browser \
+helm upgrade agent-browser ./deploy/helm/agent-browser \
   -f my-values.yaml \
   --namespace agent-browser
 ```
@@ -432,7 +432,7 @@ helm uninstall agent-browser --namespace agent-browser
 docker builder prune -a
 
 # 重新构建
-docker build --no-cache -f docker/Dockerfile -t agent-browser:latest .
+docker build --no-cache -f deploy/docker/Dockerfile -t agent-browser:latest .
 ```
 
 #### 2. Kubernetes Pod 无法启动
@@ -601,7 +601,7 @@ dnsConfig:
 ## 下一步
 
 - 阅读 [API 文档](./API_COMPARISON.md)
-- 查看 [部署架构](./DEPLOYMENT.md)
+- 查看 [部署架构](../deploy/README.md)
 - 了解 [开发指南](../CLAUDE.md)
 
 ---
