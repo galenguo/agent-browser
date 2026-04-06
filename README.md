@@ -101,8 +101,37 @@ async def main():
         task_result = await ab.run_task("Find the search box and type 'python'")
         print(f"Task: {task_result['status']}")
 
-asyncio.run(main()
+asyncio.run(main())
 ```
+
+### Server Mode (FastAPI)
+
+```bash
+# Install with server dependencies
+pip install agent-browser[full]
+
+# Start the API server
+uvicorn agent_browser.api:app --port 8000
+
+# Check health
+curl http://localhost:8000/health
+# {"status":"ok","sessions":0,"max_concurrent":10,"browser_mode":"local"}
+```
+
+**REST API endpoints** (all under `/sessions/{session_id}/`):
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Server health + pool stats |
+| POST | `/sessions/create` | Create session (`{"user_id": "..."}`) |
+| GET | `/sessions/{id}` | Session status |
+| DELETE | `/sessions/{id}` | Delete session |
+| POST | `/navigate` | Navigate to URL |
+| POST | `/snapshot` | DOM snapshot |
+| POST | `/click` | Click element by ref |
+| POST | `/fill` | Fill input field |
+| POST | `/evaluate` | Execute JavaScript |
+| POST | `/task` | Submit LLM/Agent task |
 
 ### Public API Reference
 
