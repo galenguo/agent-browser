@@ -57,23 +57,27 @@ references/
 *_TEST_REPORT.md
 *_VERIFICATION_REPORT.md
 
-# Local development docs (not committed, use GitHub Pages/Wiki for public docs)
-docs/
+# Documentation (tracked -- project docs live here)
+# Note: docs/archive/ is gitignored separately
 
 # Old architecture (pre-restructure — deleted after migration)
 src/
-skills/
 references/
 desktop/
 
-# Deployment configs (deferred to v2 — not part of v1 pip package)
-docker/
-k8s/
-helm/
+# Runtime data (never commit browser profiles or runtime state)
+test-profiles/
+
+# Deployment consolidated under deploy/
+deploy/docker/data/
+deploy/docker/.env
+
+# Config with secrets (even dummy keys don't belong in git)
+config/keys.yaml/
 
 # Test artifacts
-tests/screenshots/
-tests/results/
+tests/screenshots/*.png
+tests/results/*.json
 
 # Benchmark scripts (dev only)
-scripts/benchmark/
+bin/benchmark/
