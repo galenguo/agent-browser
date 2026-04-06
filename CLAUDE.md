@@ -1,325 +1,291 @@
-# Agent Browser - Claude Code 开发指南
+# Agent Browser - Development Guide
 
-## 项目概述
+## Overview
 
-Agent Browser 是一个 AI 驱动的反检测浏览器自动化平台，专为高防护网站设计。它结合了浏览器自动化与 AI 代理，实现智能的网页交互，同时规避检测系统。
+Agent Browser is an AI-driven anti-detection browser automation platform designed for high-protection websites. It combines browser automation with AI agents to enable intelligent web interaction while evading detection systems.
 
-**核心能力：**
-- 工业级反检测（7层防护栈 + StealthMiddleware 熔断器）
-- Pipeline 引擎 v2.3（YAML 适配器 + 错误分类 + 自动恢复 + 调试器 + 遥测）
-- 站点探索模块（自动分析 DOM + 生成适配器）
-- 多模式支持（CLI/API × LLM/Agent × Local/Extension/Remote）
-- 多账号隔离（独立指纹、Cookie、代理）
-- 灵活的部署模式（本地/Docker/分布式）
+**Core capabilities:**
+- Industrial-grade anti-detection (7-layer protection stack + StealthMiddleware circuit breaker)
+- Pipeline engine v2.3 (YAML adapters + error classification + auto-recovery + debugger + telemetry)
+- Site exploration module (automatic DOM analysis + adapter generation)
+- Multi-mode support (CLI/API x LLM/Agent x Local/Extension/Remote)
+- Multi-account isolation (independent fingerprints, cookies, proxies)
+- Flexible deployment (local/Docker/distributed)
 
-**典型应用场景：**
-- 高防护网站数据采集（Boss直聘、淘宝、知乎、B站等）
-- AI Agent 驱动的浏览器自动化
-- Chrome Extension 自动化（继承用户登录状态）
-- 反爬虫系统测试与评估
+**Typical use cases:**
+- Data collection from high-protection websites (Boss Zhipin, Taobao, Zhihu, Bilibili, etc.)
+- AI Agent-driven browser automation
+- Chrome Extension automation (inherits user login state)
+- Anti-scraping system testing and evaluation
 
-## 架构设计
+## Architecture
 
-### 7层反检测栈
+### 7-Layer Anti-Detection Stack
 
-| 层级 | 组件 | 功能 |
-|------|------|------|
-| 1 | CloakBrowser | C++ 编译级指纹伪装（33处补丁） |
-| 2 | patchright | 驱动级 CDP 补丁（移除 `__playwright__binding__`） |
-| 3 | rebrowser-patches | Runtime.Enable 泄漏修复（addBinding 模式） |
-| 4 | 非标准端口 19222 | 绑定 127.0.0.1 混淆连接 |
-| 5 | 持久化 CDP 会话 | BrowserDaemon 防止频繁 attach/detach |
-| 6 | StealthEnhancer | 人类延迟 + 贝塞尔鼠标 + 逐字输入 |
-| 7 | **StealthMiddleware** | **集中隐匿层：自动 pre/post 延迟 + 熔断器** |
+| Layer | Component | Function |
+|------|-----------|----------|
+| 1 | CloakBrowser | C++ compile-level fingerprint spoofing (33 patches) |
+| 2 | patchright | Driver-level CDP patches (removes `__playwright__binding__`) |
+| 3 | rebrowser-patches | Runtime.Enable leak fix (addBinding mode) |
+| 4 | Non-standard port 19222 | Bound to 127.0.0.1 for connection obfuscation |
+| 5 | Persistent CDP sessions | BrowserDaemon prevents frequent attach/detach |
+| 6 | StealthEnhancer | Human delays + Bezier mouse + character-by-character typing |
+| 7 | **StealthMiddleware** | **Centralized stealth layer: auto pre/post delay + circuit breaker** |
 
-### 三层架构
+**Note on optional dependencies:** Layers 1-5 require the `[cloak]` extra (`pip install agent-browser[cloak]`). A basic install (`pip install agent-browser`) works with plain Playwright and provides layers 6-7 only.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     SKILL.md (facade)                        │
-│          模式检测 + ReAct/Agent 路由                          │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────────┐
-│                     main.py (API)                            │
-│     _ensure_backend() 路由 + run_task() 智能模式             │
-└─────────────┬───────────────────────┬───────────────────────┘
-              │                       │
-┌─────────────▼─────────┐ ┌──────────▼─────────┐ ┌────────────▼────────────┐
-│   LocalCDPBackend     │ │  ExtensionBackend   │ │  RemoteAPIBackend       │
-│   (CloakBrowser)      │ │  (Chrome Extension) │ │  (HTTP 传输适配器)       │
-│  ├─ BrowserDaemon     │ │  ├─ WebSocket       │ │  ├─ aiohttp REST        │
-│  ├─ StealthEnhancer   │ │  ├─ chrome.debugger│ │  ├─ X-API-Key 认证      │
-│  └─ browser-use Agent │ │  └─ 自然指纹继承    │ │  └─ session_id 映射      │
-└─────────────┬─────────┘ └──────────┬─────────┘ └────────────┬────────────┘
-              │                      │                      │
-              └──────────────────────┼──────────────────────┘
-                                     │
-┌────────────────────────────────────▼────────────────────────────────────┐
-│                    StealthMiddleware (src/stealth/middleware.py)         │
-│     pre/post 延迟 + 贝塞尔鼠标 + 人类打字 + 熔断器 (per-session)         │
-└────────────────────────────────────────┬───────────────────────────────┘
-                                     │
-              ┌──────────────────────┼──────────────────────┐
-              │                      │                      │
-   ┌──────────▼──┐         ┌────────▼────────┐    ┌───────▼──────────┐
-   │ BrowserDaemon│         │ Pipeline Engine  │    │ Explore Module   │
-   │ (持久化连接) │         │ (v2.3)           │    │ (站点探索+生成)   │
-   └─────────────┘         │ ├─ classifier    │    └──────────────────┘
-                           │ ├─ fallback      │
-                           │ ├─ debugger      │
-                           │ └─ telemetry     │
-                           └─────────────────┘
-```
-
-**核心设计原则：**
-- **LocalCDPBackend 是唯一浏览器操作核心**：所有浏览器逻辑只实现一次
-- **ExtensionBackend 是自然指纹替代方案**：操作用户真实 Chrome，无 Extension 时自动回退
-- **RemoteAPIBackend 是 HTTP 传输层**：零业务逻辑，只做序列化/反序列化
-- **StealthMiddleware 是集中隐匿层**：自动包装所有操作，熔断器防止级联失败
-- **用户隔离**：每个用户独立的 session、profile、cookies、fingerprint
-- **持久化会话**：BrowserDaemon 单例保持 CDP 连接跨 session 复用
-
-### 模式矩阵
-
-| 调用模式 | 浏览器模式 | 后端实现 | 智能模式 | 数据流 |
-|---------|-----------|---------|---------|--------|
-| CLI | local | LocalCDPBackend (daemon) | LLM | Agent → Python API → CDP |
-| CLI | extension | ExtensionBackend (Chrome) | LLM | Agent → WS → chrome.debugger → CDP |
-| CLI | local | LocalCDPBackend | Agent | Agent → run_task → browser-use → CDP |
-| API | local | RemoteAPIBackend → localhost FastAPI | LLM/Agent | Agent → HTTP → FastAPI → CDP |
-| API | remote | RemoteAPIBackend → Gateway → Docker | LLM/Agent | Agent → HTTP → Gateway → Docker CDP |
-
-## 代码组织
-
-### 目录结构
+### Package Architecture
 
 ```
-agent-browser/
-├── src/                                  # 服务端源代码（FastAPI）
-│   ├── api.py                            # FastAPI 入口点
-│   ├── api_gateway.py                    # API 网关（多用户路由）
-│   ├── models.py                         # 数据模型
-│   ├── controller.py                     # 遗留控制器（向后兼容）
-│   ├── cli_handler.py                    # CLI 处理器
-│   ├── persistent_session.py             # 持久化会话
-│   ├── proxy_pool.py                     # 代理池
-│   ├── events.py                         # 事件系统
+agent-browser/                          # Project root
+├── agent_browser/                      # Single pip-installable package
+│   ├── main.py                        # Facade API (create_session, snapshot, click, etc.)
+│   ├── config.py                      # SkillConfig dataclass + load_config / detect_mode
+│   ├── deploy_config.py               # DeployConfig for Docker/K8s deployments
+│   ├── models.py                      # Data models (BrowserInstance, UserSession, etc.)
 │   │
-│   ├── browser/                          # 浏览器引擎层
-│   │   ├── backends/
-│   │   │   ├── __init__.py               # BrowserBackend + BrowserPageHandle ABC
-│   │   │   ├── local.py                  # LocalCDPBackend（CloakBrowser）
-│   │   │   ├── remote.py                 # RemoteAPIBackend（HTTP 传输）
-│   │   │   └── extension.py              # ExtensionBackend（Chrome 扩展）
-│   │   ├── daemon.py                     # BrowserDaemon 持久化单例
-│   │   ├── stealth_launcher.py           # CloakBrowser 启动（第1-4层）
-│   │   ├── human_behavior.py             # 类人行为参数
-│   │   └── instance_pool.py              # 浏览器实例池
+│   ├── browser/                       # Browser engine layer
+│   │   ├── __init__.py                # BrowserBackend + BrowserPageHandle ABCs
+│   │   ├── local.py                   # LocalCDPBackend (CloakBrowser + Playwright)
+│   │   ├── remote.py                  # RemoteAPIBackend (HTTP transport)
+│   │   ├── extension.py               # ExtensionBackend (Chrome DevTools)
+│   │   ├── daemon.py                  # BrowserDaemon (persistent CDP singleton)
+│   │   ├── stealth_launcher.py        # CloakBrowser launch with conditional imports
+│   │   ├── human_behavior.py          # Human behavior parameters
+│   │   └── instance_pool.py           # Browser instance pool
 │   │
-│   ├── stealth/                          # ★ 集中式隐匿层（第7层）
-│   │   └── middleware.py                 # StealthMiddleware + 熔断器
+│   ├── stealth/                       # Anti-detection layer (Layers 6-7)
+│   │   ├── __init__.py                # Exports all stealth components
+│   │   ├── middleware.py              # StealthMiddleware + circuit breaker (Layer 7)
+│   │   ├── enhancer.py                # StealthEnhancer: human delays/mouse/typing (Layer 6)
+│   │   ├── actions.py                 # Stealth action overrides for browser-use
+│   │   ├── patches.py                 # JS runtime injection patches
+│   │   └── browser_controller.py      # ActionResult + BrowserController wrapper
 │   │
-│   ├── core/                             # 核心组件
-│   │   ├── stealth_enhancer.py           # StealthEnhancer（第6层：贝塞尔鼠标等）
-│   │   ├── stealth_actions.py            # 隐身动作覆写
-│   │   ├── stealth_patches.js            # JS 注入补丁
-│   │   ├── browser_controller.py         # 浏览器控制器
-│   │   ├── session_manager.py            # 会话管理
-│   │   └── action_tracer.py              # 动作追踪
+│   ├── pipeline/                      # YAML Pipeline engine v2.3
+│   │   ├── executor.py                # Pipeline executor with fallback/telemetry
+│   │   ├── steps.py                   # Step implementations via StealthPageHandle
+│   │   ├── template.py                # Template engine (19 filters)
+│   │   ├── errors.py                  # Typed error hierarchy (6 categories)
+│   │   ├── classifier.py              # Error category classifier
+│   │   ├── fallback.py                # Auto-recovery strategies per error type
+│   │   ├── debugger.py                # Single-step debugger + breakpoints
+│   │   └── telemetry.py               # JSONL telemetry stats
 │   │
-│   ├── gateway/                          # API 网关模块
-│   │   ├── api.py                        # Gateway REST 端点
-│   │   ├── browser_pool.py               # 浏览器实例池
-│   │   ├── key_store.py                  # API Key 存储
-│   │   └── state.py                      # 网关状态
+│   ├── explore/                       # Site exploration module
+│   │   ├── explorer.py                # Site explorer (network interception, API discovery)
+│   │   ├── analysis.py                # DOM structure analysis + capability inference
+│   │   ├── cascade.py                 # Cascade CSS selector generation
+│   │   └── synthesizer.py             # YAML adapter auto-synthesis
 │   │
-│   ├── cli/                              # CLI 模块
-│   │   ├── main.py                       # CLI 入口
-│   │   ├── commands.py                   # 命令定义
-│   │   ├── session_manager.py            # CLI 会话管理
-│   │   ├── session_store.py              # 文件持久化
-│   │   └── output.py                     # 输出格式化
+│   ├── adapters/                      # Site adapter system
+│   │   ├── loader.py                  # YAML adapter scanner/loader
+│   │   ├── runner.py                  # Adapter execution engine
+│   │   └── validator.py               # YAML validation (5 checks)
 │   │
-│   ├── llm/                              # LLM 抽象层
-│   │   └── factory.py                    # LLM 工厂（OpenAI/Anthropic/GLM）
+│   ├── intelligence/                  # AI agent mode
+│   │   ├── __init__.py                # run_task() router
+│   │   └── agent_runner.py            # browser-use Agent executor
 │   │
-│   ├── agent/                            # Agent 层
-│   │   └── runner.py                     # browser-use Agent 执行器
+│   ├── session/                       # Session management
+│   │   ├── pool_manager.py            # Multi-user session pool
+│   │   ├── profile_manager.py         # Browser profile management
+│   │   └── session_manager.py         # Fingerprint-IP-Cookie consistency
 │   │
-│   ├── session/                          # 会话管理层
-│   │   ├── pool_manager.py               # 多用户会话池
-│   │   ├── profile_manager.py            # 配置文件管理
-│   │   └── session_manager.py            # 指纹-IP-Cookie 一致性
+│   ├── cli/                           # CLI subsystem
+│   │   ├── main.py                    # CLI entry point (Typer app)
+│   │   └── commands.py                # CLI command definitions
 │   │
-│   └── config/                           # 配置系统
-│       └── manager.py                    # ConfigManager
+│   └── utils/                         # Shared utilities
+│       ├── refs_generator.py          # Element reference generation (@e0, @e1)
+│       ├── action_tracer.py           # Action tracing for debugging
+│       └── persistent_session.py      # Cross-process session persistence
 │
-├── skills/agent-browser/                 # Skill 包（Claude Code / OpenClaw）
-│   ├── __init__.py                       # 顶层导出
-│   ├── main.py                           # Facade API（模式路由）
-│   ├── config.py                         # 配置系统（SkillConfig）
-│   ├── daemon.py                         # BrowserDaemon（Skill 层封装）
-│   ├── stealth.py                        # StealthEnhancer（Skill 层封装）
-│   ├── controller.py                     # 遗留控制器（向后兼容）
-│   ├── session_manager.py                # 会话管理器（Backend 包装）
-│   ├── refs_generator.py                 # 元素引用生成
-│   │
-│   ├── backends/                         # 后端抽象层（重导出到 src/）
-│   │   ├── __init__.py                   # BrowserBackend + BrowserPageHandle ABC
-│   │   ├── local.py                      # LocalCDPBackend（核心实现）
-│   │   └── remote.py                     # RemoteAPIBackend（HTTP 传输）
-│   │
-│   ├── intelligence/                     # 智能模式
-│   │   ├── __init__.py                   # run_task() 路由
-│   │   └── agent_runner.py               # browser-use Agent 执行器
-│   │
-│   ├── pipeline/                         # YAML Pipeline 引擎（v2.3）
-│   │   ├── executor.py                   # 执行器（含 fallback/telemetry 集成）
-│   │   ├── steps.py                      # 步骤实现（通过 StealthPageHandle 执行）
-│   │   ├── template.py                   # 模板引擎（19 种过滤器）
-│   │   ├── errors.py                     # 类型化错误层次（6 类异常）
-│   │   ├── classifier.py                 # 错误分类器（ErrorCategory 枚举 + 启发式）
-│   │   ├── fallback.py                   # 自动恢复策略（per error category）
-│   │   ├── debugger.py                   # 单步调试器 + 断点 + 状态检查
-│   │   ├── telemetry.py                  # JSONL 遥测统计（~/.agent-browser/telemetry.jsonl）
-│   │   └── steps/                       # 步骤定义目录
-│   │
-│   ├── explore/                          # 站点探索模块
-│   │   ├── explorer.py                   # 站点探索器
-│   │   ├── analysis.py                   # DOM 结构分析
-│   │   ├── cascade.py                    # 级联选择器生成
-│   │   └── synthesizer.py                # YAML 适配器合成器
-│   │
-│   ├── adapters/                         # 站点适配器（零 token）
-│   │   ├── loader.py                     # 适配器加载器
-│   │   ├── runner.py                     # 适配器运行器
-│   │   └── validator.py                  # YAML 校验器（5 项检查）
-│   │
-│   ├── desktop/                          # 桌面应用控制
-│   │   ├── applescript.py               # AppleScript 交互
-│   │   ├── cdp_discovery.py             # CDP 端点发现
-│   │   └── runner.py                     # 桌面运行器
-│   │
-│   └── SKILL.md                          # Skill 文档
-│
-├── tests/                                # 测试套件
-│   ├── conftest.py                       # 全局 fixtures
-│   ├── helpers/                          # 测试工具（api_client, cli_runner, skill_loader）
-│   ├── integration/                      # 集成测试（8 个文件）
-│   ├── e2e/                              # 端到端测试
-│   ├── test_stealth_middleware.py        # 中间件测试（19 个）
-│   ├── test_classifier.py                # 分类器测试（16 个）
-│   ├── test_fallback.py                  # 恢复策略测试（10 个）
-│   ├── test_debugger.py                  # 调试器测试（16 个）
-│   ├── test_telemetry.py                 # 遥测测试（16 个）
-│   ├── test_explore_*.py                 # 探索模块测试
-│   └── test_scenario_*.py                # 场景测试（7 个场景）
-│
-├── examples/                             # 示例脚本（6 个）
-├── scripts/                              # 实用脚本
-├── docker/                               # Docker 配置
-└── docs/                                 # 文档
-    ├── ARCHITECTURE.md                   # 架构设计
-    ├── Agent-Browser 架构方案V4.md        # 详细架构方案
-    ├── DEPLOYMENT.md                     # 部署指南
-    ├── INSTALL.md                        # 安装指南
-    ├── TEST_GUIDE.md                     # 测试说明
-    └── archive/                          # 历史文档归档
+├── adapters/                          # YAML site adapters (boss, zhihu, bilibili, etc.)
+├── tests/                             # Test suite (716 tests)
+├── examples/                          # Example scripts
+├── pyproject.toml                     # Package config (pip installable)
+├── README.md                          # English documentation (source of truth)
+├── README.zh-CN.md                    # Chinese translation
+├── README.ja.md                       # Japanese translation
+├── LICENSE                            # Apache 2.0
+├── CONTRIBUTING.md                    # Contribution guidelines
+└── .gitignore                         # docs/, src/, skills/ gitignored
 ```
 
-### 关键文件说明
+### Architecture Diagram
 
-**Skill 核心层：**
-- `main.py` - Facade API，所有操作的统一入口
-  - `_ensure_backend()` - 模式检测 + 后端路由（local/extension/remote）
-  - `run_task()` - Agent 模式任务提交
-  - `debug_pipeline()` - Pipeline 调试入口
-  - 原子操作：`create_session`, `snapshot`, `click`, `fill`, `scroll` 等
+```
++---------------------------------------------------------------------+
+|                        main.py (Facade API)                          |
+|                 Mode detection + ReAct/Agent routing                 |
++-------------------------------+---------------------------------------+
+                                |
++-------------------------------v---------------------------------------+
+|                    _ensure_backend() routing                          |
+|              run_task() intelligent task dispatch                     |
++---------+-------------+------------------+---------------+-----------+
+         |                               |                  |
++--------v------+    +-------------------v---+   +-----------v-----------+
+| LocalCDPBackend|    |  ExtensionBackend     |   | RemoteAPIBackend      |
+| (CloakBrowser) |    |  (Chrome DevTools)    |   | (HTTP transport)      |
+| + BrowserDaemon|    |  + WebSocket          |   |  + aiohttp REST       |
+| + StealthEnhncr|    |  + chrome.debugger    |   |  + X-API-Key auth     |
+| + browser-use  |    |  + natural fingerprint|   |  + session_id mapping |
++--------+------+    +----------+------------+   +-----------+-----------+
+         |                      |                              |
+         +----------------------+------------------------------+
+                                |
++-------------------------------v---------------------------------------+
+|              StealthMiddleware (agent_browser.stealth.middleware)      |
+|        pre/post delay + Bezier mouse + human typing + circuit breaker |
+|                          (per-session scope)                          |
++-------------------------------+---------------------------------------+
+                                |
+              +-----------------+------------------+
+              |                 |                  |
+     +--------v----+  +---------v--------+  +------v--------+
+     | BrowserDaemon|  | Pipeline Engine  |  | Explore Module|
+     | (persistent  |  | (v2.3)          |  | (site explore |
+     |  connection) |  |  + classifier    |  |  + synthesis) |
+     +--------------+  |  + fallback      |  +---------------+
+                      |  + debugger      |
+                      |  + telemetry     |
+                      +-----------------+
+```
 
-- `config.py` - 配置系统
-  - `SkillConfig` dataclass - calling_mode, browser_mode, intelligence, daemon, stealth 设置
-  - `detect_mode()` - 自动探测（localhost:8000/health → API 模式）
-  - `load_config()` - 配置优先级：参数 → 环境变量 → YAML → 自动探测
+**Core design principles:**
+- **LocalCDPBackend is the sole browser operation core**: all browser logic implemented once here
+- **ExtensionBackend is the natural fingerprint alternative**: operates user's real Chrome, auto-fallback to LocalCDPBackend when no Extension available
+- **RemoteAPIBackend is an HTTP transport layer**: zero business logic, only serialization/deserialization
+- **StealthMiddleware is the centralized stealth layer**: auto-wraps all operations, circuit breaker prevents cascading failures
+- **User isolation**: each user has independent session, profile, cookies, and fingerprint
+- **Persistent sessions**: BrowserDaemon singleton maintains CDP connections across sessions
 
-**后端抽象层：**
-- `backends/__init__.py` - 后端抽象
+### Mode Matrix
+
+| Calling Mode | Browser Mode | Backend Implementation | Intelligence | Data Flow |
+|-------------|-------------|-----------------------|-------------|-----------|
+| CLI | local | LocalCDPBackend (daemon) | LLM | Agent -> Python API -> CDP |
+| CLI | extension | ExtensionBackend (Chrome) | LLM | Agent -> WS -> chrome.debugger -> CDP |
+| CLI | local | LocalCDPBackend | Agent | Agent -> run_task -> browser-use -> CDP |
+| API | local | RemoteAPIBackend -> localhost FastAPI | LLM/Agent | Agent -> HTTP -> FastAPI -> CDP |
+| API | remote | RemoteAPIBackend -> Gateway -> Docker | LLM/Agent | Agent -> HTTP -> Gateway -> Docker CDP |
+
+## Code Organization
+
+### Key File Descriptions
+
+**Facade layer:**
+- `main.py` - Facade API, unified entry point for all operations
+  - `_ensure_backend()` - mode detection + backend routing (local/extension/remote)
+  - `run_task()` - Agent-mode task submission
+  - `debug_pipeline()` - Pipeline debug entry point
+  - Atomic operations: `create_session`, `snapshot`, `click`, `fill`, `scroll`, etc.
+
+- `config.py` - Configuration system
+  - `SkillConfig` dataclass - calling_mode, browser_mode, intelligence, daemon, stealth settings
+  - `detect_mode()` - auto-detect (localhost:8000/health -> API mode)
+  - `load_config()` - config priority: params > env vars > YAML > auto-detect
+
+- `models.py` - Data models (BrowserInstance, UserSession, etc.)
+
+- `deploy_config.py` - DeployConfig for Docker/K8s deployment scenarios
+
+**Backend abstraction layer (`browser/`):**
+- `browser/__init__.py` - Backend abstractions
   - `BrowserBackend` ABC - connect, disconnect, create_session, delete_session, get_page
   - `BrowserPageHandle` ABC - goto, evaluate, mouse_wheel, mouse_move, keyboard_press, on, close
 
-- `backends/local.py` - **LocalCDPBackend（唯一浏览器操作核心）**
-  - CDP 连接 + 会话管理 + StealthEnhancer
-  - `PlaywrightPageHandle` - Playwright Page 薄包装
-  - Daemon 集成：持久连接 + 空闲断开
+- `browser/local.py` - **LocalCDPBackend (sole browser operation core)**
+  - CDP connection + session management + StealthEnhancer integration
+  - `PlaywrightPageHandle` - thin Playwright Page wrapper
+  - Daemon integration: persistent connection + idle disconnect
 
-- `backends/remote.py` - **RemoteAPIBackend（HTTP 传输层）**
-  - aiohttp REST 调用 + X-API-Key 认证
-  - `RemotePageHandle` - 每个方法翻译为 HTTP 请求
+- `browser/remote.py` - **RemoteAPIBackend (HTTP transport layer)**
+  - aiohttp REST calls + X-API-Key authentication
+  - `RemotePageHandle` - each method translates to HTTP request
 
-- `src/browser/backends/extension.py` - **ExtensionBackend（Chrome 扩展）**
-  - 通过 WebSocket 连接 Chrome Extension
-  - 使用 `chrome.debugger` 操作用户真实浏览器
-  - 自然指纹 + 继承登录状态
-  - 无 Extension 时自动回退到 LocalCDPBackend
+- `browser/extension.py` - **ExtensionBackend (Chrome DevTools)**
+  - Connects to Chrome Extension via WebSocket
+  - Uses `chrome.debugger` to operate user's real browser
+  - Natural fingerprints + inherits login state
+  - Auto-fallback to LocalCDPBackend when no Extension available
 
-**Pipeline 引擎（v2.3）：**
-- `pipeline/executor.py` - 执行器入口，fail_fast=False 时集成 fallback + telemetry
-- `pipeline/steps.py` - 步骤实现，所有操作通过 StealthPageHandle 执行
-- `pipeline/template.py` - 模板引擎，支持 19 种过滤器和算术表达式
-- `pipeline/errors.py` - 类型化错误层次（6 类异常 + fix_hint 自动生成）
-- `pipeline/classifier.py` - 错误分类器（ErrorCategory 枚举 + 启发式匹配）
-- `pipeline/fallback.py` - 自动恢复策略（SELECTOR_DRIFT 重验证 / TIMEOUT 重试 / AUTH_FAILURE 标记）
-- `pipeline/debugger.py` - 单步调试器（DebugSession + breakpoints + step history）
-- `pipeline/telemetry.py` - JSONL 遥测统计（record/get_stats/get_recent/clear）
+- `browser/daemon.py` - **BrowserDaemon (persistent CDP singleton)**
+  - `ensure_connected()` - lazy connect + auto-reconnect
+  - `create_context()` / `destroy_context()` - session lifecycle
+  - `_idle_monitor_loop()` - dual-condition idle disconnect
 
-**站点探索模块：**
-- `explore/explorer.py` - 站点探索器，自动遍历页面结构
-- `explore/analysis.py` - DOM 结构分析（交互元素识别）
-- `explore/cascade.py` - 级联 CSS 选择器生成
-- `explore/synthesizer.py` - YAML 适配器自动合成
+- `browser/stealth_launcher.py` - CloakBrowser launcher with conditional imports (only when `[cloak]` extra installed)
 
-**智能模式层：**
-- `intelligence/__init__.py` - `run_task()` 路由
-- `intelligence/agent_runner.py` - browser-use Agent + stealth_actions + 分块执行
+**Stealth layer (`stealth/`):**
+- `stealth/middleware.py` - **StealthMiddleware (Layer 7, centralized stealth)**
+  - `StealthPageHandle` decorator: auto-injects pre/post action delays by operation type
+  - `_PerSessionCircuit` circuit breaker: per-session state machine (CLOSED->OPEN, threshold=5)
+  - Operation classification: stealth-wrapped (goto/click/fill/scroll) vs passthrough (evaluate/title/url)
 
-**隐匿增强：**
-- `src/stealth/middleware.py` - **StealthMiddleware（第7层，集中隐匿层）**
-  - `StealthPageHandle` 装饰器：按操作类型自动注入 pre/post action 延迟
-  - `_PerSessionCircuit` 熔断器：per-session 状态机（CLOSED→OPEN，阈值=5）
-  - 操作分类：stealth-wrapped (goto/click/fill/scroll) vs passthrough (evaluate/title/url)
+- `stealth/enhancer.py` - **StealthEnhancer (Layer 6)**
+  - `pre_action()` - differentiated delays by operation type
+  - `human_type()` - 50-250ms/char + 5% typo rate + 10% long pauses
+  - `random_mouse_move()` - triple Bezier curves + sinusoidal speed variation
+  - `inject_timing_noise()` - Date.now/performance.now offset
 
-- `daemon.py` (Skill 层) / `src/browser/daemon.py` (服务端) - BrowserDaemon 单例
-  - `ensure_connected()` - 懒连接 + 自动重连
-  - `create_context()` / `destroy_context()` - 会话管理
-  - `_idle_monitor_loop()` - 双条件空闲断开
+- `stealth/actions.py` - Stealth action overrides for browser-use Agent
+- `stealth/patches.js` - JS runtime injection patches
+- `stealth/browser_controller.py` - ActionResult + BrowserController wrapper
 
-- `stealth.py` (Skill 层) / `src/core/stealth_enhancer.py` (服务端) - StealthEnhancer（第6层）
-  - `pre_action()` - 按操作类型差异化延迟
-  - `human_type()` - 50-250ms/字符 + 5% typo + 10% 长停顿
-  - `random_mouse_move()` - 三次贝塞尔曲线 + 正弦波速度变化
-  - `inject_timing_noise()` - Date.now/performance.now 偏移
+**Pipeline engine v2.3 (`pipeline/`):**
+- `pipeline/executor.py` - Executor entry point; integrates fallback + telemetry when fail_fast=False
+- `pipeline/steps.py` - Step implementations, all operations execute through StealthPageHandle
+- `pipeline/template.py` - Template engine supporting 19 filters and arithmetic expressions
+- `pipeline/errors.py` - Typed error hierarchy (6 exception categories + auto-generated fix_hint)
+- `pipeline/classifier.py` - Error category classifier (ErrorCategory enum + heuristic matching)
+- `pipeline/fallback.py` - Auto-recovery strategies (SELECTOR_DRIFT re-validation / TIMEOUT retry / AUTH_FAILURE marking)
+- `pipeline/debugger.py` - Single-step debugger (DebugSession + breakpoints + step history)
+- `pipeline/telemetry.py` - JSONL telemetry stats (record/get_stats/get_recent/clear)
 
-**服务端新增模块（src/）：**
-- `src/api_gateway.py` - API 网关，多用户路由 + API Key 认证
-- `src/gateway/` - Gateway 子系统（api, browser_pool, key_store, state）
-- `src/cli/` - CLI 子系统（main, commands, session_manager, session_store, output）
-- `src/llm/factory.py` - LLM 工厂，支持 OpenAI/Anthropic/GLM 多提供商
-- `src/persistent_session.py` - 持久化会话跨进程复用
-- `src/proxy_pool.py` - 代理池管理
-- `src/events.py` - 事件总线
+**Site exploration module (`explore/`):**
+- `explore/explorer.py` - Site explorer with network interception and API discovery
+- `explore/analysis.py` - DOM structure analysis + interactive element capability inference
+- `explore/cascade.py` - Cascade CSS selector generation
+- `explore/synthesizer.py` - YAML adapter auto-synthesis
 
-## 开发规范
+**Intelligence layer (`intelligence/`):**
+- `intelligence/__init__.py` - `run_task()` router
+- `intelligence/agent_runner.py` - browser-use Agent executor + stealth_actions + chunked execution
 
-### 命名约定
+**Session management (`session/`):**
+- `session/pool_manager.py` - Multi-user session pool
+- `session/profile_manager.py` - Browser profile management
+- `session/session_manager.py` - Fingerprint-IP-Cookie consistency enforcement
 
-**文件名：** snake_case
+**Adapter system (`adapters/`):**
+- `adapters/loader.py` - YAML adapter scanner/loader
+- `adapters/runner.py` - Adapter execution engine
+- `adapters/validator.py` - YAML validation (5 checks)
+
+**CLI subsystem (`cli/`):**
+- `cli/main.py` - CLI entry point (Typer app)
+- `cli/commands.py` - CLI command definitions
+
+**Shared utilities (`utils/`):**
+- `utils/refs_generator.py` - Element reference generation (@e0, @e1, ...)
+- `utils/action_tracer.py` - Action tracing for debugging
+- `utils/persistent_session.py` - Cross-process session persistence
+
+## Development Standards
+
+### Naming Conventions
+
+**File names:** snake_case
 ```python
 stealth_launcher.py
 pool_manager.py
-local.py  # backends/
+local.py  # inside browser/
 ```
 
-**类名：** PascalCase
+**Class names:** PascalCase
 ```python
 class LocalCDPBackend:
 class BrowserDaemon:
@@ -330,27 +296,27 @@ class PipelineExecutor:
 class ErrorClassifier:
 ```
 
-**函数/方法：** snake_case
+**Functions/methods:** snake_case
 ```python
 async def create_session():
-async def _ensure_backend():  # 私有方法前缀 _
+async def _ensure_backend():  # private methods prefixed with _
 ```
 
-**变量：** snake_case
+**Variables:** snake_case
 ```python
 session_id = "xxx"
-_backend = None  # 模块级私有变量前缀 _
+_backend = None  # module-level private variables prefixed with _
 ```
 
-**常量：** UPPER_SNAKE_CASE
+**Constants:** UPPER_SNAKE_CASE
 ```python
 CDP_PORT = 19222
 MAX_SESSIONS = 10
 ```
 
-### 类型提示
+### Type Hints
 
-**必须使用类型提示：**
+Type hints are required on all public APIs:
 ```python
 from typing import Optional, Dict, List
 
@@ -365,225 +331,239 @@ class LocalCDPBackend:
     _daemon: Optional["BrowserDaemon"]
 ```
 
-### Async/Await 模式
+### Async/Await Pattern
 
-**广泛使用异步编程：**
+Async programming is used extensively throughout the codebase:
 ```python
-# 异步函数
+# Async functions
 async def connect():
     await daemon.ensure_connected()
 
-# 后台任务
+# Background tasks
 asyncio.create_task(idle_monitor_loop())
 ```
 
-### 错误处理
+### Error Handling
 
-**使用自定义异常（Pipeline 引擎 v2.2 引入的类型化错误层次）：**
+Use custom exceptions from the typed error hierarchy introduced in Pipeline engine v2.2:
 ```python
-from pipeline.errors import (
-    PipelineError,          # 基类
-    AdapterLoadError,       # 适配器加载失败
-    AdapterValidationError,  # 适配器 YAML 校验失败
-    PipelineStepError,      # 步骤执行错误
-    StepTimeoutError,       # 步骤超时
-    SelectorNotFoundError,  # 选择器未找到
-    URLError,               # URL 错误
+from agent_browser.pipeline.errors import (
+    PipelineError,              # Base class
+    AdapterLoadError,           # Adapter loading failure
+    AdapterValidationError,     # Adapter YAML validation failure
+    PipelineStepError,          # Step execution error
+    StepTimeoutError,           # Step timeout
+    SelectorNotFoundError,      # Selector not found
+    URLError,                   # URL error
 )
 
-# 每个错误携带上下文：
+# Each error carries context:
 # step_index, step_name, adapter_name, fix_hint
-err.to_dict()  # 结构化输出
-err.user_message  # 用户友好格式
+err.to_dict()  # Structured output
+err.user_message  # User-friendly format
 ```
 
-## 配置管理
+All code and comments must be in English. Variable names, function names, and class names are always in English.
 
-### 环境变量
+## Configuration Management
+
+### Environment Variables
 
 ```bash
-# 调用模式
+# Calling mode
 AGENT_BROWSER_CALLING_MODE=cli          # cli | api
 AGENT_BROWSER_BROWSER_MODE=local        # local | extension | remote
 AGENT_BROWSER_INTELLIGENCE=llm          # llm | agent
 
-# 连接配置
+# Connection config
 AGENT_BROWSER_CDP_URL=http://127.0.0.1:19222
 AGENT_BROWSER_API_URL=http://localhost:8000
 AGENT_BROWSER_API_KEY=xxx
 
-# Daemon 配置
+# Daemon config
 AGENT_BROWSER_DAEMON_ENABLED=true
 AGENT_BROWSER_DAEMON_IDLE_TIMEOUT=1800
 
-# 隐匿配置
+# Stealth config
 AGENT_BROWSER_STEALTH_ENABLED=true
 AGENT_BROWSER_STEALTH_MODE=full           # full | vanilla
 
-# LLM 配置（Agent 模式 / Pipeline 引擎）
+# LLM config (Agent mode / Pipeline engine)
 LLM_PROVIDER=openai                     # openai | anthropic
-LLM_MODEL=gpt-4                         # 支持 glm-5-turbo 等
+LLM_MODEL=gpt-4                         # supports glm-5-turbo, etc.
 OPENAI_API_KEY=sk-xxx
 OPENAI_BASE_URL=https://api.openai.com/v1
 ANTHROPIC_API_KEY=sk-ant-xxx
 ```
 
-### 配置优先级
+### Configuration Priority
 
-1. 显式参数（`create_session(mode="api")`）
-2. 环境变量（`AGENT_BROWSER_CALLING_MODE`）
-3. YAML 配置（`~/.agent-browser/config.yaml`）
-4. 自动探测（localhost:8000/health）
-5. 硬编码默认（CLI + local）
+1. Explicit parameters (`create_session(mode="api")`)
+2. Environment variables (`AGENT_BROWSER_CALLING_MODE`)
+3. YAML config (`~/.agent-browser/config.yaml`)
+4. Auto-detection (localhost:8000/health)
+5. Hardcoded default (CLI + local)
 
-### 自动探测逻辑
+### Auto-Detection Logic
 
 ```python
 async def detect_mode() -> SkillConfig:
-    # 1. 尝试 API 模式
+    # 1. Try API mode
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get("http://localhost:8000/health", timeout=2) as resp:
                 if resp.status == 200:
                     return SkillConfig(calling_mode="api")
-    except:
+    except Exception:
         pass
 
-    # 2. 检测本地 CDP
+    # 2. Detect local CDP
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get("http://127.0.0.1:19222/json/version", timeout=2) as resp:
                 if resp.status == 200:
                     return SkillConfig(calling_mode="cli")
-    except:
+    except Exception:
         pass
 
-    # 3. 默认 CLI
+    # 3. Default to CLI
     return SkillConfig()
 ```
 
-## 常见开发任务
+## Common Development Tasks
 
-### 添加新的原子操作
+### Adding a New Atomic Operation
 
-1. 在 `BrowserPageHandle` ABC 中定义接口（`backends/__init__.py`）
-2. 在 `PlaywrightPageHandle` 中实现（`backends/local.py`）
-3. 在 `ExtensionPageHandle` 中实现（`src/browser/backends/extension.py`）
-4. 在 `RemotePageHandle` 中添加 HTTP 映射（`backends/remote.py`）
-5. 在 `main.py` 中暴露 API
-6. 在 `__init__.py` 中导出
+1. Define interface in `BrowserPageHandle` ABC (`agent_browser/browser/__init__.py`)
+2. Implement in `PlaywrightPageHandle` (`agent_browser/browser/local.py`)
+3. Implement in `ExtensionPageHandle` (`agent_browser/browser/extension.py`)
+4. Add HTTP mapping in `RemotePageHandle` (`agent_browser/browser/remote.py`)
+5. Expose API in `agent_browser/main.py`
+6. Export from `agent_browser/__init__.py`
 
-### 添加新的 FastAPI 端点
+### Adding a New FastAPI Endpoint
 
-1. 在 `src/api.py` 中添加端点
-2. 在 `RemotePageHandle` 中添加对应的 HTTP 调用
+1. Add endpoint in the FastAPI app (the server runs `agent_browser` internally)
+2. Add corresponding HTTP call in `RemotePageHandle` (`agent_browser/browser/remote.py`)
 
-### 添加新的 Pipeline 步骤
+### Adding a New Pipeline Step
 
-1. 在 `pipeline/steps.py` 中添加步骤实现（通过 StealthPageHandle 执行）
-2. 在 `pipeline/template.py` 中注册步骤模板（如需要变量替换）
-3. 在 `adapters/validator.py` 的 STEPS registry 中注册（自动检测）
-4. 在 `pipeline/errors.py` 中添加对应的错误类型（如需要）
-5. 在 `pipeline/classifier.py` 中添加启发式分类规则（如需要）
+1. Add step implementation in `agent_browser/pipeline/steps.py` (executes via StealthPageHandle)
+2. Register step template in `agent_browser/pipeline/template.py` (if variable substitution needed)
+3. Register in STEPS registry of `agent_browser/adapters/validator.py` (auto-detected)
+4. Add corresponding error type in `agent_browser/pipeline/errors.py` (if needed)
+5. Add heuristic classification rule in `agent_browser/pipeline/classifier.py` (if needed)
 
-### 增强 StealthMiddleware
+### Enhancing StealthMiddleware
 
-**关键文件：** `src/stealth/middleware.py`
+**Key file:** `agent_browser/stealth/middleware.py`
 
 ```python
-# 新增操作类型映射
+# Add new operation type mapping
 delay_map["new_action"] = (0.3, 0.8)
 ```
 
-**同步更新：** `intelligence/agent_runner.py` 中的 `stealth_actions`
+**Also update:** `stealth_actions` in `agent_browser/intelligence/agent_runner.py`
 
-### 添加新的站点适配器
+### Adding a New Site Adapter
 
-1. 手动：在 `adapters/{site}/` 下创建 YAML 文件
-2. 自动：使用 `explore()` 分析目标站点 → `synthesize()` 生成适配器 YAML
+1. Manual: create YAML file under `adapters/{site}/` directory
+2. Automatic: use `explore()` to analyze target site -> `synthesize()` to generate adapter YAML
 
-### 添加新的浏览器后端
+### Adding a New Browser Backend
 
-1. 在 `src/browser/backends/` 创建新后端文件
-2. 实现 `BrowserBackend` 和 `BrowserPageHandle` ABC
-3. 在 `skills/agent-browser/backends/__init__.py` 注册
-4. 在 `main.py` 的 `_ensure_backend()` 中添加路由分支
-5. 更新 `config.py` 的 `browser_mode` 枚举
+1. Create new backend file in `agent_browser/browser/`
+2. Implement `BrowserBackend` and `BrowserPageHandle` ABCs
+3. Register in `agent_browser/browser/__init__.py`
+4. Add routing branch in `_ensure_backend()` in `agent_browser/main.py`
+5. Update `browser_mode` enum in `agent_browser/config.py`
 
-## 重要注意事项
+## Important Notes
 
-### 反检测敏感性
+### Anti-Detection Sensitivity
 
-**不要破坏反检测功能：**
-- 不要修改 CDP 端口（19222）
-- 不要移除 CloakBrowser 启动参数
-- 不要频繁 attach/detach CDP 会话（使用 Daemon）
-- 不要在浏览器中注入明显的自动化标记
-- 不要绕过 StealthMiddleware（它是集中隐匿层，绕过会导致检测信号不一致）
+**Do not break anti-detection functionality:**
+- Do not change the CDP port (19222)
+- Do not remove CloakBrowser launch parameters
+- Do not frequently attach/detach CDP sessions (use Daemon)
+- Do not inject obvious automation markers into the browser
+- Do not bypass StealthMiddleware (it is the centralized stealth layer; bypassing it causes inconsistent detection signals)
 
-### Backend 抽象
+### Backend Abstraction
 
-**保持 LocalCDPBackend 为唯一浏览器操作核心：**
-- 所有浏览器操作逻辑只在 `src/browser/backends/local.py` 实现
-- RemoteAPIBackend 只做 HTTP 序列化，零业务逻辑
-- ExtensionBackend 通过 chrome.debugger 代理，不重新实现操作逻辑
-- FastAPI 服务端内部运行 LocalCDPBackend
+**Keep LocalCDPBackend as the sole browser operation core:**
+- All browser operation logic is only implemented in `agent_browser/browser/local.py`
+- RemoteAPIBackend only does HTTP serialization, zero business logic
+- ExtensionBackend proxies via chrome.debugger, does not re-implement operation logic
+- FastAPI server internally runs LocalCDPBackend
 
-### Pipeline 引擎注意事项
+### Pipeline Engine Notes
 
-- 适配器 YAML 必须通过 `validator.py` 的 5 项检查才能加载
-- `fail_fast=True` 时错误立即抛出；`fail_fast=False` 时先尝试 fallback
-- 遥测写入是非阻塞的，不影响 pipeline 执行性能
-- 调试器断点命中时返回状态字典，不返回数据
+- Adapter YAML must pass all 5 checks in `validator.py` before it can be loaded
+- When `fail_fast=True`: errors are thrown immediately; when `fail_fast=False`: fallback is attempted first
+- Telemetry writes are non-blocking and do not affect pipeline execution performance
+- When debugger breakpoint hits: returns state dictionary, does not return data
 
-### 资源管理
+### Resource Management
 
-**BrowserDaemon 生命周期：**
-- 首次 `ensure_connected()` 时懒连接
-- 双条件断开：无活跃 session 且 超过 idle_timeout
-- 状态持久化到 `~/.agent-browser/daemon-state.json`
+**BrowserDaemon lifecycle:**
+- Lazy connection on first `ensure_connected()`
+- Dual-condition disconnect: no active sessions AND exceeds idle_timeout
+- State persisted to `~/.agent-browser/daemon-state.json`
 
-**StealthMiddleware 熔断器：**
-- per-session 作用域（非全局），避免一个 session 影响其他 session
-- 阈值默认 5 次连续失败后 OPEN（禁用该 session 的隐匿）
-- 新 session 自动 RESET（failure_count = 0）
+**StealthMiddleware circuit breaker:**
+- Per-session scope (not global), so one session cannot affect others
+- Threshold defaults to 5 consecutive failures before OPEN (disables stealth for that session)
+- New sessions automatically RESET (failure_count = 0)
 
-### 中文文档
+### Optional Dependencies
 
-- README.md 使用中文
-- 代码注释主要是中文
-- 代码本身使用英文（变量名、函数名、类名）
+The package has two installation modes:
 
-## 技术栈参考
+**Basic install** (layers 6-7 only):
+```bash
+pip install agent-browser
+```
+Works with plain Playwright. Provides StealthEnhancer and StealthMiddleware (human behavior simulation), but no C++-level fingerprint spoofing.
 
-**核心依赖：**
-- `playwright` / `patchright` - 浏览器自动化
-- `browser-use==0.12.2` - AI agent 框架
-- `langchain-openai` / `langchain-anthropic` - LLM 集成
+**Full install** (all 7 layers):
+```bash
+pip install agent-browser[cloak]
+```
+Adds CloakBrowser (C++ compiled Chromium with 33 fingerprint patches), patchright driver-level patches, rebrowser-patches runtime fixes, and non-standard CDP port binding. This activates layers 1-5 of the anti-detection stack.
+
+Code that depends on CloakBrowser uses conditional imports so the basic install never crashes -- features gracefully degrade when cloak extras are absent.
+
+## Tech Stack Reference
+
+**Core dependencies:**
+- `playwright` / `patchright` - Browser automation
+- `browser-use==0.12.2` - AI agent framework
+- `langchain-openai` / `langchain-anthropic` - LLM integration
 - `fastapi` + `uvicorn` - REST API
-- `aiohttp` - HTTP 客户端（RemoteAPIBackend）
-- `cloakbrowser==0.3.18` - 反检测 Chromium（安装在 `.venv`，C++ 编译级指纹伪装 33 处补丁）
+- `aiohttp` - HTTP client (RemoteAPIBackend)
+- `cloakbrowser==0.3.18` - Anti-detection Chromium (optional, `[cloak]` extra; C++ compile-level fingerprint spoofing with 33 patches)
 
-**CloakBrowser 安装信息：**
-- 包名：`cloakbrowser`
-- 版本：`0.3.18`
-- 安装位置：`.venv/lib/python3.13/site-packages`
-- 依赖：`httpx`, `playwright`
-- 启动方式：需通过 CloakBrowser 启动浏览器（非普通 Chrome），才能激活第 1 层反检测
-- CDP 端口：`127.0.0.1:19222`
+**CloakBrowser details (optional dependency):**
+- Package name: `cloakbrowser`
+- Version: `0.3.18`
+- Install location: `.venv/lib/python3.13/site-packages` (when `[cloak]` extra installed)
+- Dependencies: `httpx`, `playwright`
+- Launch method: Must launch browser via CloakBrowser (not regular Chrome) to activate Layer 1 anti-detection
+- CDP port: `127.0.0.1:19222`
 
-## 相关文档
+**License:** Apache 2.0
 
-- `README.md` - 项目概述和快速开始
-- `skills/agent-browser/SKILL.md` - Skill 使用文档
-- `docs/ARCHITECTURE.md` - 架构设计
-- `docs/Agent-Browser 架构方案V4.md` - 详细架构方案
-- `docs/DEPLOYMENT.md` - 部署指南
-- `docs/INSTALL.md` - 安装指南
-- `docs/TEST_GUIDE.md` - 测试说明
-- `CHANGELOG.md` - 版本历史
-- `AUTORESEARCH.md` - 自主优化实验规则
+## Related Documentation
+
+- `README.md` - Project overview and quickstart (English, source of truth)
+- `README.zh-CN.md` - Chinese translation
+- `README.ja.md` - Japanese translation
+- `CONTRIBUTING.md` - Contribution guidelines
+- `LICENSE` - Apache 2.0 license
+- `CHANGELOG.md` - Version history
+- `AUTORESEARCH.md` - Autonomous optimization experiment rules
 
 ---
 
-**最后更新：** 2026-04-05
+**Last updated:** 2026-04-05

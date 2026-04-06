@@ -33,6 +33,9 @@ from .adapters import list_adapters, run_adapter
 # Explore
 from .explore import explore, synthesize, cascade_explore as cascade
 
+# LLM
+from .llm.factory import LLMFactory
+
 __all__ = [
     # Facade API
     "create_session",
@@ -65,4 +68,6 @@ __all__ = [
     "explore",
     "synthesize",
     "cascade",
+    # LLM
+    "LLMFactory",
 ]

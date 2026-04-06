@@ -60,11 +60,16 @@ references/
 # Local development docs (not committed, use GitHub Pages/Wiki for public docs)
 docs/
 
-# Old architecture (pre-restructure — to be deleted after migration)
+# Old architecture (pre-restructure — deleted after migration)
 src/
 skills/
 references/
 desktop/
+
+# Deployment configs (deferred to v2 — not part of v1 pip package)
+docker/
+k8s/
+helm/
 
 # Test artifacts
 tests/screenshots/

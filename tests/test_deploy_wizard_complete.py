@@ -18,10 +18,7 @@ from pathlib import Path
 from unittest import mock
 from dataclasses import asdict
 
-# Ensure paths
-sys.path.insert(0, str(Path(__file__).parent.parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "agent_browser"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# agent_browser is now a proper installable package -- no sys.path hacks needed
 
 from agent_browser.deploy_config import (
     DeployConfig,
