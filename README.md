@@ -104,6 +104,37 @@ playwright install chromium
 
 ## Usage
 
+### Getting Started with Claude Code
+
+Agent Browser includes a **Claude Code skill** that lets you control browsers directly from conversation:
+
+```bash
+# 1. Install the package
+pip install agent-browser
+
+# 2. Install the Claude Code skill (copies SKILL.md to ~/.claude/skills/)
+agent-browser install-skill
+
+# 3. Restart Claude Code, then use it naturally:
+#   "Open https://example.com and tell me what's on the page"
+#   "Search for Python jobs on Boss Zhipin"
+#   "Fill out this form with my details"
+```
+
+The skill auto-detects your environment, installs missing dependencies, and guides you through the ReAct loop (Observe -> Reason -> Act -> Check). See [skill/SKILL.md](agent_browser/skill/SKILL.md) for the full skill definition.
+
+### Chrome Extension (Optional)
+
+For natural fingerprints and inherited login state, load the included Chrome extension:
+
+```bash
+# The extension ships inside the pip package at agent_browser/extension/
+# Load it in Chrome: chrome://extensions/ -> Developer mode -> Load unpacked
+# Select: <python-site-packages>/agent_browser/extension/
+```
+
+When the extension is connected, Agent Browser automatically uses **Extension mode** (your real Chrome browser) instead of launching a separate browser instance.
+
 ### Functional API
 
 ```python

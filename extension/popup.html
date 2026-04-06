@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=280">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 280px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    color: #e0e0e0;
+    background: #1a1a2e;
+    line-height: 1.4;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #2a2a3e;
+    background: #16162a;
+  }
+  .header-icon { width: 20px; height: 20px; border-radius: 4px; background: #4a90d9; }
+  .header-title { font-size: 13px; font-weight: 600; color: #fff; flex: 1; }
+  .header-version { font-size: 10px; color: #888; }
+
+  /* Sections */
+  .section { padding: 10px 12px; border-bottom: 1px solid #222236; }
+  .section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 6px; }
+
+  /* Status */
+  .status-row { display: flex; align-items: center; gap: 8px; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.connected { background: #4CAF50; box-shadow: 0 0 6px rgba(76,175,80,0.4); }
+  .status-dot.connecting { background: #FFA500; box-shadow: 0 0 6px rgba(255,165,0,0.4); animation: pulse 1.5s infinite; }
+  .status-dot.disconnected { background: #999; }
+  .status-dot.error { background: #F44336; box-shadow: 0 0 6px rgba(244,67,54,0.4); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .status-label { font-weight: 600; font-size: 13px; }
+  .status-detail { font-size: 11px; color: #aaa; margin-top: 2px; word-break: break-all; }
+
+  /* Tab info */
+  .tab-info { background: #12122a; border-radius: 4px; padding: 8px; margin-top: 4px; }
+  .tab-url { font-size: 10px; color: #888; word-break: break-all; margin-top: 2px; }
+  .tab-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .tab-label { color: #888; font-size: 11px; }
+  .tab-value { color: #ccc; font-size: 11px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+  .stat-box { background: #12122a; border-radius: 4px; padding: 6px 8px; text-align: center; }
+  .stat-value { font-size: 15px; font-weight: 700; color: #fff; }
+  .stat-label { font-size: 9px; color: #888; }
+
+  /* Troubleshoot */
+  .troubleshoot { display: none; }
+  .troubleshoot.open { display: block; }
+  .troubleshoot-toggle {
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; padding: 4px 0; color: #4a90d9; font-size: 11px; user-select: none;
+  }
+  .troubleshoot-toggle:hover { color: #6ab7ff; }
+  .troubleshoot-item { padding: 6px 0; border-top: 1px dashed #333; }
+  .troubleshoot-q { font-size: 11px; color: #ccc; margin-bottom: 2px; }
+  .troubleshoot-a { font-family: 'SF Mono', Monaco, monospace; font-size: 10px; color: #4CAF50; background: #0d1117; padding: 3px 6px; border-radius: 3px; display: block; word-break: break-all; cursor: pointer; }
+  .troubleshoot-a:hover { background: #1a6333; }
+
+  /* Footer */
+  .footer { padding: 8px 12px; font-size: 10px; color: #666; text-align: center; border-top: 1px solid #222236; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-icon"></div>
+  <div class="header-title">Agent Browser Bridge</div>
+</div>
+
+<!-- Connection Status -->
+<div class="section" id="status-section">
+  <div class="section-label">Connection Status</div>
+  <div class="status-row">
+    <div class="status-dot disconnected" id="status-dot"></div>
+    <span class="status-label" id="status-text">Checking...</span>
+  </div>
+  <div class="status-detail" id="status-detail"></div>
+</div>
+
+<!-- Current Tab -->
+<div class="section" id="tab-section">
+  <div class="section-label">Current Tab</div>
+  <div class="tab-info" id="tab-info" style="display:none">
+    <div class="tab-row"><span class="tab-label">Title</span><span class="tab-value" id="tab-title">--</span></div>
+    <div class="tab-row"><span class="tab-label">URL</span><span class="tab-value" id="tab-url">--</span></div>
+    <div class="tab-row"><span class="tab-label">Debugger</span><span class="tab-value" id="tab-debugger">No</span></div>
+  </div>
+  <div id="no-tab" style="color:#666;font-size:11px;padding:8px 0">No active tab</div>
+</div>
+
+<!-- Session Stats -->
+<div class="section" id="stats-section">
+  <div class="section-label">Session</div>
+  <div class="stats-grid">
+    <div class="stat-box"><div class="stat-value" id="stat-commands">0</div><div class="stat-label">Commands</div></div>
+    <div class="stat-box"><div class="stat-value" id="stat-reconnects">0</div><div class="stat-label">Reconnects</div></div>
+  </div>
+</div>
+
+<!-- Troubleshoot -->
+<div class="section">
+  <div class="troubleshoot-toggle" id="troubleshoot-toggle">Troubleshoot &#9660;</div>
+  <div class="troubleshoot" id="troubleshoot-panel">
+    <div class="troubleshoot-item">
+      <div class="troubleshoot-q">Daemon not running?</div>
+      <code class="troubleshoot-a" data-cmd="agent-browser">agent-browser</code>
+    </div>
+    <div class="troubleshoot-item">
+      <div class="troubleshoot-q">Wrong port / can't connect?</div>
+      <code class="troubleshoot-a" data-cmd="cat ~/.agent-browser/config.yaml">Check config.yaml cdp_url</code>
+    </div>
+    <div class="troubleshoot-item">
+      <div class="troubleshoot-q">Debugger permission denied?</div>
+      <code class="troubleshoot-a">Open DevTools (F12) on any page to grant</code>
+    </div>
+    <div class="troubleshoot-item">
+      <div class="troubleshoot-q">Extension not connecting?</div>
+      <code class="troubleshoot-a" data-cmd="Reload extension from chrome://extensions/">Reload extension</code>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="footer">Agent Browser Bridge v1.0 &middot; <a href="https://github.com/your-org/agent-browser" style="color:#666;text-decoration:none" target="_blank">Docs</a></div>
+
+<script src="popup.js"></script>
+</body>
+</html>

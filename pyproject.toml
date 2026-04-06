@@ -228,3 +228,16 @@ known-first-party = ["agent_browser"]
 [tool.setuptools.packages.find]
 include = ["agent_browser*"]
 exclude = ["tests*", "docs*", "examples*", "scripts*", "adapters*", "data*", "docker*", "helm*", "k8s*", "config*"]
+
+[tool.setuptools.package-data]
+agent_browser = [
+    "skill/SKILL.md",
+    "skill/references/*.md",
+    "skill/scripts/*.py",
+    "extension/manifest.json",
+    "extension/background.js",
+    "extension/popup.html",
+    "extension/popup.js",
+    "extension/snapshot.js",
+    "extension/icons/*.png",
+]

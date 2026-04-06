@@ -259,7 +259,7 @@ async def _try_extension_connection(config: SkillConfig) -> bool:
     Does not actually create a backend -- just a lightweight probe.
     """
     # Quick check: skip if config explicitly disables Extension
-    if getattr(config, "extension_enabled", True) is False:
+    if config.extension_enabled is False:
         return False
 
     try:

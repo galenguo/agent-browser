@@ -56,6 +56,9 @@ class SkillConfig:
     #   vanilla: Standard Playwright + only StealthEnhancer delay behavior (no CloakBrowser needed)
     warmup_enabled: bool = False
 
+    # Extension (Chrome Extension mode)
+    extension_enabled: bool = True  # Whether to attempt ExtensionBackend (Chrome Extension → natural fingerprints)
+
 
 # ── Server-side dataclasses (absorbed from former ConfigManager) ──
 
@@ -360,6 +363,8 @@ def _apply_env_overrides(cfg: SkillConfig) -> SkillConfig:
         cfg.stealth_enabled = v.lower() in ("1", "true", "yes")
     if (v := os.getenv("AGENT_BROWSER_STEALTH_MODE")) and v in ("full", "vanilla"):
         cfg.stealth_mode = v
+    if v := os.getenv("AGENT_BROWSER_EXTENSION_ENABLED"):
+        cfg.extension_enabled = v.lower() in ("1", "true", "yes")
     return cfg
 
 
@@ -403,6 +408,10 @@ def _apply_yaml_overrides(cfg: SkillConfig, yaml_data: dict) -> SkillConfig:
             cfg.stealth_mode = mode_val
     if "warmup" in stealth:
         cfg.warmup_enabled = stealth["warmup"]
+
+    extension = skill.get("extension", {})
+    if "enabled" in extension:
+        cfg.extension_enabled = extension["enabled"]
 
     return cfg
 

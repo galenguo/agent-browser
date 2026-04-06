@@ -14,6 +14,7 @@ import asyncio
 import json
 import logging
 import os
+from pathlib import Path
 
 import click
 from browser_use.browser import BrowserProfile, BrowserSession
@@ -622,6 +623,83 @@ async def _run_task(task, session_name, url, max_steps, headed, llm_provider, ll
 
     except Exception as e:
         click.echo(json.dumps({"status": "error", "error": str(e)}, ensure_ascii=False))
+
+
+# ──────────────────────────────────────────
+# Skill commands
+# ──────────────────────────────────────────
+
+
+@cli.command()
+@click.option("--path", help="Custom install path (default: ~/.claude/skills/agent-browser/)")
+@click.option("--force", is_flag=True, help="Overwrite existing skill")
+def install_skill(path, force):
+    """Install Claude Code skill to ~/.claude/skills/ for discovery."""
+    _install_skill(path, force)
+
+
+def _install_skill(custom_path=None, force=False):
+    """Copy SKILL.md and references to Claude Code skills directory."""
+    import shutil
+
+    # Locate skill files within the installed package
+    import agent_browser.skill as skill_mod
+    skill_dir = Path(skill_mod.__file__).parent
+    src_skill_md = skill_dir / "SKILL.md"
+    src_references = skill_dir / "references"
+    src_scripts = skill_dir / "scripts"
+
+    if not src_skill_md.exists():
+        click.echo(
+            json.dumps({"status": "error", "error": f"SKILL.md not found at {src_skill_md}"})
+        )
+        return
+
+    # Determine target directory
+    if custom_path:
+        target_dir = Path(custom_path)
+    else:
+        target_dir = Path.home() / ".claude" / "skills" / "agent-browser"
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    # Check existing
+    target_skill = target_dir / "SKILL.md"
+    if target_skill.exists() and not force:
+        click.echo(
+            json.dumps({
+                "status": "exists",
+                "message": f"Skill already exists at {target_dir}. Use --force to overwrite.",
+                "path": str(target_dir),
+            })
+        )
+        return
+
+    # Copy SKILL.md
+    shutil.copy2(src_skill_md, target_skill)
+
+    # Copy references/
+    target_refs = target_dir / "references"
+    if src_references.exists():
+        if target_refs.exists():
+            shutil.rmtree(target_refs)
+        shutil.copytree(src_references, target_refs)
+
+    # Copy scripts/
+    target_scripts = target_dir / "scripts"
+    if src_scripts.exists():
+        if target_scripts.exists():
+            shutil.rmtree(target_scripts)
+        shutil.copytree(src_scripts, target_scripts)
+
+    click.echo(
+        json.dumps({
+            "status": "installed",
+            "message": "Agent Browser skill installed successfully.",
+            "path": str(target_dir),
+            "next_steps": "Restart Claude Code or open a new conversation to use the skill.",
+        }, ensure_ascii=False)
+    )
 
 
 if __name__ == "__main__":

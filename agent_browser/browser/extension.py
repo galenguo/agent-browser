@@ -185,6 +185,28 @@ class ExtensionBackend(BrowserBackend):
             raise ValueError(f"Session {session_id} not found")
         return self._sessions[session_id]
 
+    async def snapshot(self, session_id: str, interactive_only: bool = False) -> dict:
+        """Get page snapshot via Extension (chrome.debugger DOM extraction).
+
+        Delegates to the Chrome Extension which runs JS via debugger to extract
+        interactive elements with @eN ref assignment.
+
+        Returns the same format as LocalCDPBackend.snapshot():
+        {url, title, elements: [{ref, text, role}]}
+        """
+        if not self._bridge:
+            await self.connect()
+
+        result = await self._send("snapshot", {"interactive_only": interactive_only}, timeout=15.0)
+
+        if isinstance(result, dict) and "url" in result:
+            return result
+
+        # Fallback: construct minimal snapshot from individual calls
+        url = await self.url() or ""
+        title = await self.title() or ""
+        return {"url": url, "title": title, "elements": result if isinstance(result, list) else []}
+
     async def run_task(
         self,
         session_id: str,
@@ -204,7 +226,7 @@ class ExtensionBackend(BrowserBackend):
                 "status": "ready",
                 "mode": "llm",
                 "session_id": session_id,
-                "tools": ["snapshot", "click", "fill", "scroll", "go_back", "hover", "press_key"],
+                "tools": ["snapshot", "click", "fill", "scroll", "go_back", "hover", "select_option", "press_key"],
                 "backend": "extension",
             }
 
