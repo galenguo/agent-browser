@@ -32,11 +32,11 @@ load_config_from_yaml() {
     # 提取 docker.* 设置（grep+awk 兼容无 yq 的环境）
     local registry image_tag shm_size memory cpu
 
-    registry=$(grep -A5 '^docker:' "$cfg_file" | grep 'registry:' | awk -F': '{print $2}' | tr -d ' "')
-    image_tag=$(grep -A10 '^docker:' "$cfg_file" | grep 'image_tag:' | awk -F': '{print $2}' | tr -d ' "')
-    shm_size=$(grep -A15 '^docker:' "$cfg_file" | grep 'shm_size:' | awk -F': '{print $2}' | tr -d ' "')
-    memory=$(grep -E '^\s*memory:' "$cfg_file" | tail -1 | awk -F': '{print $2}' | tr -d ' "')
-    cpu=$(grep -E '^\s*cpu:' "$cfg_file" | tail -1 | awk -F': '{print $2}' | tr -d ' "')
+    registry=$(grep -A5 '^docker:' "$cfg_file" | grep 'registry:' | awk -F": " '{print $2}' | tr -d '" ')
+    image_tag=$(grep -A10 '^docker:' "$cfg_file" | grep 'image_tag:' | awk -F": " '{print $2}' | tr -d '" ')
+    shm_size=$(grep -A15 '^docker:' "$cfg_file" | grep 'shm_size:' | awk -F": " '{print $2}' | tr -d '" ')
+    memory=$(grep -E '^\s*memory:' "$cfg_file" | tail -1 | awk -F": " '{print $2}' | tr -d '" ')
+    cpu=$(grep -E '^\s*cpu:' "$cfg_file" | tail -1 | awk -F": " '{print $2}' | tr -d '" ')
 
     [[ -n "$registry" ]] && REGISTRY_URL="$registry"
     [[ -n "$image_tag" ]] && DOCKER_IMAGE_TAG="$image_tag"

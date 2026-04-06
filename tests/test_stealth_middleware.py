@@ -408,7 +408,7 @@ class TestRegressionFixes:
     async def test_total_timeout_parameter_exists(self):
         """run_task 签名包含 total_timeout 参数"""
         from inspect import signature
-        from agent_browser.backends.local import LocalCDPBackend
+        from agent_browser.browser.local import LocalCDPBackend
 
         sig = signature(LocalCDPBackend.run_task)
         params = list(sig.parameters.keys())
