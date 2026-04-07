@@ -1,4 +1,4 @@
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![PyPI version](https://img.shields.io/pypi/v/agent-browser.svg)](https://pypi.org/project/agent-browser/)
 [![CI](https://github.com/galen/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/galen/agent-browser/actions/workflows/ci.yml)
@@ -135,6 +135,8 @@ For natural fingerprints and inherited login state, load the included Chrome ext
 
 When the extension is connected, Agent Browser automatically uses **Extension mode** (your real Chrome browser) instead of launching a separate browser instance.
 
+Click the extension toolbar icon to open the **popup status panel** showing connection state, current tab info, session stats, and troubleshooting commands.
+
 ### Functional API
 
 ```python
@@ -268,6 +270,7 @@ agent_browser/
 ├── session/         # Multi-user session management
 ├── cli/             # Command-line interface (Typer)
 ├── llm/             # LLM factory (OpenAI, Anthropic, GLM)
+├── skill/           # Claude Code skill (SKILL.md, references, doctor script)
 └── utils/           # Shared utilities
 ```
 
@@ -326,7 +329,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - Development environment setup
 - Code style guidelines (ruff formatter/linter)
 - Pull request process
-- Test suite (716 tests across unit, integration, scenario, stealth, browser, and skill tests)
+- Test suite (868 tests across unit, integration, scenario, stealth, browser, skill, and e2e tests)
 
 ## License
 

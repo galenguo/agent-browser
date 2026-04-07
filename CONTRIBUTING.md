@@ -100,7 +100,7 @@ tests/                  # Test suite (868 tests)
 ├── stealth/            # Anti-detection layer tests
 ├── browser/            # Browser backend tests
 ├── scenarios/          # Multi-step scenario tests (7 files)
-├── skill/              # Skill facade & deploy wizard tests
+├── skill/              # Skill facade, extension & deploy wizard tests
 ├── integration/        # Integration tests
 └── e2e/                # End-to-end tests
 

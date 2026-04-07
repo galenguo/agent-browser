@@ -600,10 +600,10 @@ dnsConfig:
 
 ## 下一步
 
-- 阅读 [API 文档](./API_COMPARISON.md)
+- 阅读 [API 文档](./archive/API_COMPARISON.md)
 - 查看 [部署架构](../deploy/README.md)
 - 了解 [开发指南](../CLAUDE.md)
 
 ---
 
-**最后更新：** 2026-03-23
+**最后更新：** 2026-04-07
