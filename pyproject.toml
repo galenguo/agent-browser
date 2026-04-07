@@ -1,6 +1,6 @@
 [project]
 name = "agent-browser"
-version = "0.1.0"
+version = "0.2.0"
 description = "Anti-detection browser automation framework built on browser-use"
 readme = "README.md"
 license = {text = "Apache-2.0"}

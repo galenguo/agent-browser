@@ -83,6 +83,7 @@ tests/
 │
 ├── skill/                              # ★ Skill 层测试
 │   ├── test_skill_facade.py           # Facade 路由
+│   ├── test_skill_extension.py        # Extension popup + SKILL.md conformance (91 tests)
 │   └── test_deploy_wizard_complete.py # 部署向导
 │
 ├── integration/                        # ★ 集成测试套件（pytest-based）
@@ -636,6 +637,6 @@ tests/results/
 
 ---
 
-**文档版本**: v3.1
+**文档版本**: v3.2
 **创建日期**: 2026-04-04
-**更新日期**: 2026-04-05 (同步最新代码结构 + 新增 Real Browser E2E v2 测试套件)
+**更新日期**: 2026-04-07 (同步 0.2.0 发布: Extension popup, SKILL.md 重写, 安全修复)

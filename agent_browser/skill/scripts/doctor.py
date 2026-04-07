@@ -40,7 +40,7 @@ class DoctorReport:
 
     @property
     def ready(self) -> bool:
-        return self.failed == 0
+        return self.failed == 0 and self.warned == 0
 
     @property
     def summary(self) -> str:
@@ -333,12 +333,16 @@ async def auto_fix(report: DoctorReport) -> DoctorReport:
 
         if result.status == "pass":
             result.message = f"Fixed: {check.output[:100]}"
+            original_status = check.status
             check.status = "pass"
             check.fixable = False
             check.output = result.output
-            report.warned -= 1
             report.passed += 1
-            report.failed -= 1
+            # Decrement only the counter matching the original status
+            if original_status == "warn":
+                report.warned -= 1
+            elif original_status == "fail":
+                report.failed -= 1
             print(f"  FIXED: {result.output[:120]}")
         else:
             result.message = f"Fix failed: {result.message}"

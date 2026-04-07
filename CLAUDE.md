@@ -96,13 +96,21 @@ agent-browser/                          # Project root
 │   │   ├── main.py                    # CLI entry point (Typer app)
 │   │   └── commands.py                # CLI command definitions
 │   │
+│   ├── llm/                           # LLM factory
+│   │   └── factory.py                 # OpenAI, Anthropic, GLM providers
+│   │
+│   ├── skill/                         # Claude Code skill
+│   │   ├── SKILL.md                   # Skill definition (triggers, modes, error recovery)
+│   │   ├── scripts/doctor.py          # Environment diagnostic + auto-fix
+│   │   └── references/                # Progressive disclosure docs
+│   │
 │   └── utils/                         # Shared utilities
 │       ├── refs_generator.py          # Element reference generation (@e0, @e1)
 │       ├── action_tracer.py           # Action tracing for debugging
 │       └── persistent_session.py      # Cross-process session persistence
 │
 ├── adapters/                          # YAML site adapters (boss, zhihu, bilibili, etc.)
-├── tests/                             # Test suite (716 tests)
+├── tests/                             # Test suite (868 tests)
 ├── examples/                          # Example scripts
 ├── pyproject.toml                     # Package config (pip installable)
 ├── README.md                          # English documentation (source of truth)
@@ -566,4 +574,4 @@ Code that depends on CloakBrowser uses conditional imports so the basic install 
 
 ---
 
-**Last updated:** 2026-04-05
+**Last updated:** 2026-04-07

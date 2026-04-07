@@ -197,22 +197,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         tabUrl: tab ? tab.url : null,
         reconnectAttempts: reconnectAttempts,
         lastActivity: lastActivity,
-        commandsProcessed: pendingCommands || 0,
+        commandsProcessed: commandCount || 0,
       });
     });
     return true; // Keep channel open for async response
   }
 });
 
-// Track command count for stats display
-let pendingCommands = 0;
+// Track command count for stats display (separate from pendingCommands Map)
+let commandCount = 0;
 
 // ── Message Handling (from daemon) ──────────────────────────
 
 async function handleMessage(msg) {
   // Count incoming commands for popup stats
   if (msg.id && msg.method) {
-    pendingCommands++;
+    commandCount++;
   }
 
   // Heartbeat from daemon
@@ -319,24 +319,34 @@ function rejectAllPending(reason) {
 
 // ── Debugger Lifecycle ─────────────────────────────────────
 
+let _attaching = null; // Promise mutex: prevents concurrent attach races
+
 function cleanupDebugger() {
   if (debuggeeId) {
     try {
       chrome.debugger.detach(debuggeeId, () => {
-        // Ignore errors on detach
+        if (chrome.runtime.lastError) {
+          console.warn('[AB] Detach error:', chrome.runtime.lastError.message);
+        }
       });
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[AB] Detach exception:', e);
+    }
     debuggeeId = null;
   }
 }
 
-// Ensure debugger is attached before operations
+// Ensure debugger is attached before operations (mutex-serialized)
 async function ensureDebuggerAttached() {
   if (debuggeeId) return debuggeeId;
 
-  return new Promise((resolve, reject) => {
+  // If already attaching, wait for that operation to complete
+  if (_attaching) return _attaching;
+
+  _attaching = new Promise((resolve, reject) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || tabs.length === 0) {
+        _attaching = null;
         return reject(new Error('No active tab found'));
       }
 
@@ -345,6 +355,7 @@ async function ensureDebuggerAttached() {
 
       chrome.debugger.attach(target, '1.3', () => {
         if (chrome.runtime.lastError) {
+          _attaching = null;
           return reject(new Error(chrome.runtime.lastError.message));
         }
         debuggeeId = target;
@@ -353,6 +364,34 @@ async function ensureDebuggerAttached() {
       });
     });
   });
+
+  try {
+    return await _attaching;
+  } finally {
+    _attaching = null;
+  }
+}
+
+// ── JS String Escaping (prevents injection via selector/value) ───
+
+function jsEscape(str) {
+  // Escape for inclusion inside a JS template literal (backtick string)
+  // Handles: backslash, backtick, ${}, ', ", newlines, unicode
+  return String(str)
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$')
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\u0000/g, '\\0');
+}
+
+function jsEscapeSelector(sel) {
+  // Additional CSS-selector-specific escaping
+  // Only allow @eN pattern or simple alphanumeric selectors
+  const cleaned = String(sel).replace(/[^a-zA-Z0-9_@.\-\[\]#=:]/g, '');
+  return jsEscape(cleaned);
 }
 
 // ── Exports for debugger.js ────────────────────────────────
@@ -401,16 +440,18 @@ async function DebuggerEvaluate(params) {
 
 async function DebuggerClick(params) {
   const target = await ensureDebuggerAttached();
-  const selector = params.selector || params.ref || '';
+  const selector = params.selector || params.ref ||';
+  const safeSel = jsEscapeSelector(selector);
+  const refPart = jsEscape(selector.replace('@', ''));
   const js = `
     (function() {
-      var el = document.querySelector('${selector.replace(/'/g, "\\'")}') ||
+      var el = document.querySelector('${safeSel}') ||
                (function(){
                  var refs = document.querySelectorAll('[data-ab-ref]');
-                 for (var i=0;i<refs.length;i++){if(refs[i].dataset.abRef==='${selector.replace('@','')}')return refs[i];}
+                 for (var i=0;i<refs.length;i++){if(refs[i].dataset.abRef==='${refPart}')return refs[i];}
                  return null;
                })();
-      if (!el) throw new Error('Element not found: ${selector}');
+      if (!el) throw new Error('Element not found: ${safeSel}');
       el.click();
       return true;
     })()
@@ -423,18 +464,21 @@ async function DebuggerFill(params) {
   const target = await ensureDebuggerAttached();
   const selector = params.selector || params.ref || '';
   const value = params.value || params.text || '';
-
+  const safeSel = jsEscapeSelector(selector);
+  const refPart = jsEscape(selector.replace('@', ''));
+  // Use JSON serialize + parse pattern to prevent value injection
+  const safeValJson = JSON.stringify(value);
   const js = `
     (function() {
-      var el = document.querySelector('${selector.replace(/'/g, "\\'")}') ||
+      var el = document.querySelector('${safeSel}') ||
                (function(){
                  var refs = document.querySelectorAll('[data-ab-ref]');
-                 for (var i=0;i<refs.length;i++){if(refs[i].dataset.abRef==='${selector.replace('@','')}')return refs[i];}
+                 for (var i=0;i<refs.length;i++){if(refs[i].dataset.abRef==='${refPart}')return refs[i];}
                  return null;
                })();
-      if (!el) throw new Error('Element not found: ${selector}');
+      if (!el) throw new Error('Element not found: ${safeSel}');
       var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-      nativeInputValueSetter.call(el, '${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}');
+      nativeInputValueSetter.call(el, JSON.parse(${safeValJson}));
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
       return true;
@@ -463,16 +507,18 @@ async function DebuggerScroll(params) {
 async function DebuggerHover(params) {
   const target = await ensureDebuggerAttached();
   const selector = params.selector || params.ref || '';
+  const safeSel = jsEscapeSelector(selector);
+  const refPart = jsEscape(selector.replace('@', ''));
 
   const js = `
     (function() {
-      var el = document.querySelector('${selector.replace(/'/g, "\\'")}') ||
+      var el = document.querySelector('${safeSel}') ||
                (function(){
                  var refs = document.querySelectorAll('[data-ab-ref]');
-                 for (var i=0;i<refs.length;i++){if(refs[i].dataset.abRef==='${selector.replace('@','')}')return refs[i];}
+                 for (var i=0;i<refs.length;i++){if(refs[i].dataset.abRef==='${refPart}')return refs[i];}
                  return null;
                })();
-      if (!el) throw new Error('Element not found: ${selector}');
+      if (!el) throw new Error('Element not found: ${safeSel}');
       var rect = el.getBoundingClientRect();
       var evt = new MouseEvent('mouseover', {
         view: window, bubbles: true, cancelable: true,
@@ -490,17 +536,20 @@ async function DebuggerSelectOption(params) {
   const target = await ensureDebuggerAttached();
   const selector = params.selector || params.ref || '';
   const value = params.value || '';
+  const safeSel = jsEscapeSelector(selector);
+  const refPart = jsEscape(selector.replace('@', ''));
+  const safeValJson = JSON.stringify(value);
 
   const js = `
     (function() {
-      var el = document.querySelector('${selector.replace(/'/g, "\\'")}') ||
+      var el = document.querySelector('${safeSel}') ||
                (function(){
                  var refs = document.querySelectorAll('[data-ab-ref]');
-                 for (var i=0;i<refs.length;i++){if(refs[i].dataset.abRef==='${selector.replace('@','')}')return refs[i];}
+                 for (var i=0;i<refs.length;i++){if(refs[i].dataset.abRef==='${refPart}')return refs[i];}
                  return null;
                })();
-      if (!el) throw new Error('Element not found: ${selector}');
-      el.value = '${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}';
+      if (!el) throw new Error('Element not found: ${safeSel}');
+      el.value = JSON.parse(${safeValJson});
       el.dispatchEvent(new Event('change', { bubbles: true }));
       return true;
     })()
@@ -520,15 +569,17 @@ async function DebuggerPressKey(params) {
     'Backspace': '\b', 'Delete': '\u007f',
   };
   const keyChar = keyMap[key] || key;
+  const safeKey = jsEscape(key);
+  const safeKeyChar = jsEscape(keyChar);
 
   const js = `
     (function() {
       var evt = new KeyboardEvent('keydown', {
-        key: '${key}', code: '${key}', bubbles: true, cancelable: true
+        key: '${safeKey}', code: '${safeKey}', bubbles: true, cancelable: true
       });
       document.activeElement.dispatchEvent(evt);
       if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
-        document.activeElement.value += '${keyChar.replace(/\\/g, '\\\\')}';
+        document.activeElement.value += '${safeKeyChar}';
         document.activeElement.dispatchEvent(new Event('input', { bubbles: true }));
       }
       return true;

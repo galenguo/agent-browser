@@ -197,7 +197,12 @@ class ExtensionBackend(BrowserBackend):
         if not self._bridge:
             await self.connect()
 
-        result = await self._send("snapshot", {"interactive_only": interactive_only}, timeout=15.0)
+        handle = self._sessions.get(session_id)
+        if handle:
+            result = await handle._send("snapshot", {"interactive_only": interactive_only}, timeout=15.0)
+        else:
+            # No handle yet; send via bridge directly
+            result = await self._bridge.send_command("snapshot", {"interactive_only": interactive_only}, timeout=15.0)
 
         if isinstance(result, dict) and "url" in result:
             return result
@@ -205,6 +210,7 @@ class ExtensionBackend(BrowserBackend):
         # Fallback: construct minimal snapshot from individual calls
         url = await self.url() or ""
         title = await self.title() or ""
+        logger.warning("Extension snapshot returned unexpected format, using fallback")
         return {"url": url, "title": title, "elements": result if isinstance(result, list) else []}
 
     async def run_task(
