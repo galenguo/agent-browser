@@ -14,8 +14,8 @@ import subprocess
 
 import pytest
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEPLOY_DOCKER_SH = os.path.join(PROJECT_ROOT, "scripts", "deploy-docker.sh")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DEPLOY_DOCKER_SH = os.path.join(PROJECT_ROOT, "deploy", "docker", "deploy-docker.sh")
 DOCKER_COMPOSE_YAML = os.path.join(PROJECT_ROOT, "docker", "docker-compose.yml")
 
 
@@ -163,12 +163,12 @@ class TestDockerHealthCheck:
 class TestInstallScriptDockerMode:
     def test_install_sh_exists(self):
         """install.sh script exists."""
-        install_sh = os.path.join(PROJECT_ROOT, "scripts", "install.sh")
+        install_sh = os.path.join(PROJECT_ROOT, "bin", "install.sh")
         assert os.path.isfile(install_sh), f"install.sh not found at {install_sh}"
 
     def test_install_sh_help(self):
         """install.sh --help exits 0."""
-        install_sh = os.path.join(PROJECT_ROOT, "scripts", "install.sh")
+        install_sh = os.path.join(PROJECT_ROOT, "bin", "install.sh")
         result = subprocess.run(
             ["bash", install_sh, "--help"],
             capture_output=True,

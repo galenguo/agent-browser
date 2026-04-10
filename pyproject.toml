@@ -73,6 +73,7 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 timeout = 30
 addopts = "-v --tb=short --durations=10 --maxfail=5"
+pythonpath = [".", "tests"]
 
 [tool.ruff]
 target-version = "py311"

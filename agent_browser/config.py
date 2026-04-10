@@ -545,6 +545,7 @@ def from_deploy_config(dep_cfg) -> SkillConfig:
         cfg.calling_mode = "cli"
         cfg.browser_mode = "local"
         cfg.remote_type = "aio"
+        cfg.api_url = default_api_url
         cfg.vnc_url = ""
     elif mode == "docker-aio":
         cfg.calling_mode = "api"

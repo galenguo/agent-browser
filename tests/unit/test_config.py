@@ -148,13 +148,11 @@ class TestYAMLOverrides:
     """A1.3 YAML 配置加载测试"""
 
     def test_yaml_skill_settings(self):
-        """YAML skill 节配置"""
+        """YAML skill.yaml flat key config"""
         yaml_data = {
-            "skill": {
-                "calling_mode": "api",
-                "browser_mode": "remote",
-                "intelligence": "agent",
-            }
+            "calling_mode": "api",
+            "browser_mode": "remote",
+            "intelligence": "agent",
         }
         cfg = SkillConfig()
         cfg = _apply_yaml_overrides(cfg, yaml_data)
@@ -163,7 +161,7 @@ class TestYAMLOverrides:
         assert cfg.intelligence == "agent"
 
     def test_yaml_daemon_settings(self):
-        """YAML daemon 节配置"""
+        """YAML daemon section config"""
         yaml_data = {
             "daemon": {
                 "enabled": False,
@@ -172,13 +170,13 @@ class TestYAMLOverrides:
             }
         }
         cfg = SkillConfig()
-        cfg = _apply_yaml_overrides(cfg, {"skill": yaml_data})
+        cfg = _apply_yaml_overrides(cfg, yaml_data)
         assert cfg.daemon_enabled is False
         assert cfg.daemon_idle_timeout == 7200
         assert cfg.daemon_state_path == "/custom/path/state.json"
 
     def test_yaml_browser_settings(self):
-        """YAML browser 节配置"""
+        """YAML browser section config"""
         yaml_data = {
             "browser": {
                 "headless": True,
@@ -186,12 +184,12 @@ class TestYAMLOverrides:
             }
         }
         cfg = SkillConfig()
-        cfg = _apply_yaml_overrides(cfg, {"skill": yaml_data})
+        cfg = _apply_yaml_overrides(cfg, yaml_data)
         assert cfg.headless is True
         assert cfg.default_timeout == 60000
 
     def test_yaml_stealth_settings(self):
-        """YAML stealth 节配置"""
+        """YAML stealth section config"""
         yaml_data = {
             "stealth": {
                 "enabled": False,
@@ -199,7 +197,7 @@ class TestYAMLOverrides:
             }
         }
         cfg = SkillConfig()
-        cfg = _apply_yaml_overrides(cfg, {"skill": yaml_data})
+        cfg = _apply_yaml_overrides(cfg, yaml_data)
         assert cfg.stealth_enabled is False
         assert cfg.warmup_enabled is True
 
@@ -221,7 +219,7 @@ class TestLoadConfigPriority:
 
     def test_env_overrides_yaml(self):
         """环境变量优先级高于 YAML"""
-        yaml_data = {"skill": {"calling_mode": "api"}}
+        yaml_data = {"calling_mode": "api"}
         with mock.patch.dict(os.environ, {"AGENT_BROWSER_CALLING_MODE": "cli"}):
             cfg = SkillConfig()
             cfg = _apply_yaml_overrides(cfg, yaml_data)
@@ -230,7 +228,7 @@ class TestLoadConfigPriority:
 
     def test_yaml_overrides_defaults(self):
         """YAML 优先级高于默认值"""
-        yaml_data = {"skill": {"calling_mode": "api"}}
+        yaml_data = {"calling_mode": "api"}
         cfg = SkillConfig()
         cfg = _apply_yaml_overrides(cfg, yaml_data)
         assert cfg.calling_mode == "api"
