@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Skill config file separation**: client-side config now lives in `~/.agent-browser/skill.yaml` (flat YAML keys, no namespace) separate from server-side `~/.agent-browser/config.yaml`. `load_config()` reads `skill.yaml`; `load_deploy_config()` continues to read `config.yaml`.
+- **`remote_type` field** (`SkillConfig`): `"aio"` or `"distributed"` -- only meaningful when `browser_mode="remote"`. Controls whether a single VNC endpoint or per-session endpoints are used. Env var: `AGENT_BROWSER_REMOTE_TYPE`.
+- **`vnc_url` field** (`SkillConfig`): noVNC endpoint for AIO remote deployments. Empty for distributed (per-session URLs). Env var: `AGENT_BROWSER_VNC_URL`.
+- **`generate_skill_config()`** (`deploy_config.py`): generates `~/.agent-browser/skill.yaml` from a `DeployConfig`. Maps all 5 deployment modes (local, docker-aio, docker-distributed, k8s-aio, k8s-distributed) to correct `SkillConfig` fields. Used by server admins to produce a shareable client config.
+- **`session.py` script** (`agent_browser/skill/scripts/session.py`): unified session lifecycle entry point for the Claude Code skill. `check_config()` returns a structured guidance dict when `skill.yaml` is absent -- no blocking `input()`. Exposes `create()`, `open_page()`, `snapshot()`, `click()`, `fill()`, `scroll()`, `run_task()`, `delete()` as thin async wrappers.
+- **`setup.py` script** (`agent_browser/skill/scripts/setup.py`): writes `~/.agent-browser/skill.yaml` from user-provided mode + params. Supports modes `local`, `remote-aio`, `remote-distributed`. Callable as CLI (`python -m agent_browser.skill.scripts.setup --mode ...`) or programmatically.
+- **Remote mode doctor checks** (`doctor.py`): Check 5 (CDP) now skips with `status=skip` when `browser_mode=remote`. New Check 5b verifies remote API health at `config.api_url/health`. New Check 5c checks VNC URL reachability when `vnc_url` is set.
+
+### Changed
+- **`from_deploy_config()`** (`config.py`): full mode mapping table covering all 5 modes. `local` mode now correctly sets `api_url` from `DeployConfig.api_port` (previously left at default, causing `test_api_port_creates_api_url` to fail).
+- **`SKILL.md` Quick Start**: updated to show `setup.py` commands for all 3 modes (`local`, `remote-aio`, `remote-distributed`). Session operations table now points to `session.py` script.
+- **`_apply_yaml_overrides()`** (`config.py`): reads `remote_type` and `vnc_url` from flat YAML keys in `skill.yaml`.
+- **`_apply_env_overrides()`** (`config.py`): applies `AGENT_BROWSER_REMOTE_TYPE` and `AGENT_BROWSER_VNC_URL`.
 
 ## [0.2.0] - 2026-04-07
 

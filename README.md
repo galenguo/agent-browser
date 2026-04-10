@@ -123,6 +123,48 @@ agent-browser install-skill
 
 The skill auto-detects your environment, installs missing dependencies, and guides you through the ReAct loop (Observe -> Reason -> Act -> Check). See [skill/SKILL.md](agent_browser/skill/SKILL.md) for the full skill definition.
 
+#### Skill Configuration (`~/.agent-browser/skill.yaml`)
+
+The skill reads client config from `~/.agent-browser/skill.yaml` (flat YAML keys):
+
+```yaml
+# Local mode (default) -- direct CloakBrowser CDP, no server needed
+calling_mode: cli
+browser_mode: local
+remote_type: aio
+api_url: http://localhost:8000
+
+# Remote AIO -- single server with noVNC
+calling_mode: api
+browser_mode: remote
+remote_type: aio
+api_url: http://my-server:8000
+vnc_url: http://my-server:6080
+
+# Remote distributed -- cluster deployment, per-session VNC
+calling_mode: api
+browser_mode: remote
+remote_type: distributed
+api_url: http://my-gateway:8000
+```
+
+Generate `skill.yaml` with the setup script:
+
+```bash
+# Local mode
+python -m agent_browser.skill.scripts.setup --mode local
+
+# Remote AIO (Docker/K8s all-in-one)
+python -m agent_browser.skill.scripts.setup --mode remote-aio \
+  --api-url http://my-server:8000 --vnc-url http://my-server:6080
+
+# Remote distributed
+python -m agent_browser.skill.scripts.setup --mode remote-distributed \
+  --api-url http://my-gateway:8000
+```
+
+Server admins can also generate a `skill.yaml` from a `DeployConfig` programmatically using `generate_skill_config()` in `agent_browser.deploy_config`.
+
 ### Chrome Extension (Optional)
 
 For natural fingerprints and inherited login state, load the included Chrome extension:
