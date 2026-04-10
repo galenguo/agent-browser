@@ -71,6 +71,7 @@ test-profiles/
 # Deployment consolidated under deploy/
 deploy/docker/data/
 deploy/docker/.env
+deploy/docker/*.tar.gz
 
 # Config with secrets (even dummy keys don't belong in git)
 config/keys.yaml/

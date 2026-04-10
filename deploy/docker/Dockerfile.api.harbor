@@ -1,0 +1,23 @@
+FROM registry-cn-gimc-local.gimccloud.com/bitnami/os-shell:12-debian-12-r43
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3.11-venv python3-pip gcc curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY deploy/docker/requirements-api.txt .
+RUN python3.11 -m pip install --upgrade pip setuptools wheel && \
+    python3.11 -m pip install --no-cache-dir --timeout 120 --retries 5 -r requirements-api.txt
+
+COPY agent_browser/ /app/agent_browser/
+
+RUN mkdir -p /data/profiles /data/logs
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    TZ=Asia/Shanghai
+
+EXPOSE 8000
+
+CMD ["python3.11", "-m", "uvicorn", "agent_browser.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

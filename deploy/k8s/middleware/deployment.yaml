@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-browser
+  namespace: middleware
+  labels:
+    app: agent-browser
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent-browser
+  template:
+    metadata:
+      labels:
+        app: agent-browser
+    spec:
+      containers:
+      - name: agent-browser
+        image: registry-cn-gimc-local.gimccloud.com/library/agent-browser:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        - containerPort: 6080
+          name: novnc
+          protocol: TCP
+        env:
+        - name: DEPLOYMENT_MODE
+          value: "all-in-one"
+        - name: BROWSER_MODE
+          value: "local"
+        - name: MAX_SESSIONS
+          value: "10"
+        - name: IDLE_TIMEOUT_SECONDS
+          value: "1800"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: PROFILE_STORAGE
+          value: "/data/profiles"
+        - name: HEADLESS
+          value: "true"
+        - name: CLOAKBROWSER_PATH
+          value: "/root/.cloakbrowser/chromium-145.0.7632.159.7/chrome"
+        volumeMounts:
+        - name: profiles
+          mountPath: /data/profiles
+        - name: logs
+          mountPath: /data/logs
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: profiles
+        persistentVolumeClaim:
+          claimName: agent-browser-profiles
+      - name: logs
+        persistentVolumeClaim:
+          claimName: agent-browser-logs

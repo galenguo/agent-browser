@@ -1,0 +1,73 @@
+FROM registry-cn-gimc-local.gimccloud.com/docker.io/library/python:3.11-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    xvfb \
+    x11vnc \
+    novnc \
+    websockify \
+    libnss3 \
+    libxss1 \
+    libx11-xcb1 \
+    libatk-bridge2.0-0 \
+    libgtk-3-0 \
+    libdrm2 \
+    libgbm1 \
+    libxshmfence1 \
+    libxrandr2 \
+    libpangocairo-1.0-0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libasound2-dev \
+    fonts-wqy-zenhei \
+    fonts-liberation \
+    fonts-dejavu-core \
+    fonts-freefont-ttf \
+    curl \
+    wget \
+    procps \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+COPY deploy/docker/wheels/ /tmp/wheels/
+RUN pip config set global.index-url http://mirrors.aliyun.com/pypi/simple/ && \
+    pip config set global.trusted-host mirrors.aliyun.com && \
+    pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir --timeout 120 --retries 5 -r requirements.txt \
+        --find-links /tmp/wheels
+
+COPY deploy/docker/cloakbrowser-linux-x64.tar.gz /tmp/cloakbrowser-linux-x64.tar.gz
+RUN mkdir -p /root/.cloakbrowser/chromium-145.0.7632.159.7 && \
+    tar -xzf /tmp/cloakbrowser-linux-x64.tar.gz -C /root/.cloakbrowser/chromium-145.0.7632.159.7 && \
+    chmod +x /root/.cloakbrowser/chromium-145.0.7632.159.7/chrome && \
+    rm /tmp/cloakbrowser-linux-x64.tar.gz
+
+RUN apt-get purge -y gcc python3-dev && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache/pip
+
+COPY agent_browser/ /app/agent_browser/
+COPY deploy/docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+RUN mkdir -p /data/sessions /data/profiles /data/logs
+
+ENV DISPLAY=:99 \
+    CDP_PORT=19222 \
+    HEADLESS=false \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    REBROWSER_PATCHES_RUNTIME_FIX_MODE=addBinding \
+    TZ=Asia/Shanghai \
+    LANG=zh_CN.UTF-8 \
+    LANGUAGE=zh_CN:zh \
+    LC_ALL=zh_CN.UTF-8
+
+EXPOSE 8000 6080 5900
+
+ENTRYPOINT ["/entrypoint.sh"]

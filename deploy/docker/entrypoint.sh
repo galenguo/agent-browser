@@ -57,7 +57,7 @@ echo "  Health:      http://<host>:8000/health"
 echo "  Legacy API:  http://<host>:8000/tasks (backward compatible)"
 
 cd /app
-exec python -m uvicorn api:app \
+exec python -m uvicorn agent_browser.api.app:app \
     --host 0.0.0.0 \
     --port 8000 \
     --workers 1 \
