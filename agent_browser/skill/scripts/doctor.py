@@ -230,42 +230,125 @@ async def run_diagnosis(config=None) -> DoctorReport:
 
     # ── Check 5: CDP endpoint ───────────────────────────────────
     cdp_url = "http://127.0.0.1:19222"
+    browser_mode = "local"
+    api_url = "http://localhost:8000"
+    vnc_url = ""
     if config:
         cdp_url = config.cdp_url
+        browser_mode = getattr(config, "browser_mode", "local")
+        api_url = getattr(config, "api_url", "http://localhost:8000") or "http://localhost:8000"
+        vnc_url = getattr(config, "vnc_url", "") or ""
 
-    try:
-        import aiohttp
-
-        async with (
-            aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3)) as s,
-            s.get(f"{cdp_url}/json/version") as r,
-        ):
-            if r.status == 200:
-                report.checks.append(CheckResult(
-                    name="cdp_endpoint",
-                    status="pass",
-                    message=f"CDP reachable at {cdp_url} (browser running)",
-                ))
-            else:
-                report.checks.append(CheckResult(
-                    name="cdp_endpoint",
-                    status="warn",
-                    message=f"CDP endpoint returned {r.status} at {cdp_url} -- browser may not be started",
-                    fixable=True,
-                    fix_command="# Start CloakBrowser or launch browser manually",
-                ))
-    except ImportError:
+    if browser_mode == "remote":
         report.checks.append(CheckResult(
             name="cdp_endpoint",
             status="skip",
-            message="aiohttp not installed, skipping CDP check (non-blocking)",
+            message="Remote browser mode -- CDP check skipped (browser runs on server)",
         ))
-    except Exception:
-        report.checks.append(CheckResult(
-            name="cdp_endpoint",
-            status="warn",
-            message=f"CDP not reachable at {cdp_url} -- will attempt auto-connect on first session",
-        ))
+    else:
+        try:
+            import aiohttp
+
+            async with (
+                aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3)) as s,
+                s.get(f"{cdp_url}/json/version") as r,
+            ):
+                if r.status == 200:
+                    report.checks.append(CheckResult(
+                        name="cdp_endpoint",
+                        status="pass",
+                        message=f"CDP reachable at {cdp_url} (browser running)",
+                    ))
+                else:
+                    report.checks.append(CheckResult(
+                        name="cdp_endpoint",
+                        status="warn",
+                        message=f"CDP endpoint returned {r.status} at {cdp_url} -- browser may not be started",
+                        fixable=True,
+                        fix_command="# Start CloakBrowser or launch browser manually",
+                    ))
+        except ImportError:
+            report.checks.append(CheckResult(
+                name="cdp_endpoint",
+                status="skip",
+                message="aiohttp not installed, skipping CDP check (non-blocking)",
+            ))
+        except Exception:
+            report.checks.append(CheckResult(
+                name="cdp_endpoint",
+                status="warn",
+                message=f"CDP not reachable at {cdp_url} -- will attempt auto-connect on first session",
+            ))
+
+    # ── Check 5b: Remote API health (when browser_mode="remote") ───
+    if browser_mode == "remote":
+        try:
+            import aiohttp
+
+            async with (
+                aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as s,
+                s.get(f"{api_url}/health") as r,
+            ):
+                if r.status == 200:
+                    report.checks.append(CheckResult(
+                        name="remote_api",
+                        status="pass",
+                        message=f"Remote API reachable at {api_url}",
+                    ))
+                else:
+                    report.checks.append(CheckResult(
+                        name="remote_api",
+                        status="warn",
+                        message=f"Remote API returned {r.status} at {api_url}/health -- server may be unhealthy",
+                    ))
+        except ImportError:
+            report.checks.append(CheckResult(
+                name="remote_api",
+                status="skip",
+                message="aiohttp not installed, skipping remote API check (non-blocking)",
+            ))
+        except Exception:
+            report.checks.append(CheckResult(
+                name="remote_api",
+                status="warn",
+                message=f"Remote API not reachable at {api_url} -- check that the server is running",
+                fixable=False,
+            ))
+
+    # ── Check 5c: VNC URL reachability (when vnc_url is set) ───────
+    if vnc_url:
+        try:
+            import aiohttp
+
+            async with (
+                aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as s,
+                s.get(vnc_url) as r,
+            ):
+                if r.status < 500:
+                    report.checks.append(CheckResult(
+                        name="vnc_url",
+                        status="pass",
+                        message=f"VNC URL reachable at {vnc_url}",
+                    ))
+                else:
+                    report.checks.append(CheckResult(
+                        name="vnc_url",
+                        status="warn",
+                        message=f"VNC URL returned {r.status} at {vnc_url}",
+                    ))
+        except ImportError:
+            report.checks.append(CheckResult(
+                name="vnc_url",
+                status="skip",
+                message="aiohttp not installed, skipping VNC URL check (non-blocking)",
+            ))
+        except Exception:
+            report.checks.append(CheckResult(
+                name="vnc_url",
+                status="warn",
+                message=f"VNC URL not reachable at {vnc_url} -- visual browser access may be unavailable",
+                fixable=False,
+            ))
 
     # ─�─ Check 6: LLM API key (for Agent mode) ─────────────────
     has_key = bool(os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("GLM_API_KEY"))

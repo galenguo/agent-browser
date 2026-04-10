@@ -39,6 +39,8 @@ class SkillConfig:
     # Remote API
     api_url: str = "http://localhost:8000"
     api_key: str = ""
+    remote_type: str = "aio"  # "aio" | "distributed" (only when browser_mode="remote")
+    vnc_url: str = ""         # noVNC endpoint; static for aio, empty for distributed (per-session)
 
     # Daemon
     daemon_enabled: bool = True
@@ -355,6 +357,10 @@ def _apply_env_overrides(cfg: SkillConfig) -> SkillConfig:
         cfg.api_url = v
     if v := os.getenv("AGENT_BROWSER_API_KEY"):
         cfg.api_key = v
+    if v := os.getenv("AGENT_BROWSER_REMOTE_TYPE"):
+        cfg.remote_type = v
+    if v := os.getenv("AGENT_BROWSER_VNC_URL"):
+        cfg.vnc_url = v
     if v := os.getenv("AGENT_BROWSER_DAEMON_ENABLED"):
         cfg.daemon_enabled = v.lower() in ("1", "true", "yes")
     if v := os.getenv("AGENT_BROWSER_DAEMON_IDLE_TIMEOUT"):
@@ -369,13 +375,19 @@ def _apply_env_overrides(cfg: SkillConfig) -> SkillConfig:
 
 
 def _apply_yaml_overrides(cfg: SkillConfig, yaml_data: dict) -> SkillConfig:
-    """Override configuration from YAML (only non-default values)."""
-    skill = yaml_data.get("skill", yaml_data)
+    """Override configuration from YAML (only non-default values).
+
+    Reads flat keys directly from skill.yaml (no 'skill:' namespace indirection).
+    """
+    # skill.yaml is a dedicated flat-key file — use yaml_data directly
+    skill = yaml_data
 
     if "calling_mode" in skill:
         cfg.calling_mode = skill["calling_mode"]
     if "browser_mode" in skill:
         cfg.browser_mode = skill["browser_mode"]
+    if "remote_type" in skill:
+        cfg.remote_type = skill["remote_type"]
     if "intelligence" in skill:
         cfg.intelligence = skill["intelligence"]
     if "cdp_url" in skill:
@@ -384,6 +396,8 @@ def _apply_yaml_overrides(cfg: SkillConfig, yaml_data: dict) -> SkillConfig:
         cfg.api_url = skill["api_url"]
     if "api_key" in skill:
         cfg.api_key = skill["api_key"]
+    if "vnc_url" in skill:
+        cfg.vnc_url = skill["vnc_url"]
 
     daemon = skill.get("daemon", {})
     if "enabled" in daemon:
@@ -430,7 +444,7 @@ async def detect_mode() -> SkillConfig:
     cfg = SkillConfig()
 
     # 1. Load YAML config
-    config_path = Path.home() / ".agent-browser" / "config.yaml"
+    config_path = Path.home() / ".agent-browser" / "skill.yaml"
     yaml_data = _load_yaml_config(config_path)
     if yaml_data:
         cfg = _apply_yaml_overrides(cfg, yaml_data)
@@ -439,7 +453,7 @@ async def detect_mode() -> SkillConfig:
     cfg = _apply_env_overrides(cfg)
 
     # 3. Auto-detection (only when no explicit setting exists)
-    if not os.getenv("AGENT_BROWSER_CALLING_MODE") and not yaml_data.get("skill", {}).get("calling_mode"):
+    if not os.getenv("AGENT_BROWSER_CALLING_MODE") and not yaml_data.get("calling_mode"):
         try:
             import aiohttp
 
@@ -483,7 +497,7 @@ def load_config(**overrides) -> SkillConfig:
     """Synchronous config loading (for scenarios that don't need auto-detection)."""
     cfg = SkillConfig()
 
-    config_path = Path.home() / ".agent-browser" / "config.yaml"
+    config_path = Path.home() / ".agent-browser" / "skill.yaml"
     yaml_data = _load_yaml_config(config_path)
     if yaml_data:
         cfg = _apply_yaml_overrides(cfg, yaml_data)
@@ -509,15 +523,59 @@ def from_deploy_config(dep_cfg) -> SkillConfig:
     Converts deployment-level settings (mode, browser type, CDP URL, etc.)
     into the SkillConfig format used by the runtime. Called by setup() after
     loading deploy-config.yaml.
+
+    Mode mapping:
+      local              -> cli,  local,  aio,         api_url unchanged, vnc_url=""
+      docker-aio         -> api,  remote, aio,         remote_api_url or http://{host}:{port}, dep_cfg.vnc_url
+      docker-distributed -> api,  remote, distributed, remote_api_url or http://{host}:{port}, ""
+      k8s-aio            -> api,  remote, aio,         remote_api_url or http://{host}:{port}, dep_cfg.vnc_url
+      k8s-distributed    -> api,  remote, distributed, remote_api_url or http://{host}:{port}, ""
     """
     cfg = SkillConfig()
 
-    # Map deployment mode -> calling/browser mode
     mode = getattr(dep_cfg, "mode", "local") or "local"
-    if "docker" in mode or "k8s" in mode:
-        cfg.calling_mode = "api"
-    else:
+    api_host = getattr(dep_cfg, "api_host", "localhost") or "localhost"
+    api_port = getattr(dep_cfg, "api_port", 8000) or 8000
+    remote_api_url = getattr(dep_cfg, "remote_api_url", "") or ""
+    dep_vnc_url = getattr(dep_cfg, "vnc_url", "") or ""
+
+    default_api_url = remote_api_url or f"http://{api_host}:{api_port}"
+
+    if mode == "local":
         cfg.calling_mode = "cli"
+        cfg.browser_mode = "local"
+        cfg.remote_type = "aio"
+        cfg.vnc_url = ""
+    elif mode == "docker-aio":
+        cfg.calling_mode = "api"
+        cfg.browser_mode = "remote"
+        cfg.remote_type = "aio"
+        cfg.api_url = default_api_url
+        cfg.vnc_url = dep_vnc_url
+    elif mode == "docker-distributed":
+        cfg.calling_mode = "api"
+        cfg.browser_mode = "remote"
+        cfg.remote_type = "distributed"
+        cfg.api_url = default_api_url
+        cfg.vnc_url = ""
+    elif mode == "k8s-aio":
+        cfg.calling_mode = "api"
+        cfg.browser_mode = "remote"
+        cfg.remote_type = "aio"
+        cfg.api_url = default_api_url
+        cfg.vnc_url = dep_vnc_url
+    elif mode == "k8s-distributed":
+        cfg.calling_mode = "api"
+        cfg.browser_mode = "remote"
+        cfg.remote_type = "distributed"
+        cfg.api_url = default_api_url
+        cfg.vnc_url = ""
+    else:
+        # Unknown mode — fall back to local
+        cfg.calling_mode = "cli"
+        cfg.browser_mode = "local"
+        cfg.remote_type = "aio"
+        cfg.vnc_url = ""
 
     # Browser settings
     cdp_url = getattr(dep_cfg, "cdp_url", None)
@@ -527,11 +585,6 @@ def from_deploy_config(dep_cfg) -> SkillConfig:
     headless = getattr(dep_cfg, "headless", None)
     if headless is not None:
         cfg.headless = headless
-
-    # API settings (when in docker/k8s mode)
-    api_port = getattr(dep_cfg, "api_port", None)
-    if api_port:
-        cfg.api_url = f"http://127.0.0.1:{api_port}"
 
     # Stealth settings
     stealth_enabled = getattr(dep_cfg, "stealth_enabled", None)

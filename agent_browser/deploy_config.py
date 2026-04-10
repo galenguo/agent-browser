@@ -51,6 +51,8 @@ class DeployConfig:
     api_enabled: bool = True
     api_port: int = 8000
     api_host: str = "127.0.0.1"
+    vnc_url: str = ""          # VNC URL for remote browser visual access (static for aio modes)
+    remote_api_url: str = ""   # Override API URL when API is on a different host than api_host:api_port
 
     # ── LLM (separated layer — changes frequently) ──
     llm_provider: str = ""  # empty = use existing SkillConfig logic
@@ -376,6 +378,8 @@ def load_deploy_config() -> DeployConfig:
         cfg.api_enabled = api.get("enabled", cfg.api_enabled)
         cfg.api_port = api.get("port", cfg.api_port)
         cfg.api_host = api.get("host", cfg.api_host)
+        cfg.vnc_url = api.get("vnc_url", cfg.vnc_url)
+        cfg.remote_api_url = api.get("remote_api_url", cfg.remote_api_url)
 
     # LLM section
     llm = yaml_data.get("llm", {})
@@ -454,6 +458,8 @@ def generate_config(cfg: DeployConfig, path: Path | None = None) -> Path:
         "enabled": cfg.api_enabled,
         "port": cfg.api_port,
         "host": cfg.api_host,
+        "vnc_url": cfg.vnc_url,
+        "remote_api_url": cfg.remote_api_url,
     }
     if cfg.llm_provider or cfg.llm_model:
         full["llm"] = {
@@ -490,26 +496,6 @@ def generate_config(cfg: DeployConfig, path: Path | None = None) -> Path:
             "list": cfg.proxy_list,
         }
 
-    # Also write under skill:* namespace so config.py:_apply_yaml_overrides() can read it.
-    # This fixes the YAML path mismatch where generate_config() writes top-level
-    # keys but _apply_yaml_overrides() reads from skill.* nested keys.
-    full["skill"] = {
-        "calling_mode": "cli" if "docker" not in cfg.mode and "k8s" not in cfg.mode else "api",
-        "browser_mode": "local",
-        "intelligence": "llm",
-        "cdp_url": cfg.cdp_url,
-        "api_url": f"http://{cfg.api_host}:{cfg.api_port}" if cfg.api_enabled else "",
-        "browser": {
-            "headless": cfg.headless,
-            "default_timeout": 30000,  # SkillConfig default
-        },
-        "stealth": {
-            "enabled": cfg.stealth_enabled,
-            "mode": cfg.stealth_mode,
-            "warmup": False,
-        },
-    }
-
     # Atomic write: temp file → rename
     import tempfile
 
@@ -524,6 +510,102 @@ def generate_config(cfg: DeployConfig, path: Path | None = None) -> Path:
     shutil.move(tmp_path, target)  # atomic on POSIX
 
     logger.info(f"Configuration written to {target}")
+    return target
+
+
+def generate_skill_config(cfg: "DeployConfig", path: Path | None = None) -> Path:
+    """Generate client-side skill.yaml from DeployConfig.
+
+    Writes flat YAML (no namespace) to ~/.agent-browser/skill.yaml by default.
+    Called by server admin to produce a shareable client config snippet.
+
+    Args:
+        cfg: DeployConfig instance (server-side deployment config).
+        path: Override output path. Defaults to ~/.agent-browser/skill.yaml.
+
+    Returns:
+        Path to the written skill.yaml file.
+    """
+    target = path or (CONFIG_DIR / "skill.yaml")
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    mode = cfg.mode or "local"
+    api_host = cfg.api_host or "localhost"
+    api_port = cfg.api_port or 8000
+    default_api_url = cfg.remote_api_url or f"http://{api_host}:{api_port}"
+
+    if mode == "local":
+        skill: dict = {
+            "calling_mode": "cli",
+            "browser_mode": "local",
+            "remote_type": "aio",
+            "intelligence": "llm",
+            "cdp_url": cfg.cdp_url,
+            "api_url": "",
+            "vnc_url": "",
+        }
+    elif mode == "docker-aio":
+        skill = {
+            "calling_mode": "api",
+            "browser_mode": "remote",
+            "remote_type": "aio",
+            "intelligence": "llm",
+            "api_url": default_api_url,
+            "vnc_url": cfg.vnc_url,
+            "cdp_url": cfg.cdp_url,
+        }
+    elif mode == "docker-distributed":
+        skill = {
+            "calling_mode": "api",
+            "browser_mode": "remote",
+            "remote_type": "distributed",
+            "intelligence": "llm",
+            "api_url": default_api_url,
+            "vnc_url": "",
+            "cdp_url": cfg.cdp_url,
+        }
+    elif mode == "k8s-aio":
+        skill = {
+            "calling_mode": "api",
+            "browser_mode": "remote",
+            "remote_type": "aio",
+            "intelligence": "llm",
+            "api_url": default_api_url,
+            "vnc_url": cfg.vnc_url,
+            "cdp_url": cfg.cdp_url,
+        }
+    elif mode == "k8s-distributed":
+        skill = {
+            "calling_mode": "api",
+            "browser_mode": "remote",
+            "remote_type": "distributed",
+            "intelligence": "llm",
+            "api_url": default_api_url,
+            "vnc_url": "",
+            "cdp_url": cfg.cdp_url,
+        }
+    else:
+        # Unknown mode — fall back to local
+        skill = {
+            "calling_mode": "cli",
+            "browser_mode": "local",
+            "remote_type": "aio",
+            "intelligence": "llm",
+            "cdp_url": cfg.cdp_url,
+            "api_url": "",
+            "vnc_url": "",
+        }
+
+    import shutil
+    import tempfile
+
+    fd, tmp_path = tempfile.mkstemp(suffix=".yaml", prefix="ab-skill-", dir=target.parent)
+    try:
+        os.write(fd, _dump_yaml(skill).encode("utf-8"))
+    finally:
+        os.close(fd)
+    shutil.move(tmp_path, target)
+    logger.info(f"Skill configuration written to {target}")
     return target
 
 
