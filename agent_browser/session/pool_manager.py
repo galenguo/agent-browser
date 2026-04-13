@@ -47,13 +47,14 @@ class SessionPoolManager:
         self,
         max_concurrent: int = 10,
         idle_timeout: int = 1800,
-        browser_mode: Literal["local", "docker"] = "local",
+        browser_mode: Literal["local", "docker", "k8s"] = "local",
     ):
         self.sessions: dict[str, UserSession] = {}
         self.max_concurrent = max_concurrent
         self.idle_timeout = idle_timeout
 
         # In docker mode, detect if local CDP is already running → auto-downgrade to local mode
+        # k8s mode is never downgraded (browser pods are always remote)
         effective_mode = browser_mode
         if browser_mode == "docker":
             try:
@@ -89,12 +90,15 @@ class SessionPoolManager:
         """Start background tasks (must be called within event loop)."""
         self._monitor_task = asyncio.create_task(self._idle_monitor())
         self._health_check_task = asyncio.create_task(self._health_check_loop())
+        if self.browser_pool.mode == "k8s" and self.browser_pool._k8s_manager:
+            self.browser_pool._k8s_manager.start()
 
     async def create_session(
         self,
         user_id: str,
         profile_config: dict | None = None,
         browser_type: str = "chromium",
+        owner_key: str = "",
     ) -> str:
         """Create a new session."""
         # Check quota and reserve session_id under lock to prevent concurrent over-allocation
@@ -125,6 +129,8 @@ class SessionPoolManager:
             await self.browser_pool.release(session_id)
             raise
 
+        # VNC token: pure random 32-char hex — routing uses session→pod_name memory lookup
+        vnc_token = uuid4().hex
         user_session = UserSession(
             session_id=session_id,
             user_id=user_id,
@@ -132,10 +138,12 @@ class SessionPoolManager:
             profile_dir=profile_dir,
             created_at=time.time(),
             last_activity=time.time(),
+            vnc_token=vnc_token,
+            owner_key=owner_key,
         )
 
         self.sessions[session_id] = user_session
-        logger.info(f"Session created: {session_id}")
+        logger.info(f"Session created: {session_id}, vnc_token: {user_session.vnc_token}")
         return session_id, self._build_browser_node_info(browser_instance)
 
     def _build_browser_node_info(self, instance) -> dict | None:
@@ -461,6 +469,10 @@ class SessionPoolManager:
             if task:
                 task.cancel()
 
+        # Shutdown k8s manager
+        if self.browser_pool.mode == "k8s" and self.browser_pool._k8s_manager:
+            await self.browser_pool._k8s_manager.shutdown()
+
         # Close all sessions
         session_ids = list(self.sessions.keys())
         for session_id in session_ids:
@@ -471,14 +483,15 @@ class SessionPoolManager:
     # ============ Atomic operation methods ============
 
     async def _get_page(self, session_id: str) -> Page:
-        """Get the Playwright Page object for a session (supports Local and Docker instances)."""
+        """Get the Playwright Page object for a session (supports Local, Docker, and K8s instances)."""
         session = self.sessions.get(session_id)
         if not session:
             raise SessionNotFoundError(f"Session not found: {session_id}")
 
         instance = session.browser_instance
 
-        if isinstance(instance, DockerBrowserInstance):
+        from agent_browser.models import K8sBrowserInstance
+        if isinstance(instance, (DockerBrowserInstance, K8sBrowserInstance)):
             return await self._get_docker_page(session_id, instance)
 
         # LocalBrowserInstance: use existing Playwright objects directly

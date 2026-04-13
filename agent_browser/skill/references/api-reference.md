@@ -17,6 +17,22 @@ session_id = await create_session(
 
 **Modes**: Auto-detected by default. Force with `mode` param or `AGENT_BROWSER_CALLING_MODE` env var.
 
+**Server mode response** (when using `remote-aio` or `remote-distributed`):
+
+In API mode the underlying `POST /sessions/create` returns a JSON object. Access it via `SkillBrowser`:
+
+```python
+sb = SkillBrowser()
+info = await sb.create_session()
+# info["session_id"]  -- session ID string
+# info["vnc_url"]     -- VNC proxy URL for this session (distributed: per-session; aio: static)
+# info["vnc_token"]   -- token for VNC WebSocket proxy endpoint
+```
+
+In `remote-distributed` mode, `vnc_url` is unique per session (each BR pod has its own VNC).
+Open `vnc_url` in a browser to watch the live session. Use `sb.get_session_info(sid)` to retrieve
+it again after creation.
+
 ### `delete_session`
 
 Release browser resources for a session.

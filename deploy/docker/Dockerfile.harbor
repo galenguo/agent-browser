@@ -53,7 +53,8 @@ RUN apt-get purge -y gcc python3-dev && \
 
 COPY agent_browser/ /app/agent_browser/
 COPY deploy/docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY deploy/docker/entrypoint-browser.sh /entrypoint-browser.sh
+RUN chmod +x /entrypoint.sh /entrypoint-browser.sh
 
 RUN mkdir -p /data/sessions /data/profiles /data/logs
 

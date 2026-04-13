@@ -21,6 +21,21 @@ from agent_browser.skill.scripts.browser_cli import SkillBrowser
 
 ---
 
+## 工具使用约束（必读）
+
+**使用 agent-browser skill 时，只能使用本 skill 提供的方法和工具（`SkillBrowser` 的方法）。**
+
+禁止引入任何其他浏览器控制工具，包括但不限于：
+- Playwright / Puppeteer（直接通过 CDP 控制本地浏览器）
+- OpenClaw / 其他内置浏览器工具
+- 任何直接操作 CDP 的工具
+
+**原因**：混用工具会导致会话状态冲突、反检测层失效、操作结果不可预期。
+
+**遇到问题时**：如果 skill 方法无法完成任务或出现异常，**不要尝试用其他工具绕过**，应立即将问题反馈给用户，由用户决策下一步。
+
+---
+
 ## 执行策略（必读）
 
 **在开始任务前，必须先读取 `config.yaml` 的 `intelligence` 字段，决定执行模式：**
@@ -314,6 +329,8 @@ Stop and ask the user when:
 - **Captcha detected** -- "There's a captcha. Please solve it, then tell me."
 - **Unexpected modal/dialog** -- "Something popped up. What should I do?"
 - **3 consecutive failures** -- "I'm stuck on [specific element]. Options: try different approach / skip / show you what I see."
+
+**分布式模式 VNC**：在 `remote-distributed` 模式下，VNC URL 是每个 session 独立的，通过 `sb.get_session_info(sid)` 获取 `novnc_url`，而非静态配置的地址。
 
 ---
 

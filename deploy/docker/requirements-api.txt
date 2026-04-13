@@ -9,3 +9,5 @@ langchain-anthropic
 langchain-openai
 docker
 aiohttp
+kubernetes
+PyYAML

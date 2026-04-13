@@ -1,0 +1,18 @@
+# DestinationRule for CP headless service.
+#
+# NOTE: Multi-pod VNC routing (pod-index subsets) is no longer needed.
+# CP is now a single-replica StatefulSet (replicas: 1).
+# VNC token → session → BR pod_name lookup is handled entirely in FastAPI memory.
+# This DestinationRule is kept as a no-op placeholder in case replicas are scaled up later.
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: agent-browser-cp
+  namespace: agent-browser
+spec:
+  host: agent-browser-cp.agent-browser.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      http:
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 1000

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-browser-cp-headless
+  namespace: agent-browser
+  labels:
+    app: agent-browser-cp
+spec:
+  clusterIP: None
+  selector:
+    app: agent-browser-cp
+  ports:
+  - name: novnc
+    port: 6080
+    targetPort: 6080
+    protocol: TCP
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP

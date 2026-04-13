@@ -91,6 +91,15 @@ class DockerBrowserInstance(BrowserInstance):
             self.container_name = f"browser_{self.session_id}"
 
 
+@dataclass
+class K8sBrowserInstance(BrowserInstance):
+    """K8s browser node instance (separate browser pod in distributed mode)."""
+
+    pod_index: int = 0   # Kept for model compat; unused in dynamic routing
+    pod_url: str = ""    # http://{pod_name}.{headless_svc}:8080
+    pod_name: str = ""   # Full pod name (e.g. agent-browser-br-a1b2c3d4) for headless DNS routing
+
+
 # ============ User sessions ============
 
 
@@ -104,6 +113,8 @@ class UserSession:
     profile_dir: str
     created_at: float
     last_activity: float
+    vnc_token: str = ""  # Random UUID for VNC access authentication
+    owner_key: str = ""  # API key that created this session (for ownership-based authorization)
     tasks: dict = None  # task_id -> task_info
     task_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 

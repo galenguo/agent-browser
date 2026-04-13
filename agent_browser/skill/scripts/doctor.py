@@ -316,7 +316,14 @@ async def run_diagnosis(config=None) -> DoctorReport:
             ))
 
     # ── Check 5c: VNC URL reachability (when vnc_url is set) ───────
-    if vnc_url:
+    remote_type = getattr(config, "remote_type", "") if config else ""
+    if browser_mode == "remote" and not vnc_url and remote_type == "distributed":
+        report.checks.append(CheckResult(
+            name="vnc_url",
+            status="skip",
+            message="Distributed mode: VNC URL is per-session (returned in create_session response, not pre-configured)",
+        ))
+    elif vnc_url:
         try:
             import aiohttp
 

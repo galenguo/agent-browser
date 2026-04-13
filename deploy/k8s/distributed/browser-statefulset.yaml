@@ -1,0 +1,12 @@
+# DEPRECATED — Static BR StatefulSet (superseded by dynamic pod management)
+#
+# This file is NO LONGER USED in production.
+# BR pods are now created dynamically by K8sBrowserNodeManager (agent_browser/browser/k8s_node_manager.py).
+# Each BR pod is an independent Pod (not StatefulSet) with:
+#   - Random UUID suffix name: agent-browser-br-{uuid8}
+#   - hostname + subdomain set for headless DNS resolution
+#   - CDP_BIND_ADDRESS=0.0.0.0 so CP can connect via pod IP
+#   - Dedicated PVC (profiles-{pod_name}) created and deleted with the pod
+#
+# Kept here for reference only. Do not apply.
+# To deploy distributed mode use: ./deploy/k8s/distributed/deploy.sh deploy

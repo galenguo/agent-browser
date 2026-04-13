@@ -1,8 +1,9 @@
 """Browser instance pool.
 
-Supports two modes:
+Supports three modes:
 1. local: Launch CloakBrowser process locally
 2. docker: Launch CloakBrowser in a Docker container
+3. k8s: Delegate to a dedicated browser pod via HTTP API (distributed mode)
 """
 
 import asyncio
@@ -11,10 +12,14 @@ import logging
 import os
 from typing import Literal
 
+import aiohttp
+
 from agent_browser.models import (
     BrowserInstance,
     DockerBrowserInstance,
+    K8sBrowserInstance,
     LocalBrowserInstance,
+    ResourceExhaustedError,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,7 +49,7 @@ class PortAllocator:
 class BrowserInstancePool:
     """Browser instance pool -- supports both local and Docker modes."""
 
-    def __init__(self, mode: Literal["local", "docker"] = "local"):
+    def __init__(self, mode: Literal["local", "docker", "k8s"] = "local"):
         self.mode = mode
         self.instances = {}
         self.port_allocator = PortAllocator(start=19222, end=19300)
@@ -54,6 +59,11 @@ class BrowserInstancePool:
         )
         self._docker_client = None  # Lazy init, reused
         self._debug_mode = os.getenv("DEBUG_CONTAINERS", "false").lower() == "true"
+        # k8s mode: dynamic br pod manager (initialized lazily to avoid import at module load)
+        self._k8s_manager = None
+        if mode == "k8s":
+            from agent_browser.browser.k8s_node_manager import K8sBrowserNodeManager
+            self._k8s_manager = K8sBrowserNodeManager()
         logger.info(f"BrowserInstancePool initialized in {mode} mode")
 
     async def allocate(
@@ -65,6 +75,10 @@ class BrowserInstancePool:
         """Allocate a browser instance."""
         if self.mode == "local":
             return await self._allocate_local(session_id, profile_dir)
+        if self.mode == "k8s":
+            instance = await self._k8s_manager.allocate(session_id)
+            self.instances[session_id] = instance
+            return instance
         return await self._allocate_docker(session_id, profile_dir)
 
     async def _allocate_local(
@@ -244,6 +258,10 @@ class BrowserInstancePool:
         logger.info(f"Docker browser instance created: {instance.instance_id}")
         return instance
 
+    async def _allocate_k8s(self, session_id: str) -> K8sBrowserInstance:
+        """Delegate to K8sBrowserNodeManager (dynamic pod creation)."""
+        return await self._k8s_manager.allocate(session_id)
+
     async def _wait_cdp_ready(self, cdp_url: str, timeout: int = 30):
         """Wait for CDP port to become ready."""
         from urllib.parse import urlparse
@@ -317,5 +335,22 @@ class BrowserInstancePool:
             if instance.novnc_host_port:
                 self.novnc_port_allocator.release(instance.novnc_host_port)
 
-        # Release port
+        elif isinstance(instance, K8sBrowserInstance):
+            # Delegate to K8sBrowserNodeManager: stops browser + deletes pod + PVC
+            if self._k8s_manager:
+                await self._k8s_manager.release(instance.session_id, instance.pod_name)
+            else:
+                # Fallback: best-effort stop via HTTP
+                try:
+                    async with aiohttp.ClientSession() as client:
+                        async with client.post(
+                            f"{instance.pod_url}/browser/stop",
+                            timeout=aiohttp.ClientTimeout(total=10),
+                        ) as resp:
+                            logger.info(f"Browser pod {instance.pod_name} stopped: {resp.status}")
+                except Exception as e:
+                    logger.warning(f"Failed to stop browser pod {instance.pod_name}: {e}")
+            return  # K8s pods don't use the local port allocator
+
+        # Release port (local/docker modes only)
         self.port_allocator.release(instance.cdp_port)

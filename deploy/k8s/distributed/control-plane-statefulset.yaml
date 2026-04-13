@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agent-browser-cp
+  namespace: agent-browser
+  labels:
+    app: agent-browser-cp
+spec:
+  serviceName: agent-browser-cp-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent-browser-cp
+  template:
+    metadata:
+      labels:
+        app: agent-browser-cp
+    spec:
+      serviceAccountName: agent-browser-cp
+      containers:
+      - name: agent-browser
+        image: registry-cn-gimc-local.gimccloud.com/library/agent-browser:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: agent-browser-config
+        - secretRef:
+            name: agent-browser-secret
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: profiles
+          mountPath: /data/profiles
+        - name: api-keys
+          mountPath: /app/config/keys.yaml
+          subPath: keys.yaml
+      volumes:
+      - name: api-keys
+        configMap:
+          name: agent-browser-api-keys
+  volumeClaimTemplates:
+  - metadata:
+      name: profiles
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: rook-ceph-block
+      resources:
+        requests:
+          storage: 1Gi

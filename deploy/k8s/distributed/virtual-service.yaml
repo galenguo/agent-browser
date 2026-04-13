@@ -1,0 +1,3 @@
+# VNC per-pod VirtualService removed.
+# VNC traffic now routes through the ClusterIP service (agent-browser-cp:8000).
+# FastAPI handles cross-pod proxying internally using the pod index embedded in the VNC token.

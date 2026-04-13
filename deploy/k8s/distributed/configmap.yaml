@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-browser-config
+  namespace: agent-browser
+data:
+  DEPLOYMENT_MODE: "distributed"
+  BROWSER_MODE: "k8s"
+  MAX_SESSIONS: "10"
+  IDLE_TIMEOUT_SECONDS: "1800"
+  PROFILE_STORAGE: "/data/profiles"
+  LOG_LEVEL: "INFO"
+  VNC_BASE_URL: "http://agent-browser-vnc.vpc-dale.gimcyun.com"
+  BROWSER_HEADLESS_SVC: "agent-browser-br-headless.agent-browser.svc.cluster.local"
+  WARM_POOL_SIZE: "3"
+  BR_IDLE_TIMEOUT_SECONDS: "3600"
