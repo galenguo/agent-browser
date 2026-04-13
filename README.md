@@ -209,7 +209,18 @@ async def main():
         await ab.open_page("https://example.com")
         snap = await ab.snapshot()
         await ab.click("@e0")
-        result = await ab.run_task("Find the search box and type 'python'")
+
+        # Agent mode with full configuration
+        result = await ab.run_task(
+            "Find the search box and type 'python'",
+            intelligence="agent",
+            agent_config={
+                "enable_planning": True,
+                "use_judge": True,
+                "max_failures": 8,
+                "loop_detection_enabled": True,
+            },
+        )
         print(result['status'])
 
 asyncio.run(main())
@@ -275,22 +286,66 @@ agent-browser --help
 
 ## Public API Reference
 
+### Core Operations
+
 | Function | Description |
 |----------|-------------|
-| `create_session()` | Create browser session, returns UUID |
+| `create_session(**profile)` | Create browser session, returns UUID (accepts BrowserProfile params) |
 | `open_page(sid, url)` | Navigate to URL |
-| `snapshot(sid)` | Get DOM snapshot with `@eN` element refs |
-| `click(sid, ref)` | Click element by ref (`"@e0"`) |
+| `snapshot(sid, interactive_only, iframe_selector)` | Get DOM snapshot with `@eN` element refs |
+| `click(sid, ref_or_x, y)` | Click by element ref or viewport coordinates |
 | `fill(sid, ref, text)` | Type text into input element |
 | `scroll(sid, direction, amount)` | Scroll page |
-| `select_option(sid, ref, value)` | Select dropdown option |
-| `hover(sid, ref)` | Move mouse to element center |
 | `press_key(sid, key)` | Press keyboard key |
 | `wait_for_selector(sel, timeout)` | Wait for CSS selector |
 | `go_back(sid)` | Navigate back |
 | `evaluate(sid, expr)` | Execute JS, return result |
-| `run_task(sid, task, intelligence)` | LLM/Agent autonomous task |
 | `delete_session(sid)` | Release session resources |
+
+### Search & Discovery
+
+| Function | Description |
+|----------|-------------|
+| `search_page(sid, pattern, ...)` | Search page text (regex/plain) with context |
+| `find_elements(sid, selector, ...)` | Find elements by CSS selector with metadata |
+| `get_dropdown_options(sid, ref)` | Get options from a `<select>` element |
+| `select_dropdown_option(sid, ref, text)` | Select option by visible text |
+
+### File & Media
+
+| Function | Description |
+|----------|-------------|
+| `upload_file(sid, ref, paths)` | Upload files to `<input type=file>` |
+| `screenshot(sid, ref, ...)` | Screenshot (page or element, PNG/JPEG) |
+| `save_as_pdf(sid, path, landscape)` | Save page as PDF |
+
+### Advanced Interaction
+
+| Function | Description |
+|----------|-------------|
+| `send_keys(sid, keys)` | Complex key sequences (modifiers + keys) |
+| `scroll_to_text(sid, text)` | Scroll until text becomes visible |
+| `open_tab(sid, url)` | Open new tab (optional navigate) |
+| `switch_tab(sid, index)` | Switch to tab by index |
+| `close_tab(sid, index)` | Close tab |
+
+### Data Extraction
+
+| Function | Description |
+|----------|-------------|
+| `extract_content(sid, selector, type)` | Extract text/html/links/images |
+| `structured_output(sid, schema, prompt)` | Extract data via JSON schema validation |
+
+### Agent Mode
+
+| Function | Description |
+|----------|-------------|
+| `run_task(sid, task, intelligence, ..., agent_config)` | Autonomous Agent task with full config (24 tunable params via `AgentConfig`) |
+
+### Configuration
+
+| Function | Description |
+|----------|-------------|
 | `configure(**kwargs)` | Update config for next session |
 | `reset()` | Clear all global state |
 | `setup()` | Full first-session setup with validation |
@@ -329,7 +384,7 @@ See [`examples/`](examples/) directory:
 
 | Feature | browser-use | Agent Browser |
 |---------|------------|-------------|
-| AI agent automation | Yes | Yes (wraps browser-use) |
+| AI agent automation | 50+ params | Full exposure (24 tunable via `AgentConfig`) |
 | Anti-detection | No | 7-layer stack |
 | Human behavior simulation | No | Bezier mouse, per-char typing |
 | Circuit breaker | No | Per-session auto-degradation |
@@ -337,6 +392,7 @@ See [`examples/`](examples/) directory:
 | Error classification | No | 6-category typed errors |
 | Auto-recovery | No | Per-error-category fallback |
 | Site exploration | No | DOM analysis -> adapter synthesis |
+| LLM Actions (14) | Built-in | Exposed as atomic API operations |
 | Telemetry | No | JSONL execution tracing |
 | Debugger | No | Single-step with breakpoints |
 

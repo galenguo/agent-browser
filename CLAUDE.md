@@ -42,7 +42,7 @@ agent-browser/                          # Project root
 │   ├── main.py                        # Facade API (create_session, snapshot, click, etc.)
 │   ├── config.py                      # SkillConfig dataclass + load_config / detect_mode
 │   ├── deploy_config.py               # DeployConfig for Docker/K8s deployments
-│   ├── models.py                      # Data models (BrowserInstance, UserSession, etc.)
+│   ├── models.py                      # Data models (BrowserInstance, UserSession, AgentConfig, BrowserProfile, etc.)
 │   │
 │   ├── browser/                       # Browser engine layer
 │   │   ├── __init__.py                # BrowserBackend + BrowserPageHandle ABCs
@@ -202,7 +202,7 @@ agent-browser/                          # Project root
   - `detect_mode()` - auto-detect (localhost:8000/health -> API mode)
   - `load_config()` - config priority: params > env vars > YAML > auto-detect
 
-- `models.py` - Data models (BrowserInstance, UserSession, etc.)
+- `models.py` - Data models (BrowserInstance, UserSession, AgentConfig with 24 fields, BrowserProfile config models, request/response models)
 
 - `deploy_config.py` - DeployConfig for Docker/K8s deployment scenarios
 
