@@ -800,6 +800,7 @@ async def run_task(
     max_steps: int = 6,
     total_timeout: float = 300.0,
     poll_interval: float = 5.0,
+    agent_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]
 ```
 
@@ -813,6 +814,7 @@ async def run_task(
 | `max_steps` | `int` | `6` | Maximum agent steps per chunk. |
 | `total_timeout` | `float` | `300.0` | Max wall-clock seconds to wait for completion. |
 | `poll_interval` | `float` | `5.0` | Seconds between status polls. |
+| `agent_config` | `dict \| None` | `None` | Agent configuration. See **AgentConfig** below. Keys match `AgentConfig` fields. |
 
 **Returns:** `dict` with:
 
@@ -836,13 +838,22 @@ result = await sb.run_task(
 )
 # result = {"status": "completed", "result": "...", "steps": [...]}
 
-# Explicit agent mode
+# Explicit agent mode with fine-grained config
 result = await sb.run_task(
     sid,
     task="Fill out the contact form",
     intelligence="agent",
-    max_steps=12,
-    total_timeout=300.0,
+    max_steps=20,
+    agent_config={
+        "enable_planning": True,
+        "use_judge": True,
+        "use_thinking": True,
+        "message_compaction": True,
+        "fallback_llm_model": "gpt-4o-mini",
+        "max_failures": 8,
+        "loop_detection_enabled": True,
+        "calculate_cost": True,
+    },
 )
 
 # LLM mode with custom polling
@@ -852,6 +863,100 @@ result = await sb.run_task(
     intelligence="llm",
     poll_interval=2.0,
 )
+```
+
+---
+
+## AgentConfig
+
+Configuration object for browser-use Agent behavior tuning. Pass as the `agent_config` parameter of `run_task()` or as the `agent_config` field in the `/sessions/{id}/task` REST endpoint.
+
+```python
+class AgentConfig(BaseModel):
+    # Planning
+    enable_planning: bool = True                    # Multi-step todo list system
+    planning_replan_on_stall: int = 3              # Replan after N consecutive failures
+    planning_exploration_limit: int = 5           # Nudge to plan after N steps without one
+
+    # Judge (post-completion validation)
+    use_judge: bool = True                          # LLM evaluates if task succeeded
+
+    # Thinking mode
+    use_thinking: bool = True                       # Extended thinking (<<<<<<<) support
+
+    # Message compaction (token optimization)
+    message_compaction: bool | None = True         # Auto-summarize old messages
+
+    # Reliability
+    max_failures: int = 5                           # Max consecutive failures
+    final_response_after_failure: bool = True       # One final 'done' attempt before giving up
+    loop_detection_enabled: bool = True            # Detect behavioral loops
+    loop_detection_window: int = 20                # Steps to analyze for loops
+
+    # Timeouts (seconds)
+    llm_timeout: int | None = None                 # Per-LLM-call timeout (None = auto-detect per model)
+    step_timeout: int = 180                        # Per-step timeout (browser + LLM)
+
+    # Vision
+    use_vision: bool | Literal["auto"] = False     # Send screenshots to LLM
+    vision_detail_level: Literal["auto","low","high"] = "auto"
+
+    # Flash mode (browser-use ChatBrowserUse optimization)
+    flash_mode: bool = False                       # Strips plan fields for flash models
+
+    # System prompt customization
+    override_system_message: str | None = None      # Replace entire system prompt
+    extend_system_message: str | None = None         # Append to default prompt
+
+    # Structured output
+    extraction_schema: dict | None = None           # JSON schema for output format
+
+    # Fallback LLM (rate limit recovery)
+    fallback_llm_model: str | None = None            # Fallback model name (e.g. "gpt-4o-mini")
+
+    # Recording & debugging
+    generate_gif: bool = False                      # Animated GIF of session
+    save_conversation_path: str | None = None        # Save conversation logs
+
+    # Cost tracking
+    calculate_cost: bool = False                     # Track token usage/cost
+
+    # Skills ecosystem
+    skill_ids: list[str] | None = None              # browser-use skill IDs (e.g. ["*"])
+
+    # Security
+    sensitive_data: dict[str, str] | None = None   # Credential injection with domain scoping
+```
+
+**AgentConfig quick-reference by use case:**
+
+```python
+# Production resilient (rate-limit aware, loop detection, cost tracking)
+AGENT_CONFIG_PROD = {
+    "enable_planning": True,
+    "use_judge": True,
+    "message_compaction": True,
+    "fallback_llm_model": "gpt-4o-mini",
+    "loop_detection_enabled": True,
+    "max_failures": 8,
+    "calculate_cost": True,
+}
+
+# Fast & cheap (simple tasks, minimize token usage)
+AGENT_CONFIG_FAST = {
+    "enable_planning": False,
+    "use_judge": False,
+    "use_thinking": False,
+    "message_compaction": False,
+    "max_failures": 3,
+}
+
+# Vision-enabled (visual tasks: charts, captchas, layout verification)
+AGENT_CONFIG_VISION = {
+    "use_vision": True,
+    "vision_detail_level": "high",
+    "enable_planning": True,
+}
 ```
 
 ---

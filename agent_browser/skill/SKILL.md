@@ -243,6 +243,11 @@ result = await sb.evaluate_with_retry(sid, "...", retries=3)
 
 ### Agent Mode
 
+Agent mode submits a task to the server-side browser-use Agent, which autonomously
+plans, acts, and verifies completion using an LLM decision loop.
+
+**Basic usage:**
+
 ```python
 result = await sb.run_task(
     sid,
@@ -252,6 +257,105 @@ result = await sb.run_task(
     total_timeout=300.0,
 )
 # result = {status: "completed"|"failed"|"timeout", result: "...", steps: [...]}
+```
+
+**With AgentConfig (fine-grained control):**
+
+```python
+result = await sb.run_task(
+    sid,
+    task="Fill out the contact form with user data, then verify submission",
+    intelligence="agent",
+    max_steps=20,
+    agent_config={
+        # Planning: create/revise a todo list for multi-step tasks
+        "enable_planning": True,
+        "planning_replan_on_stall": 3,      # replan after 3 consecutive failures
+        "planning_exploration_limit": 5,     # nudge to plan after 5 steps without one
+
+        # Judge: post-completion LLM validation (verifies success)
+        "use_judge": True,
+
+        # Thinking: extended thinking for models that support it
+        "use_thinking": True,
+
+        # Compaction: keep token usage under control for long tasks
+        "message_compaction": True,          # auto-summarize old messages
+
+        # Reliability tuning
+        "max_failures": 5,                   # retries before giving up
+        "loop_detection_enabled": True,       # detect and break action loops
+
+        # Timeouts (seconds)
+        "llm_timeout": 90,                    # per-LLM-call timeout (None = auto-detect)
+        "step_timeout": 180,                 # per-step timeout (browser + LLM)
+
+        # Fallback: switch model on rate limits
+        "fallback_llm_model": "gpt-4o-mini",
+
+        # Cost tracking
+        "calculate_cost": True,
+    },
+)
+```
+
+**AgentConfig reference:**
+
+| Parameter | Type | Default | When to use |
+|-----------|------|---------|-------------|
+| `enable_planning` | `bool` | `True` | Complex multi-step tasks (fill forms, multi-page flows) |
+| `planning_replan_on_stall` | `int` | `3` | Flaky sites where the agent gets stuck |
+| `planning_exploration_limit` | `int` | `5` | Tasks that need structured exploration first |
+| `use_judge` | `bool` | `True` | When you need quality verification of results |
+| `use_thinking` | `bool` | `True` | Claude/DeepSeek models with extended thinking |
+| `message_compaction` | `bool\|None` | `True` | Long-running tasks (>20 steps) approaching context limit |
+| `max_failures` | `int` | `5` | Unstable sites (increase) or critical accuracy (decrease) |
+| `final_response_after_failure` | `bool` | `True` | Set `False` to fail immediately on max_failures |
+| `loop_detection_enabled` | `bool` | `True` | Always on unless the task is inherently repetitive |
+| `llm_timeout` | `int\|None` | `auto` | Slow models or complex pages may need >90s |
+| `step_timeout` | `int` | `180` | Heavy pages (SPA rendering) may need 300+ |
+| `use_vision` | `bool\|"auto"` | `False` | Vision-capable models (GPT-4o, Claude Sonnet) |
+| `flash_mode` | `bool` | `False` | Only for browser-use's own ChatBrowserUse model |
+| `fallback_llm_model` | `str\|None` | `None` | Production resilience against rate limits |
+| `override_system_message` | `str\|None` | `None` | Complete system prompt replacement (advanced) |
+| `extend_system_message` | `str\|None` | `None` | Add rules/instructions without replacing defaults |
+| `extraction_schema` | `dict\|None` | `None` | JSON schema for structured output format |
+| `calculate_cost` | `bool` | `False` | Token/cost tracking for budget management |
+| `generate_gif` | `bool` | `False` | Debug: animated GIF of session |
+| `save_conversation_path` | `str\|None` | `None` | Debug: save LLM conversation logs |
+| `skill_ids` | `list[str]\|None` | `None` | browser-use skills ecosystem (e.g. `["*"]`) |
+| `sensitive_data` | `dict\|None` | `None` | Credential injection with domain scoping |
+
+**Common AgentConfig patterns:**
+
+```python
+# Robust production config (rate-limit resilient, loop-aware)
+PROD_CONFIG = {
+    "enable_planning": True,
+    "use_judge": True,
+    "message_compaction": True,
+    "fallback_llm_model": "gpt-4o-mini",
+    "loop_detection_enabled": True,
+    "max_failures": 8,
+    "calculate_cost": True,
+}
+
+# Fast/cheap config (simple tasks, cost-sensitive)
+FAST_CONFIG = {
+    "enable_planning": False,
+    "use_judge": False,
+    "use_thinking": False,
+    "message_compaction": False,
+    "max_failures": 3,
+    "max_steps": 10,
+}
+
+# Vision-enabled config (for visual tasks: charts, captchas, layouts)
+VISION_CONFIG = {
+    "use_vision": True,
+    "vision_detail_level": "high",
+    "enable_planning": True,
+}
 ```
 
 ### Diagnostics

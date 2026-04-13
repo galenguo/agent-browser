@@ -14,7 +14,7 @@ import asyncio
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel
 
@@ -368,3 +368,94 @@ class SnapshotResponse(BaseModel):
     elements: list[ElementInfo]
     raw_html_size: int | None = None
     snapshot_size: int | None = None
+
+
+class AgentConfig(BaseModel):
+    """browser-use Agent configuration for Agent mode tasks.
+
+    Controls how the autonomous browser-use Agent behaves during task execution.
+    All fields have sensible defaults matching browser-use's built-in values.
+    Pass as ``agent_config`` in ``run_task()`` or the ``/sessions/{id}/task`` endpoint.
+    """
+
+    # ── Planning ──────────────────────────────────────────────
+    enable_planning: bool = True
+    """Enable multi-step planning system. Agent creates/revises a todo list for complex tasks."""
+    planning_replan_on_stall: int = 3
+    """After N consecutive failures, nudge agent to revise its plan."""
+    planning_exploration_limit: int = 5
+    """If agent takes this many steps without a plan, nudge it to create one."""
+
+    # ── Judge (post-completion validation) ────────────────────
+    use_judge: bool = True
+    """Run judge LLM evaluation after task completion to verify success."""
+
+    # ── Thinking mode ─────────────────────────────────────────
+    use_thinking: bool = True
+    """Enable extended thinking (<<<<<<<) in model responses. Requires model support."""
+
+    # ── Message compaction (token optimization) ─────────────
+    message_compaction: bool | None = True
+    """Compact message history to stay within context window.
+    True = default compaction settings, False = disabled, None = no compaction logic."""
+
+    # ── Reliability ──────────────────────────────────────────
+    max_failures: int = 5
+    """Max consecutive failures before giving up."""
+    final_response_after_failure: bool = True
+    """Try one final 'done' action after max_failures before stopping."""
+    loop_detection_enabled: bool = True
+    """Detect behavioral loops (repeating same actions) and inject recovery nudges."""
+    loop_detection_window: int = 20
+    """Number of recent steps to analyze for loop detection patterns."""
+
+    # ── Timeouts ──────────────────────────────────────────────
+    llm_timeout: int | None = None
+    """LLM call timeout in seconds. None = auto-detect based on model (75-90s)."""
+    step_timeout: int = 180
+    """Max seconds per agent step (including browser operations)."""
+
+    # ── Vision ────────────────────────────────────────────────
+    use_vision: bool | Literal["auto"] = False
+    """Send page screenshots to LLM. 'auto' excludes screenshot tool from registry.
+    Default False avoids vision errors for non-vision models."""
+    vision_detail_level: Literal["auto", "low", "high"] = "auto"
+    """Screenshot detail level when use_vision is enabled."""
+
+    # ── Flash mode ───────────────────────────────────────────
+    flash_mode: bool = False
+    """Optimized mode for browser-use's own ChatBrowserUse model (strips plan fields)."""
+
+    # ── System prompt customization ──────────────────────────
+    override_system_message: str | None = None
+    """Replace the entire system prompt (advanced)."""
+    extend_system_message: str | None = None
+    """Append additional instructions to the default system prompt."""
+
+    # ── Structured output ────────────────────────────────────
+    extraction_schema: dict | None = None
+    """JSON schema for structured data extraction. Passed to the LLM output format."""
+
+    # ── Fallback LLM ─────────────────────────────────────────
+    fallback_llm_model: str | None = None
+    """Fallback model name on rate limit / provider errors (e.g. 'gpt-4o-mini').
+    Uses same API key/base_url as the primary LLM."""
+
+    # ── Recording & debugging ────────────────────────────────
+    generate_gif: bool = False
+    """Generate animated GIF of the agent session. True = 'agent_history.gif', or specify path."""
+    save_conversation_path: str | None = None
+    """Save LLM conversation logs to this directory (one file per step)."""
+
+    # ── Cost tracking ────────────────────────────────────────
+    calculate_cost: bool = False
+    """Track and report token usage/cost in the result."""
+
+    # ── Skills ecosystem ─────────────────────────────────────
+    skill_ids: list[str] | None = None
+    """browser-use skill IDs to register as additional agent actions (e.g. ['*'] for all)."""
+
+    # ── Security ─────────────────────────────────────────────
+    sensitive_data: dict[str, str] | None = None
+    """Credentials to inject into agent context with domain-scoping warnings.
+    Format: {'domain': 'credential'} or {'domain': {'user': '...', 'pass': '...'}}."""

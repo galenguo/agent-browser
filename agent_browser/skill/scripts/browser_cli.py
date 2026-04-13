@@ -909,6 +909,7 @@ class SkillBrowser:
         max_steps: int = 6,
         total_timeout: float = 300.0,
         poll_interval: float = 5.0,
+        agent_config: dict[str, Any] | None = None,
         **_kwargs: Any,
     ) -> dict[str, Any]:
         """Submit an Agent task and poll for completion.
@@ -921,6 +922,12 @@ class SkillBrowser:
             max_steps: Maximum agent steps per chunk (default 6).
             total_timeout: Max wall-clock seconds (default 300).
             poll_interval: Seconds between status polls (default 5).
+            agent_config: Agent mode configuration dict. Keys match ``AgentConfig`` fields:
+                ``enable_planning``, ``use_judge``, ``use_thinking``,
+                ``message_compaction``, ``max_failures``, ``llm_timeout``,
+                ``step_timeout``, ``use_vision``, ``flash_mode``,
+                ``override_system_message``, ``extend_system_message``,
+                ``fallback_llm_model``, ``calculate_cost``, etc.
 
         Returns:
             Result dict with ``status``, ``result``, ``steps``, etc.
@@ -935,6 +942,8 @@ class SkillBrowser:
             "intelligence": intelligence,
             "max_steps": max_steps,
         }
+        if agent_config:
+            submit_body["agent_config"] = agent_config
         result = await self._request(
             "POST",
             f"/sessions/{session_id}/task",

@@ -47,6 +47,7 @@ from pydantic import BaseModel
 
 from agent_browser.api.auth import load_keys, require_api_key
 from agent_browser.models import (
+    AgentConfig,
     ClickRequest,
     EvaluateRequest,
     ExtractContentRequest,
@@ -192,6 +193,7 @@ class TaskSubmitRequest(BaseModel):
     task: str
     model: str = "glm-5-turbo"
     max_steps: int = 10
+    agent_config: AgentConfig | None = None
 
 
 class MouseMoveRequest(BaseModel):
@@ -894,8 +896,13 @@ async def submit_task(session_id: str, req: TaskSubmitRequest, api_key: str = De
     _get_owned_session(pool, session_id, api_key)
     try:
         llm_config = {"model": req.model}
-        task_id = await pool.submit_task(session_id=session_id, task=req.task,
-                                         llm_config=llm_config, max_steps=req.max_steps)
+        task_id = await pool.submit_task(
+            session_id=session_id,
+            task=req.task,
+            llm_config=llm_config,
+            max_steps=req.max_steps,
+            agent_config=req.agent_config.model_dump() if req.agent_config else None,
+        )
         return {"task_id": task_id, "session_id": session_id}
     except SessionNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")

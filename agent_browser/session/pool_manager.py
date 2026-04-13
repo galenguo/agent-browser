@@ -225,6 +225,7 @@ class SessionPoolManager:
         task: str,
         llm_config: dict,
         max_steps: int = 50,
+        agent_config: dict | None = None,
     ) -> str:
         """Submit a task to the specified session."""
         session = self.sessions.get(session_id)
@@ -237,6 +238,16 @@ class SessionPoolManager:
 
         # Create LLM
         llm = self._create_llm(llm_config)
+
+        # Create fallback LLM if configured
+        fallback_llm = None
+        if agent_config and agent_config.get("fallback_llm_model"):
+            fallback_llm_config = dict(llm_config)
+            fallback_llm_config["model"] = agent_config["fallback_llm_model"]
+            fallback_llm = self._create_llm(fallback_llm_config)
+
+        # Build Agent kwargs from agent_config
+        agent_kwargs = self._build_agent_kwargs(agent_config)
 
         # Rebuild BrowserSession per task (avoid state corruption after previous task cleanup)
         browser_session = BrowserSession(
@@ -253,8 +264,7 @@ class SessionPoolManager:
             task=task,
             llm=llm,
             browser_session=browser_session,
-            max_actions_per_step=5,
-            use_vision=False,
+            **agent_kwargs,
         )
 
         task_id = f"task_{uuid4().hex[:8]}"
@@ -264,6 +274,7 @@ class SessionPoolManager:
             "status": "running",
             "task": task,
             "llm_config": llm_config,
+            "agent_config": agent_config,
             "result": None,
             "error": None,
             "created_at": time.time(),
@@ -276,6 +287,44 @@ class SessionPoolManager:
 
         logger.info(f"Task {task_id} submitted to session {session_id}")
         return task_id
+
+    @staticmethod
+    def _build_agent_kwargs(agent_config: dict | None) -> dict:
+        """Convert agent_config dict to Agent() keyword arguments.
+
+        Filters out None values so browser-use defaults apply.
+        Only includes fields that are actual Agent.__init__ parameters.
+        """
+        if not agent_config:
+            # Default conservative config matching historical behavior
+            return {
+                "max_actions_per_step": 5,
+                "use_vision": False,
+            }
+
+        # Fields that map directly to Agent.__init__ params
+        _AGENT_PARAM_KEYS = {
+            "enable_planning", "planning_replan_on_stall", "planning_exploration_limit",
+            "use_judge", "use_thinking", "message_compaction",
+            "max_failures", "final_response_after_failure",
+            "loop_detection_enabled", "loop_detection_window",
+            "llm_timeout", "step_timeout",
+            "use_vision", "vision_detail_level", "flash_mode",
+            "override_system_message", "extend_system_message",
+            "extraction_schema", "generate_gif", "save_conversation_path",
+            "calculate_cost", "skill_ids", "sensitive_data",
+        }
+
+        kwargs = {}
+        for key in _AGENT_PARAM_KEYS:
+            if key in agent_config and agent_config[key] is not None:
+                kwargs[key] = agent_config[key]
+
+        # Always set defaults for fields that historically had explicit values
+        kwargs.setdefault("max_actions_per_step", 5)
+        kwargs.setdefault("use_vision", False)
+
+        return kwargs
 
     async def _run_agent(
         self,
@@ -295,6 +344,7 @@ class SessionPoolManager:
         task_info = session.tasks.get(task_id, {})
         task_description = task_info.get("task", "")
         llm_config = task_info.get("llm_config", {})
+        agent_config = task_info.get("agent_config")
         cdp_url = session.browser_instance.cdp_url
 
         async with session.task_lock:
@@ -369,7 +419,7 @@ class SessionPoolManager:
                         )
                         await asyncio.sleep(wait_time)
 
-                        # Recreate BrowserSession and Agent
+                        # Recreate BrowserSession and Agent (with original agent_config)
                         new_bs = BrowserSession(
                             browser_profile=BrowserProfile(
                                 cdp_url=cdp_url,
@@ -378,12 +428,12 @@ class SessionPoolManager:
                                 highlight_elements=True,
                             ),
                         )
+                        agent_kwargs = self._build_agent_kwargs(agent_config)
                         new_agent = Agent(
                             task=task_description,
                             llm=self._create_llm(llm_config),
                             browser_session=new_bs,
-                            max_actions_per_step=5,
-                            use_vision=False,
+                            **agent_kwargs,
                         )
                         current_agent = new_agent
                         current_bs = new_bs
