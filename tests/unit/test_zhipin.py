@@ -4,7 +4,7 @@ Boss 直聘端到端测试。
 用法：
     export ANTHROPIC_API_KEY=...
     export CLOAKBROWSER_PATH=/opt/cloakbrowser/chrome
-    cd /Users/galen/OpenSource/browser-controller/agent-browser
+    cd <project-root>
     python tests/test_zhipin.py
 """
 

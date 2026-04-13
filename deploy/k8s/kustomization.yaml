@@ -5,40 +5,34 @@ namespace: agent-browser
 
 resources:
   - namespace.yaml
-  - configmap.yaml
+  # ConfigMap: use configmap-distributed for kind+Traefik deployment
+  - configmap-distributed.yaml
+  # Shared state ConfigMap (CAS-based distributed coordination)
+  - configmap-state.yaml
+  # Secret (user must create from example)
   - secret.yaml
   - pvc.yaml
-  # All-in-One 模式（默认）
-  - aio-deployment.yaml
-  - aio-service.yaml
-  # 分布式模式（取消注释以启用）
-  # - api-deployment.yaml
-  # - api-service.yaml
-  # - browser-deployment.yaml
-  # - browser-service.yaml
+  # RBAC for API Pod K8s access + state ConfigMap
+  - serviceaccount.yaml
+  # Distributed mode resources
+  - api-deployment.yaml
+  - api-service.yaml
+  # Browser Deployment (K8s pool mode)
+  - browser-deployment.yaml
+  - browser-service.yaml
+  # Gateway API routing (kind + Traefik)
+  - gateway.yaml
+  - httproute-api.yaml
+  - httproute-browser.yaml
+  # All-in-One mode (commented out)
+  # - aio-deployment.yaml
+  # - aio-service.yaml
 
-# 镜像替换（根据实际 Registry 修改）
+# Image replacement (adjust registry as needed)
 images:
-  - name: ${REGISTRY_URL}/agent-browser
-    newName: localhost:5000/agent-browser
-    newTag: latest
   - name: ${REGISTRY_URL}/agent-browser-api
-    newName: localhost:5000/agent-browser-api
+    newName: agent-browser-api
     newTag: latest
   - name: ${REGISTRY_URL}/agent-browser-browser
-    newName: localhost:5000/agent-browser-browser
+    newName: agent-browser-browser
     newTag: latest
-
-# ConfigMap 生成器（可选）
-# configMapGenerator:
-#   - name: agent-browser-config
-#     literals:
-#       - DEPLOYMENT_MODE=all-in-one
-#       - MAX_SESSIONS=10
-
-# Secret 生成器（可选）
-# secretGenerator:
-#   - name: agent-browser-secret
-#     literals:
-#       - ANTHROPIC_API_KEY=your-key
-#       - OPENAI_API_KEY=your-key

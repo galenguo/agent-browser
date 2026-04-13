@@ -6,7 +6,7 @@ Boss 直聘端到端测试：推荐牛人简历筛选与收藏
   2. browser-use Agent 接管全部操作（登录检测 + 推荐牛人 + 简历筛选 + 收藏）
 
 用法：
-    cd /Users/galen/OpenSource/browser-controller/agent-browser
+    cd <project-root>
     PYTHONPATH=src python scripts/test_recruit_e2e.py
 """
 import asyncio

@@ -8,19 +8,25 @@ metadata:
     component: browser
     mode: distributed
 spec:
-  clusterIP: None  # Headless service for StatefulSet
+  # Headless — enables pod-level DNS ({pod}.{svc}.{ns}.svc.cluster.local)
+  # for CDP direct access. Traefik still discovers pods via selector.
+  clusterIP: None
   selector:
     app: agent-browser
     component: browser
     mode: distributed
   ports:
-  - name: cdp
-    port: 19222
-    targetPort: 19222
+  - name: auth-proxy
+    port: 80
+    targetPort: 80
     protocol: TCP
   - name: novnc
     port: 6080
     targetPort: 6080
+    protocol: TCP
+  - name: cdp
+    port: 19222
+    targetPort: 19222
     protocol: TCP
   - name: vnc
     port: 5900

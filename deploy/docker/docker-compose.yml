@@ -15,13 +15,13 @@ services:
     profiles: ["all-in-one"]
     image: agent-browser:latest
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
     container_name: agent-browser
     ports:
       - "8000:8000"   # FastAPI API
       - "6080:6080"   # noVNC Web 查看器
-      - "5900:5900"   # VNC 直连
+      - "6000:5900"   # VNC 直连（映射到宿主机 6000，避免 macOS 屏幕共享冲突）
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
@@ -35,6 +35,8 @@ services:
       - DISPLAY=:99
       - PROFILE_STORAGE=/data/profiles
       - LOG_LEVEL=info
+      - BROWSER_PUBLIC_HOST=${BROWSER_PUBLIC_HOST:-}
+      - BROWSER_PORT_OFFSET=${BROWSER_PORT_OFFSET:-0}
     volumes:
       - ./data/profiles:/data/profiles
       - ./data/logs:/data/logs
@@ -61,8 +63,8 @@ services:
     profiles: ["distributed"]
     image: agent-browser-api:latest
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.api
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.api
     container_name: agent-browser-api
     ports:
       - "8000:8000"

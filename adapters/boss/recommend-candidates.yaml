@@ -1,0 +1,151 @@
+site: boss
+name: recommend-candidates
+description: |
+  Boss直聘推荐人才筛选（雇主端）。从推荐页面提取候选人信息，
+  支持按工作年限和 AI 关键词筛选。
+  数据来源：https://www.zhipin.com/web/chat/recommend （需登录态）
+strategy: cookie
+browser: true
+
+stealth:
+  warmup: true
+  human_click: true
+  human_type: true
+  request_delay: [1.5, 3.0]
+  scroll_before: true
+  jitter: true
+
+args:
+  min_experience_years:
+    type: int
+    default: 0
+    description: 最低工作年限
+  max_experience_years:
+    type: int
+    default: 99
+    description: 最高工作年限
+  keywords:
+    type: str
+    default: ""
+    description: "AI 关键词筛选（逗号分隔，如：AI,大模型,LLM,机器学习,深度学习,NLP,CV,AIGC,RAG,向量数据库）"
+  limit:
+    type: int
+    default: 10
+    description: 返回结果数量上限
+
+columns: [name, salary, experience_years, tags, ai_keywords_matched, ai_projects, description]
+
+pipeline:
+  # Step 1: 导航到雇主端推荐牛人页面
+  - navigate: "https://www.zhipin.com/web/chat/recommend"
+
+  # Step 2: 等待 iframe 加载
+  - wait:
+      selector: "iframe[name=recommendFrame]"
+      timeout: 15000
+
+  # Step 3: 等待动态内容渲染
+  - wait: 2
+
+  # Step 3.5: 在 iframe 内滚动加载更多卡片
+  - evaluate: |
+      (() => {
+        var iframe = document.querySelector('iframe[name="recommendFrame"]');
+        if (!iframe || !iframe.contentDocument) return 'no iframe';
+        var doc = iframe.contentDocument;
+        var container = doc.querySelector('.card-list-wrap, .recommend-list, .scroll-wrap, .main-wrap, .page-content, body');
+        if (!container) container = doc.scrollingElement || doc.body;
+        var totalScroll = container.scrollHeight;
+        for (var i = 0; i < 8; i++) {
+          totalScroll += 400;
+          container.scrollTop = totalScroll;
+        }
+        return 'scrolled to ' + container.scrollTop;
+      })()
+
+  # Step 4: 提取 + 年限过滤 + AI 关键词过滤 + AI项目详情提取
+  - evaluate: |
+      (() => {
+        var minExp = ${{ args.min_experience_years }};
+        var maxExp = ${{ args.max_experience_years }};
+        var kwStr = '${{ args.keywords }}';
+        var keywords = kwStr ? kwStr.split(',').map((k) => k.trim().toLowerCase()).filter(Boolean) : [];
+
+        var iframe = document.querySelector('iframe[name="recommendFrame"]');
+        if (!iframe || !iframe.contentDocument) {
+          return {error: 'iframe not found or cross-origin'};
+        }
+
+        var doc = iframe.contentDocument;
+        var candidates = [];
+        var cards = doc.querySelectorAll('li.card-item');
+
+        cards.forEach((card) => {
+          var nameEl = card.querySelector('.name');
+          var name = nameEl ? nameEl.textContent.trim() : '';
+          if (!name) return;
+
+          var salaryEl = card.querySelector('.salary-wrap .salary, .col-1 .salary-wrap');
+          var salary = salaryEl ? salaryEl.textContent.trim() : '';
+
+          var expYears = 0;
+          var expText = '';
+          var infoRow = card.querySelector('.join-text-wrap.base-info');
+          if (infoRow) {
+            infoRow.querySelectorAll('span').forEach((s) => {
+              var m = s.textContent.trim().match(/(\d+)年/);
+              if (m) { expText = s.textContent.trim(); expYears = parseInt(m[1], 10); }
+            });
+          }
+
+          if (expYears < minExp || expYears > maxExp) return;
+
+          var tags = [];
+          card.querySelectorAll('.tag-item').forEach((t) => tags.push(t.textContent.trim()));
+
+          var descEl = card.querySelector('.geek-desc .content, .row.geek-desc .content');
+          var fullDesc = descEl ? descEl.textContent.trim() : '';
+          var desc = fullDesc.substring(0, 500);
+
+          // AI 关键词匹配
+          var aiMatched = [];
+          var searchText = (tags.join(' ') + ' ' + fullDesc).toLowerCase();
+          if (keywords.length > 0) {
+            keywords.forEach((kw) => {
+              if (searchText.indexOf(kw) >= 0) aiMatched.push(kw);
+            });
+            if (aiMatched.length === 0) return;
+          }
+
+          // 提取 AI 项目相关句子
+          var aiSentences = [];
+          var sentences = fullDesc.split(/[。；\n]/);
+          var aiPattern = /ai|大模型|llm|机器学习|深度学习|nlp|cv|aigc|rag|向量|智能体|agent|transformer|gpt|bert|模型训练|模型部署|prompt|微调|fine.?tun|langchain|spring.?ai|diffus|yolo|ocr|语音识别|图像识别|推荐系统|知识图谱|tensorflow|pytorch|cuda/;
+          sentences.forEach((s) => {
+            var t = s.trim();
+            if (t.length > 8 && aiPattern.test(t.toLowerCase())) {
+              aiSentences.push(t);
+            }
+          });
+          var aiProjects = aiSentences.slice(0, 5).join('；');
+          if (!aiProjects && aiMatched.length > 0) {
+            aiProjects = '(标签/技能中包含: ' + aiMatched.join(', ') + ')';
+          }
+
+          candidates.push({
+            name: name,
+            salary: salary,
+            experience_text: expText,
+            experience_years: expYears,
+            tags: tags.join(', '),
+            description: desc,
+            ai_keywords_matched: aiMatched.join(', '),
+            ai_projects: aiProjects
+          });
+        });
+
+        return candidates;
+      })()
+
+  # Step 5: 限制结果数
+  - limit: "${{ args.limit }}"

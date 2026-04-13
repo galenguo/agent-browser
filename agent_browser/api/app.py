@@ -8,6 +8,7 @@ Run:
 
 Endpoints:
     GET  /health                          -- Server health + pool stats
+    GET  /auth                            -- ForwardAuth endpoint
     GET  /sessions                        -- List all sessions
     POST /sessions/create                 -- Create session
     GET  /sessions/{id}                   -- Get session status
@@ -25,19 +26,23 @@ Endpoints:
     POST /sessions/{id}/keyboard/press     -- Press key
     POST /sessions/{id}/task                -- Submit agent task
     GET  /sessions/{id}/tasks/{task_id}   -- Task status
+    GET  /vnc/{token}/{path}              -- noVNC proxy (HTTP)
+    WS   /vnc/{token}/websockify          -- noVNC proxy (WebSocket)
+    *    /browser-proxy/{id}/{path}       -- Browser pod reverse proxy
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 import os
 import tempfile
 
 import aiohttp
-from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import Response, StreamingResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from agent_browser.api.auth import load_keys, require_api_key
@@ -45,6 +50,7 @@ from agent_browser.models import (
     ClickRequest,
     EvaluateRequest,
     FillRequest,
+    K8sBrowserInstance,
     NavigateRequest,
     ResourceExhaustedError,
     ScrollRequest,
@@ -76,19 +82,16 @@ def get_pool() -> SessionPoolManager:
     """Get or lazily create the session pool."""
     global _pool
     if _pool is None:
-        browser_mode = os.environ.get("BROWSER_MODE", "local")
-        max_concurrent = int(os.environ.get("MAX_SESSIONS", "10"))
-        idle_timeout = int(os.environ.get("IDLE_TIMEOUT_SECONDS", "1800"))
         _pool = SessionPoolManager(
-            max_concurrent=max_concurrent,
-            idle_timeout=idle_timeout,
-            browser_mode=browser_mode,
+            max_concurrent=int(os.getenv("MAX_SESSIONS", "10")),
+            idle_timeout=int(os.getenv("IDLE_TIMEOUT_SECONDS", "1800")),
+            browser_mode=os.getenv("BROWSER_MODE", "local"),
         )
     return _pool
 
 
 # ── Auth dependency ──────────────────────────────────────────────────
-# require_api_key is imported from agent_browser.api.auth
+# require_api_key is imported from agent_browser.api.auth (validates against keys.yaml)
 
 
 def _get_owned_session(pool, session_id: str, api_key: str) -> UserSession:
@@ -99,6 +102,60 @@ def _get_owned_session(pool, session_id: str, api_key: str) -> UserSession:
     if session.owner_key and session.owner_key != api_key:
         raise HTTPException(status_code=403, detail="Access denied: session belongs to another key")
     return session
+
+
+class KeyManager:
+    """Multi-API-Key authentication and 1-key-1-browser allocation.
+
+    Manages three-way mapping: api_key → session_id → pod_name.
+    State backed by StateStore (K8s ConfigMap+CAS in distributed mode,
+    in-memory dicts otherwise).
+    """
+
+    def __init__(self, store=None):
+        raw = os.getenv("API_KEYS", "[]")
+        try:
+            self.valid_keys: list[str] = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            self.valid_keys = [k.strip() for k in raw.split(",") if k.strip()]
+        self._fallback_key = os.getenv("API_KEY", "")
+
+        from agent_browser.state.store import create_state_store
+        self.store = store or create_state_store()
+
+    @property
+    def is_multi_key(self) -> bool:
+        return len(self.valid_keys) > 0
+
+    def validate(self, key: str) -> bool:
+        if self.is_multi_key:
+            return key in self.valid_keys
+        return not self._fallback_key or key == self._fallback_key
+
+    async def allocate(self, key: str, session_id: str, pod_name: str | None = None):
+        await self.store.allocate_key(key, session_id, pod_name or "")
+
+    async def release(self, key: str):
+        await self.store.release_key(key)
+
+    async def get_pod_for_key(self, key: str) -> str | None:
+        return await self.store.get_pod_for_key(key)
+
+    async def get_key_for_session(self, session_id: str) -> str | None:
+        return await self.store.get_key_for_session(session_id)
+
+    async def get_all_pod_idle_since(self) -> dict[str, float]:
+        return await self.store.get_all_pod_idle_since()
+
+
+_key_manager: KeyManager | None = None
+
+
+def get_key_manager() -> KeyManager:
+    global _key_manager
+    if _key_manager is None:
+        _key_manager = KeyManager()
+    return _key_manager
 
 
 # ── Request/Response models not in models.py ────────────────────────────
@@ -141,8 +198,26 @@ async def _startup():
     logger.info("Starting Agent Browser API server...")
     pool = get_pool()
     pool.start()
+
+    # Initialize state store (triggers K8s ConfigMap connection if in cluster)
+    km = get_key_manager()
+    try:
+        await km.store.read_cache()
+        logger.info("State store initialized: %s", type(km.store).__name__)
+    except Exception as e:
+        logger.warning(
+            "State store init failed (%s), falling back to InMemoryStateStore: %s",
+            type(e).__name__, e,
+        )
+        from agent_browser.state.store import InMemoryStateStore
+        km.store = InMemoryStateStore()
+
+    # Wire KeyManager into pool for mixed recycling health checks
+    pool._key_manager = km
+    if hasattr(pool, 'store'):
+        pool.store = km.store
     _pool = pool
-    logger.info(f"API server ready (max_concurrent={pool.max_concurrent})")
+    logger.info(f"API server ready (max_concurrent={pool.max_concurrent}, mode={pool.browser_pool.mode})")
 
 
 @app.on_event("shutdown")
@@ -159,13 +234,71 @@ async def _shutdown():
 
 @app.get("/health")
 async def health():
+    """Health check endpoint (public, no auth required)."""
     pool = get_pool()
+    km = get_key_manager()
     return {
         "status": "ok",
         "sessions": len(pool.sessions),
         "max_concurrent": pool.max_concurrent,
         "browser_mode": pool.browser_pool.mode,
+        "auth_mode": "multi-key" if km.is_multi_key else ("single-key" if km._fallback_key else "open"),
+        "valid_keys": len(km.valid_keys) if km.is_multi_key else (1 if km._fallback_key else 0),
     }
+
+
+# ── Auth endpoint (for ForwardAuth middleware / browser proxy) ────────
+
+
+@app.get("/auth")
+async def auth_endpoint(request: Request):
+    """Validate API Key, return 200/403. Used by Traefik ForwardAuth."""
+    km = get_key_manager()
+    key = request.headers.get("X-API-Key", "")
+    if km.validate(key):
+        return Response(status_code=200)
+    return Response(status_code=403)
+
+
+# ── Browser reverse proxy ───────────────────────────────────────────
+
+
+@app.api_route("/browser-proxy/{session_id}/{path:path}", methods=["GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS", "PATCH"])
+async def browser_proxy(session_id: str, path: str, request: Request,
+                        api_key: str = Depends(require_api_key)):
+    """Reverse proxy to browser pod's noVNC. Validates key owns the session."""
+    import httpx
+    from urllib.parse import urljoin
+
+    _get_owned_session(get_pool(), session_id, api_key)
+
+    pool = get_pool()
+    session = pool.sessions.get(session_id)
+    instance = session.browser_instance if session else None
+    if not instance:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found or has no browser instance")
+
+    if isinstance(instance, K8sBrowserInstance):
+        target_base = instance.novnc_url or f"http://{instance.pod_name}.agent-browser-browser:6080"
+    else:
+        container_ip = getattr(instance, "container_ip", None)
+        if not container_ip:
+            raise HTTPException(status_code=502, detail=f"Browser instance for session {session_id} has no reachable address")
+        target_base = f"http://{container_ip}:6080"
+
+    target_url = urljoin(target_base, f"/{path}")
+    exclude_headers = {"host", "content-length", "transfer-encoding", "connection"}
+    forward_headers = {k: v for k, v in request.headers.items() if k.lower() not in exclude_headers}
+    body = await request.body()
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
+        try:
+            resp = await client.request(method=request.method, url=target_url, headers=forward_headers, content=body)
+            return Response(content=resp.content, status_code=resp.status_code,
+                            media_type=resp.headers.get("content-type"),
+                            headers={"X-Proxy-By": "agent-browser-api"})
+        except httpx.ConnectError:
+            raise HTTPException(status_code=502, detail=f"Cannot connect to browser at {target_base}")
 
 
 # ── Session CRUD ───────────────────────────────────────────────────────
@@ -178,30 +311,53 @@ async def list_sessions(api_key: str = Depends(require_api_key)):
     for sid, s in pool.sessions.items():
         if not s or s.owner_key != api_key:
             continue
-        sessions.append(
-            {
-                "session_id": sid,
-                "user_id": s.user_id,
-                "created_at": s.created_at,
-                "last_activity": s.last_activity,
-            }
-        )
+        sessions.append({"session_id": sid, "user_id": s.user_id, "created_at": s.created_at, "last_activity": s.last_activity})
     return {"sessions": sessions, "total": len(sessions)}
 
 
 @app.post("/sessions/create")
 async def create_session(req: CreateSessionRequest, api_key: str = Depends(require_api_key)):
     pool = get_pool()
+    km = get_key_manager()
     try:
-        session_id = await pool.create_session(user_id=req.user_id, owner_key=api_key)
-        # create_session returns tuple (session_id, node_info); we only need the ID
-        sid = session_id[0] if isinstance(session_id, tuple) else session_id
-        # Build VNC URL from session token
+        result = await pool.create_session(user_id=req.user_id, owner_key=api_key)
+        sid = result[0] if isinstance(result, tuple) else result
+        node_info = result[1] if isinstance(result, tuple) and len(result) > 1 else None
+
+        # Bind key → session → pod in StateStore
+        pod_name = None
         session = pool.sessions.get(sid)
+        instance = session.browser_instance if session else None
+        if instance:
+            if hasattr(instance, 'pod_name'):
+                pod_name = instance.pod_name
+            elif hasattr(instance, 'container_name'):
+                pod_name = instance.container_name
+
+        try:
+            await km.allocate(api_key, sid, pod_name)
+        except Exception:
+            logger.warning("km.allocate failed for session %s, rolling back", sid)
+            with contextlib.suppress(Exception):
+                await pool.close_session(sid)
+            raise
+
+        # Build VNC URL from session token
         vnc_token = session.vnc_token if session else ""
         vnc_base = os.environ.get("VNC_BASE_URL", "")
         vnc_url = f"{vnc_base}/vnc/{vnc_token}/" if vnc_base and vnc_token else None
-        return {"session_id": sid, "user_id": req.user_id, "vnc_url": vnc_url, "vnc_token": vnc_token}
+
+        resp = {"session_id": sid, "user_id": req.user_id, "vnc_url": vnc_url, "vnc_token": vnc_token}
+        if node_info:
+            if node_info.get("novnc_url"):
+                resp["novnc_url"] = node_info["novnc_url"]
+            if node_info.get("public_novnc_port"):
+                resp["public_novnc_port"] = node_info["public_novnc_port"]
+        if pod_name:
+            resp["pod_name"] = pod_name
+        return resp
+    except HTTPException:
+        raise
     except ResourceExhaustedError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except OSError as e:
@@ -224,9 +380,11 @@ async def get_session(session_id: str, api_key: str = Depends(require_api_key)):
 @app.delete("/sessions/{session_id}")
 async def delete_session(session_id: str, api_key: str = Depends(require_api_key)):
     pool = get_pool()
+    km = get_key_manager()
     _get_owned_session(pool, session_id, api_key)
     try:
         await pool.close_session(session_id)
+        await km.release(api_key)
         return {}
     except SessionNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
@@ -243,6 +401,12 @@ async def navigate(session_id: str, req: NavigateRequest, api_key: str = Depends
         return await pool.navigate(session_id, req)
     except SessionNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except Exception as e:
+        logger.warning("Navigate failed for session %s: %s: %s", session_id, type(e).__name__, e)
+        raise HTTPException(status_code=502, detail={
+            "error": "navigation_failed", "type": type(e).__name__, "message": str(e),
+            "hint": "Page may already be at the target URL, or the browser is unresponsive."
+        })
 
 
 @app.post("/sessions/{session_id}/back")
@@ -281,11 +445,14 @@ async def get_title(session_id: str, api_key: str = Depends(require_api_key)):
 
 
 @app.post("/sessions/{session_id}/snapshot")
-async def snapshot(session_id: str, interactive_only: bool = False, api_key: str = Depends(require_api_key)):
+async def snapshot(session_id: str, interactive_only: bool = False,
+                   iframe_selector: str | None = None,
+                   api_key: str = Depends(require_api_key)):
     pool = get_pool()
     _get_owned_session(pool, session_id, api_key)
     try:
-        result = await pool.snapshot(session_id, interactive_only=interactive_only)
+        result = await pool.snapshot(session_id, interactive_only=interactive_only,
+                                     iframe_selector=iframe_selector)
         return result.model_dump() if isinstance(result, SnapshotResponse) else result
     except SessionNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
@@ -299,6 +466,8 @@ async def click(session_id: str, req: ClickRequest, api_key: str = Depends(requi
         return await pool.click(session_id, req)
     except SessionNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/sessions/{session_id}/fill")
@@ -332,6 +501,12 @@ async def evaluate(session_id: str, req: EvaluateRequest, api_key: str = Depends
         return {"result": result}
     except SessionNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except Exception as e:
+        logger.warning("Evaluate failed for session %s: %s: %s", session_id, type(e).__name__, e)
+        raise HTTPException(status_code=400, detail={
+            "error": "evaluation_failed", "type": type(e).__name__, "message": str(e),
+            "hint": "Check JavaScript expression for syntax errors.",
+        })
 
 
 @app.post("/sessions/{session_id}/wait")
@@ -368,33 +543,20 @@ async def keyboard_press(session_id: str, req: KeyPressRequest, api_key: str = D
 
 
 def _get_vnc_target(vnc_token: str) -> str:
-    """Resolve noVNC proxy target from VNC token.
-
-    Dynamic k8s mode: look up session by token → get pod_name → headless DNS.
-    All-in-one / local mode: localhost:6080.
-    """
+    """Resolve noVNC proxy target from VNC token."""
     pool = get_pool()
     browser_mode = os.environ.get("BROWSER_MODE", "local")
 
     if browser_mode == "k8s":
-        from agent_browser.models import K8sBrowserInstance
-
-        br_svc = os.environ.get(
-            "BROWSER_HEADLESS_SVC",
-            "agent-browser-br-headless.agent-browser.svc.cluster.local",
-        )
-        # Find session by VNC token and extract pod_name
         for session in pool.sessions.values():
             if session and session.vnc_token == vnc_token:
                 instance = session.browser_instance
                 if isinstance(instance, K8sBrowserInstance) and instance.pod_name:
                     ns = os.environ.get("BR_NAMESPACE", "agent-browser")
                     return f"http://{instance.pod_name}.agent-browser-br-headless.{ns}.svc.cluster.local:6080"
-        # Token not found or no pod_name — fallback (shouldn't happen in normal operation)
         logger.warning(f"VNC token {vnc_token[:8]}... not matched to any k8s session")
         return "http://localhost:6080"
 
-    # All-in-one mode: VNC is on this pod
     return "http://localhost:6080"
 
 
@@ -459,16 +621,9 @@ async def submit_task(session_id: str, req: TaskSubmitRequest, api_key: str = De
     pool = get_pool()
     _get_owned_session(pool, session_id, api_key)
     try:
-        llm_config = {
-            "model": req.model,
-            # Pass through any extra fields for LLM factory
-        }
-        task_id = await pool.submit_task(
-            session_id=session_id,
-            task=req.task,
-            llm_config=llm_config,
-            max_steps=req.max_steps,
-        )
+        llm_config = {"model": req.model}
+        task_id = await pool.submit_task(session_id=session_id, task=req.task,
+                                         llm_config=llm_config, max_steps=req.max_steps)
         return {"task_id": task_id, "session_id": session_id}
     except SessionNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
@@ -501,12 +656,8 @@ async def legacy_create_task(req: TaskSubmitRequest, api_key: str = Depends(requ
         session_id = await pool.create_session(user_id="legacy_api", owner_key=api_key)
         sid = session_id[0] if isinstance(session_id, tuple) else session_id
         llm_config = {"model": req.model}
-        task_id = await pool.submit_task(
-            session_id=sid,
-            task=req.task,
-            llm_config=llm_config,
-            max_steps=req.max_steps,
-        )
+        task_id = await pool.submit_task(session_id=sid, task=req.task,
+                                         llm_config=llm_config, max_steps=req.max_steps)
         return {"task_id": task_id, "session_id": sid}
     except ResourceExhaustedError as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -524,9 +675,5 @@ async def legacy_get_task_status(task_id: str, api_key: str = Depends(require_ap
             continue
         if task_id in session.tasks:
             info = session.tasks[task_id]
-            return {
-                "task_id": task_id,
-                "session_id": sid,
-                **info,
-            }
+            return {"task_id": task_id, "session_id": sid, **info}
     raise HTTPException(status_code=404, detail=f"Task {task_id} not found in any session")

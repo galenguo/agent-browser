@@ -29,8 +29,8 @@ class SkillConfig:
     """Unified skill configuration for the agent_browser runtime."""
 
     # Mode
-    calling_mode: str = "cli"  # "cli" | "api"
-    browser_mode: str = "local"  # "local" | "remote"
+    calling_mode: str = "api"  # "cli" | "api"
+    browser_mode: str = "remote"  # "remote" only (local mode deprecated)
     intelligence: str = "llm"  # "llm" | "agent"
 
     # Local CDP

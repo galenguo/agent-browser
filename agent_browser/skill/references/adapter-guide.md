@@ -1,104 +1,262 @@
-# Adapter & Exploration Guide
+# Adapter Guide
 
 Site adapters provide zero-LLM-cost deterministic automation for known websites. Instead of running a full ReAct loop, an adapter executes a pre-defined pipeline of steps (navigate, fill, submit, extract).
 
-## Listing Available Adapters
-
-```python
-from agent_browser import list_adapters
-
-adapters = await list_adapters()
-# Returns: [{"name": "boss", "site": "boss.zhipin.com", "commands": ["search", ...]}, ...]
-```
-
-Adapters are YAML files under `adapters/{site}/` directory. Each adapter defines:
+Adapters are YAML files deployed on the server under `adapters/{site}/`. Each adapter defines:
 - Site URL patterns
 - Available commands (search, login, extract, etc.)
-- Step templates with CSS selectors
+- Step templates with CSS selectors and JavaScript extraction
 - Error handling rules
 
-## Running an Adapter
+As a SkillBrowser client, you do not load or execute adapters directly. Instead, you submit a natural language task via `sb.run_task()` and the server routes it through the appropriate adapter or agent pipeline.
+
+## Running Adapter-Powered Tasks
 
 ```python
-from agent_browser import create_session, run_adapter, delete_session
+from agent_browser.skill.scripts.browser_cli import SkillBrowser
 
-sid = await create_session()
+sb = SkillBrowser()
+sid = await sb.create_session()
 
-# Boss Zhipin search
-results = await run_adapter("boss", "search", query="Python", city="101010100")
-# Returns: {"status": "completed", "data": [...], "extracted": [...]}
+# Boss Zhipin search -- the server recognizes the intent and uses the boss/search adapter
+result = await sb.run_task(sid, "Search for Python jobs in Beijing on Boss Zhipin")
 
-# Bilibili video search
-results = await run_adapter("bilibili", "search", keyword="AI tutorial")
+# Bilibili hot videos
+result = await sb.run_task(sid, "Get the top 10 hot videos on Bilibili")
 
-await delete_session(sid)
+# Zhihu trending
+result = await sb.run_task(sid, "Show me the Zhihu hot list")
+
+await sb.delete_session(sid)
 ```
 
-Adapter execution goes through the Pipeline engine v2.3 with full stealth middleware and error recovery.
+The server-side adapter system handles:
+- Matching the task to the correct adapter (boss, bilibili, zhihu, etc.)
+- Executing the YAML pipeline with stealth middleware and error recovery
+- Returning structured results
 
-## Auto-Exploring Unknown Sites
+## Adapter YAML Format
 
-When no adapter exists for a target site, use the exploration module to automatically analyze DOM structure and generate one:
+Adapters live on the server in the `adapters/{site}/` directory. Here is what they look like so you can understand server logs or create new ones for deployment.
 
-```python
-from agent_browser import create_session, explore, synthesize, cascade
+### Structure
 
-sid = await create_session()
+```yaml
+site: <site-name>             # e.g. "boss", "zhihu", "bilibili"
+name: <command-name>          # e.g. "search", "hot"
+description: <human-readable> # e.g. "Boss Zhipin job search"
+strategy: cookie              # Authentication strategy
+browser: true                 # Requires a browser session
 
-# Step 1: Explore -- intercepts network requests, analyzes DOM
-artifacts = await explore(
-    sid,
-    "https://example.com/articles",
-    goal="Get article list with titles and links",
-)
-# Returns: {endpoints: [...], dom_structure: {...}, forms: [...], interactive_elements: [...]}
+args:                         # Input parameters
+  <arg-name>:
+    type: str | int
+    required: true | false
+    default: <value>
+    description: <purpose>
 
-# Step 2: Cascade -- generate robust CSS selectors from exploration data
-strategies = await cascade(
-    sid,
-    "https://example.com/articles",
-    endpoints=artifacts.endpoints,
-)
-# Returns: [{selector: ".article-item h2 > a", confidence: 0.95, type: "link"}, ...]
+columns: [col1, col2, ...]    # Output column names
 
-# Step 3: Synthesize -- generate YAML adapter from artifacts + strategies
-adapter_yaml = synthesize(
-    "example",
-    artifacts,
-    command_name="articles",
-)
-# Returns: YAML string ready to write to adapters/example/ directory
+pipeline:                     # Ordered list of steps
+  - navigate: "<url>"
+  - wait:
+      selector: "<css>"
+      timeout: <ms>
+  - evaluate: |
+      <JavaScript extraction>
+  - limit: "${{ args.limit }}"
 ```
 
-### Exploration Output Fields
+### Step Types
 
-| Field | Description |
-|-------|-------------|
-| `endpoints` | Discovered API endpoints (URLs, methods, params) |
-| `dom_structure` | Page layout: headers, nav, content areas, sidebars |
-| `forms` | Login/search forms with input names and action URLs |
-| `interactive_elements` | Buttons, links, inputs with CSS selectors and visibility |
+| Step | Purpose | Key Fields |
+|------|---------|------------|
+| `navigate` | Open a URL | URL string (supports `${{ args.x }}` template vars) |
+| `wait` | Wait for element | `selector`, `timeout` (ms) |
+| `evaluate` | Run JS, return data | JavaScript expression (IIFE recommended) |
+| `limit` | Truncate results | Number or template expression |
+| `fill` | Type into input | `selector`, `text` |
+| `click` | Click element | `selector` |
+| `scroll` | Scroll page | `direction`, `amount` |
 
-### Cascade Selector Quality
+### Template Variables
 
-Cascade generates selectors ranked by confidence:
-- **0.9+**: Stable (ID, unique class, data attribute) -- use directly
-- **0.7-0.9**: Good (class chain, structural) -- test before using
-- **<0.7**: Fragile (positional, nth-child) -- manual review needed
+Inside pipeline steps, use `${{ args.<name> }}` to reference input arguments. Filters are also available:
 
-## Adapter Development Workflow
+```
+${{ args.query | urlencode }}   # URL-encode the value
+${{ args.limit | int }}         # Cast to integer
+```
 
-1. **Explore** a target site to understand its structure
-2. **Synthesize** an initial adapter YAML from exploration results
-3. **Test** the adapter against real pages
-4. **Refine** selectors that drift or fail
-5. **Commit** the adapter to `adapters/{site}/` for reuse
+## Existing Adapters
 
-After synthesis, the adapter file should be placed in the project's `adapters/` directory so it gets shipped with the package and shared with other users.
+These adapters are deployed on the server and available for use via `sb.run_task()`.
 
-## Notes
+### Boss Zhipin (boss/search)
 
-- `explore()` requires LocalCDPBackend (CLI mode). Not available in API/remote mode.
-- `synthesize()` returns a YAML string; you must write it to a file manually or via script.
-- Adapters are most valuable for sites you automate repeatedly (daily jobs, monitoring, bulk extraction).
-- For one-off tasks, ReAct mode (Mode 1) is simpler and more flexible.
+Searches jobs on zhipin.com with anti-detection stealth configuration.
+
+```yaml
+site: boss
+name: search
+description: Boss Zhipin job search
+strategy: cookie
+browser: true
+
+stealth:
+  warmup: true
+  human_click: true
+  human_type: true
+  request_delay: [1.0, 3.0]
+  scroll_before: true
+  jitter: true
+
+args:
+  query:
+    type: str
+    required: true
+    description: Search keyword
+  city:
+    type: str
+    default: ""
+    description: City code (e.g. 101010100 for Beijing)
+  limit:
+    type: int
+    default: 10
+    description: Number of results
+
+columns: [title, salary, company, location, experience, education]
+
+pipeline:
+  - navigate: "https://www.zhipin.com/web/geek/job?query=${{ args.query | urlencode }}&city=${{ args.city }}"
+  - wait:
+      selector: ".job-list-box li, .search-job-result li"
+      timeout: 10000
+  - evaluate: |
+      (() => {
+        const items = [];
+        document.querySelectorAll('.job-list-box li, .search-job-result .job-card-wrapper').forEach((el) => {
+          const titleEl = el.querySelector('.job-name a, .job-title');
+          const salaryEl = el.querySelector('.salary, .job-salary');
+          const companyEl = el.querySelector('.company-name a, .company-name');
+          const locationEl = el.querySelector('.job-area, .job-area');
+          const tagEls = el.querySelectorAll('.tag-list li, .job-info .tag-list li');
+          const tags = Array.from(tagEls).map(t => t.textContent.trim());
+          items.push({
+            title: titleEl ? titleEl.textContent.trim() : '',
+            salary: salaryEl ? salaryEl.textContent.trim() : '',
+            company: companyEl ? companyEl.textContent.trim() : '',
+            location: locationEl ? locationEl.textContent.trim() : '',
+            experience: tags[0] || '',
+            education: tags[1] || ''
+          });
+        });
+        return items;
+      })()
+  - limit: "${{ args.limit }}"
+```
+
+### Zhihu Hot List (zhihu/hot)
+
+Extracts the Zhihu trending topics list.
+
+```yaml
+site: zhihu
+name: hot
+description: Zhihu hot list
+strategy: cookie
+browser: true
+
+args:
+  limit:
+    type: int
+    default: 10
+    description: Number of results
+
+columns: [rank, title, url, hot_score, excerpt]
+
+pipeline:
+  - navigate: "https://www.zhihu.com/hot"
+  - wait:
+      selector: ".HotItem"
+      timeout: 10000
+  - evaluate: |
+      (() => {
+        const items = [];
+        document.querySelectorAll('.HotItem').forEach((el, i) => {
+          const titleEl = el.querySelector('.HotItem-title');
+          const excerptEl = el.querySelector('.HotItem-excerpt');
+          const linkEl = el.querySelector('.HotItem-content a');
+          const metricsEl = el.querySelector('.HotItem-metrics');
+          items.push({
+            rank: i + 1,
+            title: titleEl ? titleEl.textContent.trim() : '',
+            url: linkEl ? linkEl.href : '',
+            hot_score: metricsEl ? metricsEl.textContent.trim() : '',
+            excerpt: excerptEl ? excerptEl.textContent.trim().substring(0, 100) : ''
+          });
+        });
+        return items;
+      })()
+  - limit: "${{ args.limit }}"
+```
+
+### Bilibili Hot Videos (bilibili/hot)
+
+Extracts the Bilibili popular video ranking.
+
+```yaml
+site: bilibili
+name: hot
+description: Bilibili hot video ranking
+strategy: cookie
+browser: true
+
+args:
+  limit:
+    type: int
+    default: 10
+    description: Number of results
+
+columns: [rank, title, url, play_count, danmaku, author]
+
+pipeline:
+  - navigate: "https://www.bilibili.com/v/popular/rank/all"
+  - wait:
+      selector: ".rank-item"
+      timeout: 10000
+  - evaluate: |
+      (() => {
+        const items = [];
+        document.querySelectorAll('.rank-item').forEach((el, i) => {
+          const titleEl = el.querySelector('.title, a.title');
+          const authorEl = el.querySelector('.author, .up-name');
+          const playEl = el.querySelectorAll('.data-box')[0];
+          const danmakuEl = el.querySelectorAll('.data-box')[1];
+          items.push({
+            rank: i + 1,
+            title: titleEl ? titleEl.textContent.trim() : '',
+            url: titleEl ? titleEl.href : '',
+            play_count: playEl ? playEl.textContent.trim() : '',
+            danmaku: danmakuEl ? danmakuEl.textContent.trim() : '',
+            author: authorEl ? authorEl.textContent.trim() : ''
+          });
+        });
+        return items;
+      })()
+  - limit: "${{ args.limit }}"
+```
+
+## Adding a New Adapter
+
+New adapters are created and deployed on the server side. The SkillBrowser client does not create adapters; it only uses them via `sb.run_task()`.
+
+To add a new adapter:
+
+1. Create a YAML file under `adapters/{site}/` on the server (e.g., `adapters/taobao/search.yaml`)
+2. Define the `site`, `name`, `description`, `args`, `columns`, and `pipeline` fields
+3. Write the CSS selectors and JavaScript extraction logic in the pipeline steps
+4. Deploy the updated adapter directory to the server
+5. Test by submitting a task: `result = await sb.run_task(sid, "Search for shoes on Taobao")`
+
+Adapters are most valuable for sites you automate repeatedly (daily jobs, monitoring, bulk extraction). For one-off tasks, `sb.run_task()` in ReAct mode is simpler and more flexible since the agent figures out the page structure on the fly.

@@ -1,5 +1,9 @@
 FROM python:3.11-slim
 
+# 使用阿里云 Debian 镜像源（国内网络加速）
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
+
 # 系统基础依赖（浏览器运行环境）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
@@ -45,7 +49,9 @@ RUN pip install --upgrade pip setuptools wheel && \
     cloakbrowser \
     patchright \
     rebrowser-playwright \
-    browserforge
+    browserforge \
+	aiohttp \
+    pyyaml
 
 # 只下载 CloakBrowser 二进制（不下载 patchright 的 Chromium，CloakBrowser 自带）
 # 这样节省约 1GB 空间
@@ -57,8 +63,8 @@ RUN apt-get purge -y gcc python3-dev && \
     rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache/pip
 
 # 复制源码和启动脚本
-COPY src/ /app/src/
-COPY docker/entrypoint-browser.sh /entrypoint.sh
+COPY agent_browser/ /app/src/agent_browser/
+COPY deploy/docker/entrypoint-browser.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # 数据目录
@@ -77,6 +83,6 @@ ENV DISPLAY=:99 \
     LANGUAGE=zh_CN:zh \
     LC_ALL=zh_CN.UTF-8
 
-EXPOSE 19222 6080 5900
+EXPOSE 80 19222 6080 5900
 
 ENTRYPOINT ["/entrypoint.sh"]
