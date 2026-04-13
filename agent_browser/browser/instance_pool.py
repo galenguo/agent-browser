@@ -258,10 +258,6 @@ class BrowserInstancePool:
         logger.info(f"Docker browser instance created: {instance.instance_id}")
         return instance
 
-    async def _allocate_k8s(self, session_id: str) -> K8sBrowserInstance:
-        """Delegate to K8sBrowserNodeManager (dynamic pod creation)."""
-        return await self._k8s_manager.allocate(session_id)
-
     async def _wait_cdp_ready(self, cdp_url: str, timeout: int = 30):
         """Wait for CDP port to become ready."""
         from urllib.parse import urlparse

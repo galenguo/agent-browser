@@ -86,8 +86,8 @@ class SessionPoolManager:
         self._monitor_task = None
         self._health_check_task = None
         self._create_lock = asyncio.Lock()
-        # Docker mode CDP connection cache: session_id -> (playwright, browser)
-        self._docker_connections: dict[str, tuple] = {}
+        # CDP connection cache: session_id -> (playwright, browser) — shared by Docker and K8s modes
+        self._cdp_connections: dict[str, tuple] = {}
 
         logger.info(
             f"SessionPoolManager initialized: "
@@ -471,8 +471,8 @@ class SessionPoolManager:
 
         if session:
             logger.info(f"Closing session {session_id}")
-            # Close Docker CDP connection (local only)
-            conn = self._docker_connections.pop(session_id, None)
+            # Close CDP connections (Docker and K8s modes)
+            conn = self._cdp_connections.pop(session_id, None)
             if conn:
                 pw, browser = conn
                 with contextlib.suppress(Exception):
@@ -696,7 +696,7 @@ class SessionPoolManager:
         logger.info("Shutting down SessionPoolManager...")
 
         # Cancel background tasks
-        for task in (self._monitor_task, self._health_check_task):
+        for task in (self._monitor_task, self._health_check_task, getattr(self, '_cleanup_task', None)):
             if task:
                 task.cancel()
 
@@ -800,7 +800,7 @@ class SessionPoolManager:
         instance = session.browser_instance
 
         from agent_browser.models import K8sBrowserInstance
-        if isinstance(instance, (DockerBrowserInstance, K8sBrowserInstance)):
+        if isinstance(instance, DockerBrowserInstance):
             return await self._get_docker_page(session_id, instance)
 
         if isinstance(instance, K8sBrowserInstance):
@@ -833,15 +833,15 @@ class SessionPoolManager:
     async def _get_docker_page(self, session_id: str, instance: DockerBrowserInstance) -> Page:
         """Get Page from Docker container via CDP (with retry)."""
         # Reuse existing CDP connection
-        if session_id in self._docker_connections:
-            pw, browser = self._docker_connections[session_id]
+        if session_id in self._cdp_connections:
+            pw, browser = self._cdp_connections[session_id]
             try:
                 contexts = browser.contexts
                 if contexts and contexts[0].pages:
                     return contexts[0].pages[0]
             except Exception:
                 # Connection broken, clean up and reconnect
-                old_pw, old_browser = self._docker_connections.pop(session_id, (None, None))
+                old_pw, old_browser = self._cdp_connections.pop(session_id, (None, None))
                 if old_browser:
                     with contextlib.suppress(Exception):
                         await old_browser.close()
@@ -855,7 +855,7 @@ class SessionPoolManager:
             try:
                 pw = await async_playwright().start()
                 browser = await pw.chromium.connect_over_cdp(instance.cdp_url)
-                self._docker_connections[session_id] = (pw, browser)
+                self._cdp_connections[session_id] = (pw, browser)
 
                 contexts = browser.contexts
                 if contexts and contexts[0].pages:
@@ -866,8 +866,8 @@ class SessionPoolManager:
                 last_error = e
                 logger.warning(f"CDP connect attempt {attempt + 1}/3 failed: {e}")
                 # Clean up failed connection
-                if session_id in self._docker_connections:
-                    _, failed_browser = self._docker_connections.pop(session_id, (None, None))
+                if session_id in self._cdp_connections:
+                    _, failed_browser = self._cdp_connections.pop(session_id, (None, None))
                     try:
                         if failed_browser:
                             await failed_browser.close()
@@ -884,17 +884,17 @@ class SessionPoolManager:
         """Get Page from K8s browser pod via CDP (with retry).
 
         Similar to _get_docker_page but targets K8s pod DNS addresses.
-        Reuses the same _docker_connections cache for CDP connection reuse.
+        Reuses the same _cdp_connections cache for CDP connection reuse.
         """
         # Reuse existing CDP connection
-        if session_id in self._docker_connections:
-            pw, browser = self._docker_connections[session_id]
+        if session_id in self._cdp_connections:
+            pw, browser = self._cdp_connections[session_id]
             try:
                 contexts = browser.contexts
                 if contexts and contexts[0].pages:
                     return contexts[0].pages[0]
             except Exception:
-                old_pw, old_browser = self._docker_connections.pop(session_id, (None, None))
+                old_pw, old_browser = self._cdp_connections.pop(session_id, (None, None))
                 if old_browser:
                     with contextlib.suppress(Exception):
                         await old_browser.close()
@@ -908,7 +908,7 @@ class SessionPoolManager:
             try:
                 pw = await async_playwright().start()
                 browser = await pw.chromium.connect_over_cdp(instance.cdp_url)
-                self._docker_connections[session_id] = (pw, browser)
+                self._cdp_connections[session_id] = (pw, browser)
 
                 contexts = browser.contexts
                 if contexts and contexts[0].pages:
@@ -918,8 +918,8 @@ class SessionPoolManager:
             except Exception as e:
                 last_error = e
                 logger.warning(f"K8s CDP connect attempt {attempt + 1}/3 failed: {e}")
-                if session_id in self._docker_connections:
-                    _, failed_browser = self._docker_connections.pop(session_id, (None, None))
+                if session_id in self._cdp_connections:
+                    _, failed_browser = self._cdp_connections.pop(session_id, (None, None))
                     try:
                         if failed_browser:
                             await failed_browser.close()

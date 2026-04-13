@@ -14,7 +14,7 @@ service:
   url: "http://192.168.0.99:30801"
 
   # API authentication key (leave empty if server doesn't require auth)
-  api_key: "key-alice-001"
+  api_key: "ab_f2d637aa9d3741d8f48784cb90a9b6fb"
 
   # HTTP request timeout in seconds
   timeout: 120
