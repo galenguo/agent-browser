@@ -100,7 +100,7 @@ class UserSession:
     task_lock: asyncio.Lock
 ```
 
-### 2. 后端抽象层 (skills/agent-browser/backends/__init__.py)
+### 2. 后端抽象层 (agent_browser/browser/__init__.py)
 
 ```python
 class BrowserBackend(ABC):
@@ -122,7 +122,7 @@ class BrowserPageHandle(ABC):
     # ... 更多原子操作
 ```
 
-### 2.1 LocalCDPBackend (skills/agent-browser/backends/local.py)
+### 2.1 LocalCDPBackend (agent_browser/browser/local.py)
 
 浏览器操作的唯一核心实现：
 
@@ -133,7 +133,7 @@ class BrowserPageHandle(ABC):
 - `click()` / `fill()` — 通过 `[data-ab-ref="@eN"]` 精准定位元素
 - Daemon 集成：持久连接 + 空闲断开
 
-### 2.2 ExtensionBackend (src/browser/backends/extension.py)
+### 2.2 ExtensionBackend (agent_browser/browser/extension.py)
 
 Chrome Extension 后端，操作用户真实浏览器：
 
@@ -143,7 +143,7 @@ Chrome Extension 后端，操作用户真实浏览器：
 - 继承登录状态（cookies、session、localStorage）
 - 无 Extension 时自动回退到 LocalCDPBackend
 
-### 2.3 RemoteAPIBackend (skills/agent-browser/backends/remote.py)
+### 2.3 RemoteAPIBackend (agent_browser/browser/remote.py)
 
 零业务逻辑的 HTTP 传输层：
 
@@ -151,7 +151,7 @@ Chrome Extension 后端，操作用户真实浏览器：
 - 支持 `X-API-Key` 认证头
 - 将 `session_id` 映射到服务端会话
 
-### 3. StealthMiddleware (src/stealth/middleware.py)
+### 3. StealthMiddleware (agent_browser/stealth/middleware.py)
 
 第 7 层反检测，集中式隐匿中间件：
 
@@ -185,7 +185,7 @@ class StealthMiddleware:
 - 连续 5 次失败 → OPEN（禁用该 session 的隐匿，降级为透传）
 - 新 session 自动 RESET（failure_count = 0）
 
-### 4. Pipeline 引擎 v2.3 (skills/agent-browser/pipeline/)
+### 4. Pipeline 引擎 v2.3 (agent_browser/pipeline/)
 
 YAML 声明式的适配器执行引擎：
 
@@ -234,7 +234,7 @@ class ErrorCategory(str, Enum):
     UNKNOWN = "unknown"                 # 未知错误
 ```
 
-### 5. 站点探索模块 (skills/agent-browser/explore/)
+### 5. 站点探索模块 (agent_browser/explore/)
 
 自动分析网站结构并生成 YAML 适配器：
 
@@ -257,18 +257,16 @@ class ErrorCategory(str, Enum):
                                        adapters/{site}.yaml
 ```
 
-### 6. Gateway 模块 (src/gateway/)
+### 6. API 层 (agent_browser/api/)
 
-多用户 API 网关：
+FastAPI REST API 服务，多租户会话管理：
 
 | 文件 | 功能 |
 |------|------|
-| `api.py` | Gateway REST 端点（路由到内部服务） |
-| `browser_pool.py` | 多租户浏览器实例池 |
-| `key_store.py` | API Key 存储与验证 |
-| `state.py` | 网关运行状态 |
+| `app.py` | FastAPI 应用 + KeyManager 多 API Key 认证 |
+| (SessionPoolManager) | 委托给 agent_browser/session/pool_manager.py |
 
-### 7. CLI 模块 (src/cli/)
+### 7. CLI 模块 (agent_browser/cli/)
 
 命令行接口：
 
@@ -280,7 +278,7 @@ class ErrorCategory(str, Enum):
 | `session_store.py` | 文件系统持久化 |
 | `output.py` | 输出格式化（JSON/table） |
 
-### 8. LLM 工厂 (src/llm/factory.py)
+### 8. LLM 工厂 (agent_browser/llm/factory.py)
 
 统一 LLM 创建接口：
 
@@ -293,7 +291,7 @@ class LLMFactory:
         # 返回: browser-use ChatOpenAI 或 langchain ChatAnthropic
 ```
 
-### 9. SessionPoolManager (src/session/pool_manager.py)
+### 9. SessionPoolManager (agent_browser/session/pool_manager.py)
 
 **职责**：多用户会话隔离、Session 生命周期管理、任务调度、空闲超时回收。
 
@@ -308,34 +306,16 @@ async def close_session(self, session_id: str):
     """关闭会话，释放资源"""
 ```
 
-### 10. API 层 (src/api.py)
+### 10. 共享状态层 (agent_browser/state/store.py)
 
-**Session 管理 API：**
+分布式协调的共享状态后端：
 
-```
-POST   /sessions/create          # 创建会话
-GET    /sessions/{session_id}    # 查询会话状态
-DELETE /sessions/{session_id}    # 删除会话
-GET    /sessions                 # 列出所有会话
-```
-
-**任务管理 API：**
-
-```
-POST   /sessions/{session_id}/task              # 提交任务
-GET    /sessions/{session_id}/tasks/{task_id}   # 查询任务状态
-```
-
-**原子操作 API（LLM ReAct 模式）：**
-
-```
-GET/POST /sessions/{session_id}/snapshot  # 页面快照 + 元素 refs
-POST     /sessions/{session_id}/navigate  # 导航
-POST     /sessions/{session_id}/click     # 点击元素
-POST     /sessions/{session_id}/fill      # 填充输入
-POST     /sessions/{session_id}/scroll    # 滚动页面
-POST     /sessions/{session_id}/back      # 后退
-```
+| 类 | 功能 |
+|------|------|
+| `StateStore` | 抽象基类，定义 hget/hset/allocate_pod/release_pod 等接口 |
+| `K8sSharedState` | K8s ConfigMap 后端，CAS (Compare-And-Swap) 乐观并发控制 |
+| `InMemoryStateStore` | 内存后端，单 replica / 本地开发用 |
+| `create_state_store()` | 工厂函数，自动检测 K8s 环境选择后端 |
 
 ## 数据流
 
@@ -604,5 +584,13 @@ StealthMiddleware (自动包装所有操作)
 ### 待办
 - [ ] 任务队列和优先级
 - [ ] Prometheus 监控指标
-- [ ] 多节点部署
 - [ ] 适配器市场/共享平台
+
+### Phase 6: 分布式部署 + 稳定性
+- K8s Gateway API 路由 (Traefik + HTTPRoute)
+- 共享状态层 (ConfigMap CAS + InMemory 双后端)
+- 跨 Replica 会话恢复 (_recover_session)
+- KeyManager 多 API Key 1-key-1-browser 绑定
+- noVNC 网关代理 (b.agent-browser.local)
+- 周期性泄漏清理 + double allocation 防护
+- SkillBrowser client (HTTP facade for Claude Code)

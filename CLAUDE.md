@@ -52,7 +52,8 @@ agent-browser/                          # Project root
 │   │   ├── daemon.py                  # BrowserDaemon (persistent CDP singleton)
 │   │   ├── stealth_launcher.py        # CloakBrowser launch with conditional imports
 │   │   ├── human_behavior.py          # Human behavior parameters
-│   │   └── instance_pool.py           # Browser instance pool
+│   │   ├── instance_pool.py           # Browser instance pool
+│   │   └── auth_proxy.py              # Reverse proxy for browser pod CDP + noVNC
 │   │
 │   ├── stealth/                       # Anti-detection layer (Layers 6-7)
 │   │   ├── __init__.py                # Exports all stealth components
@@ -92,6 +93,9 @@ agent-browser/                          # Project root
 │   │   ├── profile_manager.py         # Browser profile management
 │   │   └── session_manager.py         # Fingerprint-IP-Cookie consistency
 │   │
+│   ├── state/                         # Shared state store (distributed coordination)
+│   │   └── store.py                   # K8s ConfigMap CAS + InMemory state backend
+│   │
 │   ├── cli/                           # CLI subsystem
 │   │   ├── main.py                    # CLI entry point (Typer app)
 │   │   └── commands.py                # CLI command definitions
@@ -101,7 +105,9 @@ agent-browser/                          # Project root
 │   │
 │   ├── skill/                         # Claude Code skill
 │   │   ├── SKILL.md                   # Skill definition (triggers, modes, error recovery)
+│   │   ├── config.yaml                # Skill configuration (service URL, API key, mode)
 │   │   ├── scripts/doctor.py          # Environment diagnostic + auto-fix
+│   │   ├── scripts/browser_cli.py     # SkillBrowser client (HTTP facade for Claude Code)
 │   │   └── references/                # Progressive disclosure docs
 │   │
 │   └── utils/                         # Shared utilities
@@ -574,4 +580,4 @@ Code that depends on CloakBrowser uses conditional imports so the basic install 
 
 ---
 
-**Last updated:** 2026-04-07
+**Last updated:** 2026-04-13
