@@ -46,12 +46,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --timeout 120 --retries 5 \
-    cloakbrowser \
+    cloakbrowser==0.3.21 \
     patchright \
     rebrowser-playwright \
     browserforge \
 	aiohttp \
-    pyyaml
+    pyyaml \
+    fastapi \
+    uvicorn[standard]
 
 # 只下载 CloakBrowser 二进制（不下载 patchright 的 Chromium，CloakBrowser 自带）
 # 这样节省约 1GB 空间
@@ -64,8 +66,8 @@ RUN apt-get purge -y gcc python3-dev && \
 
 # 复制源码和启动脚本
 COPY agent_browser/ /app/src/agent_browser/
-COPY deploy/docker/entrypoint-browser.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY deploy/docker/entrypoint-browser.sh /entrypoint-browser.sh
+RUN chmod +x /entrypoint-browser.sh
 
 # 数据目录
 RUN mkdir -p /data/profiles
@@ -85,4 +87,4 @@ ENV DISPLAY=:99 \
 
 EXPOSE 80 19222 6080 5900
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint-browser.sh"]

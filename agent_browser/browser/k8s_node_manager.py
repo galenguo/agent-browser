@@ -16,7 +16,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-BR_IMAGE = os.getenv("BR_IMAGE", "registry-cn-gimc-local.gimccloud.com/library/agent-browser:latest")
+BR_IMAGE = os.getenv("BR_IMAGE", "registry-cn-gimc-local.gimccloud.com/library/agent-browser-br:latest")
 BR_NAMESPACE = os.getenv("BR_NAMESPACE", "agent-browser")
 BR_HEADLESS_SVC = os.getenv(
     "BROWSER_HEADLESS_SVC",

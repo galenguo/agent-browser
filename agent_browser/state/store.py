@@ -286,9 +286,19 @@ class K8sSharedState(StateStore):
                         ),
                         data={"state.json": "{}"},
                     )
-                    cm = v1.create_namespaced_config_map(self.namespace, body)
-                    logger.info("Created state ConfigMap %s", self.configmap_name)
-                    return {}, cm.metadata.resource_version
+                    try:
+                        cm = v1.create_namespaced_config_map(self.namespace, body)
+                        logger.info("Created state ConfigMap %s", self.configmap_name)
+                        return {}, cm.metadata.resource_version
+                    except Exception as create_err:
+                        # 409 = another replica created it concurrently, just re-read
+                        if getattr(create_err, "status", None) == 409:
+                            cm = v1.read_namespaced_config_map(
+                                self.configmap_name, self.namespace
+                            )
+                            raw = cm.data.get("state.json", "{}")
+                            return json.loads(raw), cm.metadata.resource_version
+                        raise
                 raise
 
         return await loop.run_in_executor(None, _do_read)

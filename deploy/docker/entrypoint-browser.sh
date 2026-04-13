@@ -49,7 +49,7 @@ echo "[browser-node] noVNC started"
 
 # ── 4. Browser Node API ───────────────────────────────────────
 echo "[browser-node] Starting Browser Node API on :8080..."
-cd /app
+cd /app/src
 exec python -m uvicorn agent_browser.browser.node_api:app \
     --host 0.0.0.0 \
     --port 8080 \

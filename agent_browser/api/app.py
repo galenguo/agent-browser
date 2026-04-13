@@ -553,9 +553,9 @@ def _get_vnc_target(vnc_token: str) -> str:
                 instance = session.browser_instance
                 if isinstance(instance, K8sBrowserInstance) and instance.pod_name:
                     ns = os.environ.get("BR_NAMESPACE", "agent-browser")
-                    return f"http://{instance.pod_name}.agent-browser-br-headless.{ns}.svc.cluster.local:6080"
+                    return f"http://{instance.pod_name}.agent-browser-br-headless.{ns}.svc.cluster.local:80"
         logger.warning(f"VNC token {vnc_token[:8]}... not matched to any k8s session")
-        return "http://localhost:6080"
+        return "http://localhost:80"
 
     return "http://localhost:6080"
 
