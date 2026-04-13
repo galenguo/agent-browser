@@ -114,9 +114,10 @@ async def test_with_patchright(browser_path: str | None = None):
             else:
                 logger.warning("\n⚠️  Some checks failed. With CloakBrowser these should all pass.")
 
-            # 等待用户查看
-            logger.info("\nPress Enter to close...")
-            await asyncio.get_event_loop().run_in_executor(None, input)
+            # 等待用户查看 (skip input() under pytest to avoid stdin capture error)
+            if not os.getenv("PYTEST_CURRENT_TEST"):
+                logger.info("\nPress Enter to close...")
+                await asyncio.get_event_loop().run_in_executor(None, input)
 
         finally:
             await context.close()
