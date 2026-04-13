@@ -78,6 +78,7 @@ class DockerBrowserInstance(BrowserInstance):
 
     container: Any = None  # docker.models.containers.Container
     container_name: str = None
+    container_ip: str | None = None  # Container IP address (for reverse proxy)
     novnc_host_port: int | None = None  # Allocated host noVNC port (Mode B)
     # Public access info (requires BROWSER_PUBLIC_HOST env var)
     public_host: str | None = None  # Public IP or domain name
@@ -89,6 +90,19 @@ class DockerBrowserInstance(BrowserInstance):
         super().__post_init__()
         if self.container_name is None:
             self.container_name = f"browser_{self.session_id}"
+
+
+@dataclass
+class K8sBrowserInstance(BrowserInstance):
+    """K8s Pod browser instance (from Deployment pool).
+
+    Each pod runs CloakBrowser + noVNC + auth proxy.
+    The API allocates pods from a pre-deployed Deployment pool.
+    """
+
+    pod_name: str = ""
+    pod_api_key: str | None = None  # This pod's unique API key for auth proxy
+    novnc_url: str | None = None   # Internal noVNC URL (pod DNS :6080)
 
 
 # ============ User sessions ============
@@ -134,7 +148,9 @@ class NavigateRequest(BaseModel):
 class ClickRequest(BaseModel):
     """Click element request."""
 
-    ref: str  # Element reference, e.g., @e0, @e1
+    ref: str | None = None  # Element reference, e.g., @e0 (alternative to x/y)
+    x: float | None = None  # Viewport X coordinate (alternative to ref)
+    y: float | None = None  # Viewport Y coordinate (alternative to ref)
     button: str = "left"  # left | right | middle
     click_count: int = 1
     delay: int | None = None  # Click delay in ms
@@ -188,6 +204,7 @@ class ElementInfo(BaseModel):
     is_visible: bool = True
     is_enabled: bool = True
     bounding_box: dict | None = None
+    iframe: str | None = None  # Name/id of iframe if element is inside one (for iframe-aware snapshots)
 
 
 class SnapshotResponse(BaseModel):

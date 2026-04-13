@@ -1,5 +1,7 @@
 # API 层依赖（Distributed 模式 API 容器专用）
 # 不含浏览器相关包（cloakbrowser, patchright, rebrowser-playwright, browserforge）
+# 但需要 playwright（pool_manager 依赖）和 browser-use
+playwright>=0.40.0
 browser-use==0.12.2
 fastapi
 uvicorn[standard]
@@ -9,3 +11,5 @@ langchain-anthropic
 langchain-openai
 docker
 aiohttp
+httpx
+kubernetes

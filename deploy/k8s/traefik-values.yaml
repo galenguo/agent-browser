@@ -1,0 +1,16 @@
+# Traefik v3.x with Kubernetes Gateway API provider
+experimental:
+  gatewayAPI:
+    enabled: true
+    class: traefik
+
+ports:
+  web:
+    hostPort: 80
+  websecure:
+    hostPort: 443
+
+service:
+  type: LoadBalancer
+  annotations:
+    metallb.universe.tf/address-pool: agent-browser-pool

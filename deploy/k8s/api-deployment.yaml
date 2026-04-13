@@ -21,19 +21,37 @@ spec:
         component: api
         mode: distributed
     spec:
+      # Service account for K8s API access (pod listing)
+      serviceAccountName: agent-browser-api
+
       containers:
       - name: api
-        image: ${REGISTRY_URL}/agent-browser-api:latest
+        image: agent-browser-api:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
           name: api
           protocol: TCP
         env:
+        # ── Deployment mode ──
         - name: DEPLOYMENT_MODE
           value: "distributed"
         - name: BROWSER_MODE
-          value: "docker"
+          value: "k8s"                      # Use K8s Browser Pod pool (not docker socket)
+
+        # ── Authentication ──
+        - name: API_KEYS
+          valueFrom:
+            secretKeyRef:
+              name: agent-browser-secret
+              key: API_KEYS
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: agent-browser-secret
+              key: API_KEY
+
+        # ── Session limits (read by get_pool()) ──
         - name: MAX_SESSIONS
           value: "50"
         - name: IDLE_TIMEOUT_SECONDS
@@ -41,6 +59,8 @@ spec:
             configMapKeyRef:
               name: agent-browser-config
               key: IDLE_TIMEOUT_SECONDS
+
+        # ── Storage ──
         - name: PROFILE_STORAGE
           valueFrom:
             configMapKeyRef:
@@ -51,11 +71,25 @@ spec:
             configMapKeyRef:
               name: agent-browser-config
               key: LOG_LEVEL
+
+        # ── Browser recycling ──
+        - name: BROWSER_IDLE_RESTART_MINUTES
+          valueFrom:
+            configMapKeyRef:
+              name: agent-browser-config
+              key: BROWSER_IDLE_RESTART_MINUTES
+
+        # ── LLM Keys ──
         - name: ANTHROPIC_API_KEY
           valueFrom:
             secretKeyRef:
               name: agent-browser-secret
               key: ANTHROPIC_API_KEY
+        - name: ANTHROPIC_BASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: agent-browser-secret
+              key: ANTHROPIC_BASE_URL
         - name: OPENAI_API_KEY
           valueFrom:
             secretKeyRef:
@@ -66,6 +100,7 @@ spec:
             secretKeyRef:
               name: agent-browser-secret
               key: OPENAI_BASE_URL
+
         volumeMounts:
         - name: profiles
           mountPath: /data/profiles

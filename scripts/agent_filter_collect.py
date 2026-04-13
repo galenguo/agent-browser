@@ -5,7 +5,7 @@ browser-use Agent 筛选推荐牛人并收藏。
 目标：收藏 3 位符合条件的候选人
 
 用法：
-    cd /Users/galen/OpenSource/browser-controller/agent-browser
+    cd <project-root>
     PYTHONPATH=. python scripts/agent_filter_collect.py
 """
 import asyncio

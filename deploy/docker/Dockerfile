@@ -1,5 +1,12 @@
 FROM python:3.11-slim
 
+# 使用中科大 Debian 镜像源（国内网络加速）
+RUN sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list 2>/dev/null || true
+
+# 使用清华 PyPI 镜像源（加速 pip 下载）
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
 # 系统基础依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
@@ -52,8 +59,8 @@ RUN apt-get purge -y gcc python3-dev && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache/pip
 
-# 复制应用代码
-COPY src/ /app/src/
+# 复制应用代码（保留 agent_browser 包名，因为内部 import 依赖它）
+COPY agent_browser/ /app/src/agent_browser/
 
 # 数据目录
 RUN mkdir -p /data/sessions /data/profiles /data/logs
@@ -71,7 +78,7 @@ ENV DISPLAY=:99 \
     LC_ALL=zh_CN.UTF-8
 
 # 复制 entrypoint
-COPY docker/entrypoint.sh /entrypoint.sh
+COPY deploy/docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 EXPOSE 8000 6080 5900

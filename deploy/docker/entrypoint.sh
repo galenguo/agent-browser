@@ -4,6 +4,8 @@ set -e
 echo "[entrypoint-v2] Starting Agent Browser - Multi-User Sessions (v2)"
 
 # ── 1. 启动 Xvfb 虚拟显示 ──────────────────────────────────────
+# 清理残留的 Xvfb 锁文件（容器重启时可能残留）
+rm -f /tmp/.X99-lock
 echo "[entrypoint-v2] Starting Xvfb on :99 (1920x1080x24)..."
 Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp -ac &
 XVFB_PID=$!
@@ -57,7 +59,7 @@ echo "  Health:      http://<host>:8000/health"
 echo "  Legacy API:  http://<host>:8000/tasks (backward compatible)"
 
 cd /app
-exec python -m uvicorn agent_browser.api.app:app \
+exec python -m uvicorn agent_browser.api:app \
     --host 0.0.0.0 \
     --port 8000 \
     --workers 1 \

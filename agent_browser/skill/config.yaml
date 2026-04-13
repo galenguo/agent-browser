@@ -1,0 +1,24 @@
+# Agent Browser Skill Configuration
+# ===========================================
+# This file is bundled with the skill and loaded automatically by SkillBrowser().
+# Edit the values below to match your deployment.
+#
+# Config priority: constructor params > this file > auto-detect > defaults
+
+service:
+  # Browser API service endpoint URL
+  # - Local Docker (default): http://localhost:8000
+  # - K8s + Traefik:       http://api.agent-browser.local
+  # - K8s + PortForward:   http://localhost:8888
+  # - Remote server:        http://your-server:8000
+  url: "http://192.168.0.99:30801"
+
+  # API authentication key (leave empty if server doesn't require auth)
+  api_key: "key-alice-001"
+
+  # HTTP request timeout in seconds
+  timeout: 120
+
+# Interaction mode: "llm" (ReAct step-by-step) or "agent" (autonomous)
+# Affects run_task() default behavior
+intelligence: "llm"

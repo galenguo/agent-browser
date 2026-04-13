@@ -439,8 +439,21 @@ async def snapshot(session_id: str, interactive_only: bool = False):
     return await mw.snapshot(session_id, interactive_only)
 
 
-async def click(session_id: str, ref: str):
-    await _ref_op(session_id, ref, "el.click();")
+async def click(session_id: str, ref: str = None, x: float = None, y: float = None):
+    """Click element by ref or by viewport coordinates."""
+    page = await _get_page(session_id)
+    if x is not None and y is not None:
+        # Coordinate-based click (for iframe content or arbitrary positions)
+        if hasattr(page, 'click'):
+            await page.click(x=x, y=y)
+        else:
+            # Fallback: use mouse move + click via evaluate
+            await page.mouse_move(x, y)
+            await page.evaluate("document.elementFromPoint(arguments[0], arguments[1])?.click()", x, y)
+    elif ref:
+        await _ref_op(session_id, ref, "el.click();")
+    else:
+        raise ValueError("click requires either 'ref' or both 'x' and 'y'")
 
 
 async def fill(session_id: str, ref: str, text: str):

@@ -9,6 +9,7 @@ It is an HTTP remote proxy for LocalCDPBackend:
 """
 
 import asyncio
+import atexit
 import contextlib
 import logging
 from collections.abc import Callable
@@ -77,6 +78,28 @@ class RemotePageHandle(BrowserPageHandle):
             {"x": x, "y": y},
         )
 
+    async def click(self, ref: str = None, x: float = None, y: float = None,
+                    button: str = "left", click_count: int = 1,
+                    delay: int | None = None) -> None:
+        """Click element by ref or by viewport coordinates."""
+        body: dict = {}
+        if ref:
+            body["ref"] = ref
+        if x is not None and y is not None:
+            body["x"] = x
+            body["y"] = y
+        if button != "left":
+            body["button"] = button
+        if click_count != 1:
+            body["click_count"] = click_count
+        if delay is not None:
+            body["delay"] = delay
+        await self._backend._request(
+            "POST",
+            f"/sessions/{self._remote_id}/click",
+            body,
+        )
+
     async def keyboard_press(self, key: str) -> None:
         await self._backend._request(
             "POST",
@@ -119,6 +142,17 @@ class RemoteAPIBackend(BrowserBackend):
         self._sessions: dict[str, RemotePageHandle] = {}
         self._id_map: dict[str, str] = {}  # local_id -> remote_id
         self._reverse_id_map: dict[str, str] = {}  # remote_id -> local_id
+        atexit.register(self._sync_cleanup)
+
+    def _sync_cleanup(self):
+        """atexit handler: best-effort close aiohttp session to prevent resource leaks."""
+        if self._http_session and not self._http_session.closed:
+            try:
+                loop = asyncio.get_event_loop()
+                if not loop.is_closed() and loop.is_running():
+                    loop.create_task(self._http_session.close())
+            except RuntimeError:
+                pass
 
     async def _ensure_http(self):
         """Ensure aiohttp session has been created."""
@@ -212,10 +246,26 @@ class RemoteAPIBackend(BrowserBackend):
         self._sessions.pop(session_id, None)
 
     async def get_page(self, session_id: str) -> RemotePageHandle:
-        """Get the remote page handle for a session."""
-        if session_id not in self._sessions:
-            raise ValueError(f"Session {session_id} not found")
-        return self._sessions[session_id]
+        """Get the remote page handle for a session.
+
+        If the session was created externally (e.g., via curl or another client),
+        queries the remote server to verify it exists and auto-registers it locally.
+        """
+        if session_id in self._sessions:
+            return self._sessions[session_id]
+
+        # External session: query remote server to verify existence, then auto-register
+        try:
+            result = await self._request("GET", f"/sessions/{session_id}")
+            remote_id = result.get("session_id", session_id)
+            handle = RemotePageHandle(self, session_id, remote_id)
+            self._sessions[session_id] = handle
+            self._id_map[session_id] = remote_id
+            self._reverse_id_map[remote_id] = session_id
+            logger.info(f"Auto-registered external session: local={session_id}, remote={remote_id}")
+            return handle
+        except Exception as e:
+            raise ValueError(f"Session {session_id} not found locally or remotely: {e}") from e
 
     # -- Agent mode: task submission + polling --
 
@@ -267,13 +317,17 @@ class RemoteAPIBackend(BrowserBackend):
 
     # -- Snapshot (requires FastAPI endpoint) --
 
-    async def snapshot(self, session_id: str, interactive_only: bool = False) -> dict:
+    async def snapshot(self, session_id: str, interactive_only: bool = False,
+                     iframe_selector: str | None = None) -> dict:
         """Get snapshot remotely."""
         remote_id = self._id_map.get(session_id)
         if not remote_id:
             raise ValueError(f"Session {session_id} not found")
+        params: dict = {"interactive_only": interactive_only}
+        if iframe_selector:
+            params["iframe_selector"] = iframe_selector
         return await self._request(
             "POST",
             f"/sessions/{remote_id}/snapshot",
-            {"interactive_only": interactive_only},
+            params,
         )

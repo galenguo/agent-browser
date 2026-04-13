@@ -7,7 +7,7 @@ browser-use Agent 自动登录 + 查询推荐牛人简历。
   Step 2: 登录成功后，Agent 访问"推荐牛人"，收集并总结 3 份简历
 
 用法：
-    cd /Users/galen/OpenSource/browser-controller/agent-browser
+    cd <project-root>
     PYTHONPATH=. python scripts/agent_login_recruit.py
 """
 import asyncio

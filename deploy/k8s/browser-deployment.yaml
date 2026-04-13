@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: agent-browser-browser
   namespace: agent-browser
@@ -8,8 +8,7 @@ metadata:
     component: browser
     mode: distributed
 spec:
-  serviceName: agent-browser-browser
-  replicas: 3
+  replicas: 3  # Adjust based on expected concurrent sessions
   selector:
     matchLabels:
       app: agent-browser
@@ -24,16 +23,19 @@ spec:
     spec:
       containers:
       - name: browser
-        image: ${REGISTRY_URL}/agent-browser-browser:latest
+        image: agent-browser-browser:latest
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 19222
-          name: cdp
+        - containerPort: 80          # Auth proxy (external access)
+          name: auth-proxy
           protocol: TCP
-        - containerPort: 6080
+        - containerPort: 6080        # noVNC (internal, behind auth proxy)
           name: novnc
           protocol: TCP
-        - containerPort: 5900
+        - containerPort: 19222       # CDP (internal, API connects via cluster DNS)
+          name: cdp
+          protocol: TCP
+        - containerPort: 5900        # VNC direct (internal)
           name: vnc
           protocol: TCP
         env:
@@ -43,9 +45,13 @@ spec:
           value: "0.0.0.0"
         - name: HEADLESS
           value: "false"
+        - name: PROFILE_STORAGE
+          value: "/data/profiles"
         volumeMounts:
         - name: shm
           mountPath: /dev/shm
+        - name: profiles
+          mountPath: /data/profiles
         resources:
           requests:
             memory: "512Mi"
@@ -58,3 +64,6 @@ spec:
         emptyDir:
           medium: Memory
           sizeLimit: 128Mi
+      - name: profiles
+        persistentVolumeClaim:
+          claimName: agent-browser-profiles

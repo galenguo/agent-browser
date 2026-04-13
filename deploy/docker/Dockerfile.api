@@ -1,5 +1,9 @@
 FROM python:3.11-slim
 
+# 使用阿里云 Debian 镜像源（国内网络加速）
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
+
 # 只安装 API 运行需要的系统依赖（无浏览器、无 Xvfb/VNC）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -10,21 +14,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # API 依赖（不含 cloakbrowser/patchright/rebrowser 等浏览器包）
-COPY docker/requirements-api.txt .
+COPY deploy/docker/requirements-api.txt .
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --timeout 120 --retries 5 -r requirements-api.txt
 
 # 复制应用代码
-COPY agent_browser/ /app/agent_browser/
+COPY agent_browser/ /app/src/agent_browser/
 
 # 数据目录
 RUN mkdir -p /data/profiles /data/logs
 
 # 环境变量
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
+    PYTHONPATH=/app/src \
     TZ=Asia/Shanghai
 
 EXPOSE 8000
 
-CMD ["uvicorn", "agent_browser.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "agent_browser.api:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -8,7 +8,7 @@
   Step 4: browser-use Agent 使用保存的 Cookie 验证登录态（获取薪资等数据）
 
 用法：
-    cd /Users/galen/OpenSource/browser-controller/agent-browser
+    cd <project-root>
     PYTHONPATH=. python scripts/login_and_verify.py
 """
 import asyncio

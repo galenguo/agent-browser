@@ -11,6 +11,7 @@ Multi-user isolation core:
 
 import asyncio
 import contextlib
+import json
 import logging
 import os
 import time
@@ -27,6 +28,7 @@ from agent_browser.models import (
     ElementInfo,
     EvaluateRequest,
     FillRequest,
+    K8sBrowserInstance,
     NavigateRequest,
     ResourceExhaustedError,
     ScrollRequest,
@@ -47,15 +49,24 @@ class SessionPoolManager:
         self,
         max_concurrent: int = 10,
         idle_timeout: int = 1800,
-        browser_mode: Literal["local", "docker"] = "local",
+        browser_mode: Literal["local", "docker", "k8s"] = "local",
+        store=None,
     ):
         self.sessions: dict[str, UserSession] = {}
         self.max_concurrent = max_concurrent
         self.idle_timeout = idle_timeout
 
+        # Shared state store (K8s ConfigMap or in-memory)
+        if store is not None:
+            self.store = store
+        else:
+            from agent_browser.state.store import create_state_store
+            self.store = create_state_store()
+
         # In docker mode, detect if local CDP is already running → auto-downgrade to local mode
+        # Skip auto-downgrade in Kubernetes (KUBERNETES_SERVICE_HOST is auto-injected)
         effective_mode = browser_mode
-        if browser_mode == "docker":
+        if browser_mode == "docker" and not os.getenv("KUBERNETES_SERVICE_HOST"):
             try:
                 import socket
 
@@ -89,6 +100,8 @@ class SessionPoolManager:
         """Start background tasks (must be called within event loop)."""
         self._monitor_task = asyncio.create_task(self._idle_monitor())
         self._health_check_task = asyncio.create_task(self._health_check_loop())
+        # Clean up leaked allocated_pods from ConfigMap (e.g. after crash/restart)
+        self._cleanup_task = asyncio.create_task(self._cleanup_leaked_allocations())
 
     async def create_session(
         self,
@@ -97,9 +110,10 @@ class SessionPoolManager:
         browser_type: str = "chromium",
     ) -> str:
         """Create a new session."""
-        # Check quota and reserve session_id under lock to prevent concurrent over-allocation
+        # Check global quota via store (atomic across replicas)
         async with self._create_lock:
-            if len(self.sessions) >= self.max_concurrent:
+            acquired = await self.store.try_acquire_session_slot(self.max_concurrent)
+            if not acquired:
                 raise ResourceExhaustedError(f"Max concurrent sessions reached ({self.max_concurrent})")
             session_id = f"{user_id}_{uuid4().hex[:8]}"
             # Reserve slot upfront to prevent concurrent requests from bypassing quota check
@@ -122,6 +136,7 @@ class SessionPoolManager:
         except Exception:
             logger.error(f"Failed to allocate browser for session {session_id}, cleaning up")
             self.sessions.pop(session_id, None)
+            await self.store.decr_session_count()
             await self.browser_pool.release(session_id)
             raise
 
@@ -135,26 +150,67 @@ class SessionPoolManager:
         )
 
         self.sessions[session_id] = user_session
+        # Persist session metadata for cross-replica recovery
+        if hasattr(self.store, 'save_session_meta'):
+            try:
+                await self.store.save_session_meta(
+                    session_id, user_id, profile_dir
+                )
+            except Exception:
+                logger.debug("save_session_meta failed (non-critical)")
         logger.info(f"Session created: {session_id}")
         return session_id, self._build_browser_node_info(browser_instance)
 
     def _build_browser_node_info(self, instance) -> dict | None:
-        """Build browser node public access info (DockerBrowserInstance returns VNC info)."""
-        if not isinstance(instance, DockerBrowserInstance):
-            return None
-        # Return VNC info if novnc_url is available (always generated when BROWSER_PUBLIC_HOST is set)
-        info = {
-            "instance_id": instance.instance_id,
-        }
-        if instance.public_host:
-            info["public_host"] = instance.public_host
-        if instance.public_cdp_port:
-            info["public_cdp_port"] = instance.public_cdp_port
-        if instance.public_novnc_port:
-            info["public_novnc_port"] = instance.public_novnc_port
-        if instance.novnc_url:
-            info["novnc_url"] = instance.novnc_url
-        return info
+        """Build browser node public access info.
+
+        For K8sBrowserInstance: uses pod DNS + public host from env.
+        For DockerBrowserInstance: uses instance attributes.
+        For local mode inside Docker (all-in-one): constructs noVNC URL from env vars.
+        """
+        if isinstance(instance, K8sBrowserInstance):
+            public_host = os.getenv("BROWSER_PUBLIC_HOST", "")
+            info = {"instance_id": instance.instance_id, "pod_name": instance.pod_name}
+            if instance.novnc_url:
+                info["novnc_url"] = instance.novnc_url
+            if public_host:
+                # Build public noVNC URL via gateway domain
+                base = public_host
+                if ":" not in base:
+                    gateway_port = os.getenv("BROWSER_GATEWAY_PORT", "")
+                    if gateway_port:
+                        base = f"{base}:{gateway_port}"
+                path_prefix = os.getenv("BROWSER_NOVNC_PATH_PREFIX", "")
+                if path_prefix:
+                    path_prefix = path_prefix.replace("{pod_name}", instance.pod_name)
+                info["public_host"] = public_host
+                info["novnc_url"] = f"http://{base}{path_prefix}/vnc.html"
+            return info
+
+        if isinstance(instance, DockerBrowserInstance):
+            info = {"instance_id": instance.instance_id}
+            if instance.public_host:
+                info["public_host"] = instance.public_host
+            if instance.public_cdp_port:
+                info["public_cdp_port"] = instance.public_cdp_port
+            if instance.public_novnc_port:
+                info["public_novnc_port"] = instance.public_novnc_port
+            if instance.novnc_url:
+                info["novnc_url"] = instance.novnc_url
+            return info
+
+        # all-in-one Docker: local browser + noVNC via entrypoint
+        public_host = os.getenv("BROWSER_PUBLIC_HOST", "")
+        novnc_port = os.getenv("NOVNC_PORT", "6080")
+        if public_host:
+            novnc_url = f"http://{public_host}:{novnc_port}/vnc.html"
+            return {
+                "instance_id": getattr(instance, "instance_id", None),
+                "public_host": public_host,
+                "public_novnc_port": int(novnc_port),
+                "novnc_url": novnc_url,
+            }
+        return None
 
     async def submit_task(
         self,
@@ -165,6 +221,8 @@ class SessionPoolManager:
     ) -> str:
         """Submit a task to the specified session."""
         session = self.sessions.get(session_id)
+        if not session:
+            session = await self._recover_session(session_id)
         if not session:
             raise SessionNotFoundError(f"Session not found: {session_id}")
 
@@ -329,13 +387,26 @@ class SessionPoolManager:
                     await current_bs.close()
 
     def _create_llm(self, llm_config: dict):
-        """Create LLM instance (using browser-use's ChatOpenAI wrapper)."""
+        """Create LLM instance (using browser-use's ChatOpenAI wrapper).
+
+        Supports both OpenAI and Anthropic-compatible APIs via base_url.
+        Reads ANTHROPIC_BASE_URL / OPENAI_BASE_URL from environment.
+        """
         from browser_use.llm import ChatOpenAI
 
+        model = llm_config.get("model", "glm-5-turbo")
+        api_key = os.getenv("OPENAI_API_KEY")
+        base_url = os.getenv("OPENAI_BASE_URL")
+
+        # If model looks like an Anthropic model, use Anthropic credentials
+        if any(model.startswith(p) for p in ("claude-", "anthropic")):
+            api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+            base_url = base_url or os.getenv("ANTHROPIC_BASE_URL")
+
         return ChatOpenAI(
-            model=llm_config.get("model", "glm-5-turbo"),
-            api_key=os.getenv("OPENAI_API_KEY"),
-            base_url=os.getenv("OPENAI_BASE_URL"),
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
             temperature=0.1,
             add_schema_to_system_prompt=True,
             dont_force_structured_output=True,
@@ -344,6 +415,8 @@ class SessionPoolManager:
     async def get_task_status(self, session_id: str, task_id: str) -> dict:
         """Get task status."""
         session = self.sessions.get(session_id)
+        if not session:
+            session = await self._recover_session(session_id)
         if not session:
             raise SessionNotFoundError(f"Session not found: {session_id}")
 
@@ -358,6 +431,8 @@ class SessionPoolManager:
     async def get_session_status(self, session_id: str) -> dict:
         """Get session status."""
         session = self.sessions.get(session_id)
+        if not session:
+            session = await self._recover_session(session_id)
         if not session:
             raise SessionNotFoundError(f"Session not found: {session_id}")
 
@@ -379,27 +454,89 @@ class SessionPoolManager:
         }
 
     async def close_session(self, session_id: str):
-        """Close a session."""
+        """Close a session.
+
+        Handles both local sessions (created on this replica) and remote
+        sessions (created on another replica) by always attempting
+        shared-store cleanup (pod release + counter decrement).
+        """
         session = self.sessions.pop(session_id, None)
-        if not session:
-            logger.warning(f"Session not found: {session_id}")
-            return
 
-        logger.info(f"Closing session {session_id}")
+        if session:
+            logger.info(f"Closing session {session_id}")
+            # Close Docker CDP connection (local only)
+            conn = self._docker_connections.pop(session_id, None)
+            if conn:
+                pw, browser = conn
+                with contextlib.suppress(Exception):
+                    await browser.close()
+                with contextlib.suppress(Exception):
+                    await pw.stop()
+            # Release browser instance (local pool + shared store)
+            await self.browser_pool.release(session_id)
+        else:
+            logger.warning(
+                "Session %s not found locally (may be on another replica), "
+                "attempting shared-store cleanup only",
+                session_id,
+            )
+            # Session was created on another replica — release pod directly
+            # via shared store (browser_pool.release won't find it locally)
+            try:
+                await self.store.release_pod(session_id)
+                logger.info("Released pod for remote session %s from shared store", session_id)
+            except Exception as e:
+                logger.warning("Failed to release pod for remote session %s: %s", session_id, e)
 
-        # Close Docker CDP connection
-        conn = self._docker_connections.pop(session_id, None)
-        if conn:
-            pw, browser = conn
-            with contextlib.suppress(Exception):
-                await browser.close()
-            with contextlib.suppress(Exception):
-                await pw.stop()
+        # Always decrement global session counter (even for remote sessions)
+        try:
+            await self.store.decr_session_count()
+        except Exception as e:
+            logger.warning("Failed to decrement session counter: %s", e)
 
-        # Release browser instance
-        await self.browser_pool.release(session_id)
+        # Clean up session metadata
+        if hasattr(self.store, 'remove_session_meta'):
+            try:
+                await self.store.remove_session_meta(session_id)
+            except Exception:
+                pass
 
         logger.info(f"Session closed: {session_id}")
+
+    async def _cleanup_leaked_allocations(self):
+        """Clean up allocated_pods entries that don't correspond to any active session.
+
+        This runs once at startup to handle leaked state after API pod crashes
+        or restarts where close_session() was never called.
+        """
+        try:
+            allocated = await self.store.get_allocated_pods()
+            if not allocated:
+                return
+            # Any allocated_pods entry whose session_id is not in self.sessions is leaked
+            leaked = [
+                sid for sid in allocated
+                if sid not in self.sessions
+            ]
+            if leaked:
+                logger.warning(
+                    "Cleaning up %d leaked pod allocation(s): %s",
+                    len(leaked), leaked,
+                )
+                for sid in leaked:
+                    try:
+                        await self.store.release_pod(sid)
+                    except Exception as e:
+                        logger.warning("Failed to release leaked pod for %s: %s", sid, e)
+                # Fix session counter: decrement for each leaked session
+                for _ in leaked:
+                    try:
+                        await self.store.decr_session_count()
+                    except Exception:
+                        pass
+                logger.info("Leaked allocations cleaned up (counter fixed)")
+        except Exception as e:
+            logger.warning("Leaked allocation cleanup failed: %s", e)
 
     async def _idle_monitor(self):
         """Idle monitor: auto-close sessions that exceed idle timeout (skip sessions with active tasks)."""
@@ -423,34 +560,129 @@ class SessionPoolManager:
                 await self.close_session(session_id)
 
     async def _health_check_loop(self):
-        """Runtime health check: detect crashed Docker containers and auto-recover."""
-        from agent_browser.models import DockerBrowserInstance
+        """Runtime health check + mixed recycling.
+
+        - Detects crashed Docker/K8s browser instances and auto-recovers
+        - Restarts idle K8s pods that exceed BROWSER_IDLE_RESTART_MINUTES threshold
+        """
+        from agent_browser.models import DockerBrowserInstance, K8sBrowserInstance
+
+        idle_restart_threshold = int(
+            os.getenv("BROWSER_IDLE_RESTART_MINUTES", "30")
+        ) * 60  # Convert to seconds
+        cleanup_interval = int(os.getenv("LEAKED_CLEANUP_INTERVAL_SECONDS", "300"))
+        last_cleanup = time.time()
 
         while True:
             await asyncio.sleep(30)  # Check every 30 seconds
+            now = time.time()
+
+            # Periodic leaked allocation cleanup (every 5 min by default)
+            if now - last_cleanup > cleanup_interval:
+                last_cleanup = now
+                try:
+                    allocated = await self.store.get_allocated_pods()
+                    leaked = [
+                        sid for sid in allocated
+                        if sid not in self.sessions
+                    ]
+                    if leaked:
+                        logger.warning(
+                            "Periodic cleanup: %d leaked allocation(s): %s",
+                            len(leaked), leaked,
+                        )
+                        for sid in leaked:
+                            try:
+                                await self.store.release_pod(sid)
+                            except Exception as e:
+                                logger.warning("Failed to release leaked pod %s: %s", sid, e)
+                        for _ in leaked:
+                            try:
+                                await self.store.decr_session_count()
+                            except Exception:
+                                pass
+                        logger.info("Periodic cleanup done (counter fixed)")
+                except Exception as e:
+                    logger.warning("Periodic cleanup failed: %s", e)
 
             for session_id, session in list(self.sessions.items()):
                 instance = session.browser_instance
 
-                if not isinstance(instance, DockerBrowserInstance):
-                    continue
-
-                try:
-                    instance.container.reload()
-                    status = instance.container.status
-                except Exception as e:
-                    logger.warning(f"Cannot inspect container for {session_id}: {e}")
-                    status = "unknown"
-
-                if status not in ("running",):
-                    logger.error(f"Container for session {session_id} is {status}, recovering...")
-                    # Clean up dead session, release resources
+                if isinstance(instance, DockerBrowserInstance):
+                    # Docker container health check
                     try:
-                        await self.close_session(session_id)
+                        instance.container.reload()
+                        status = instance.container.status
                     except Exception as e:
-                        logger.warning(f"Failed to close dead session {session_id}: {e}")
+                        logger.warning(f"Cannot inspect container for {session_id}: {e}")
+                        status = "unknown"
 
-                    # TODO Phase 2: Auto-rebuild session (need to remember original user_id and profile_config)
+                    if status not in ("running",):
+                        logger.error(f"Container for session {session_id} is {status}, recovering...")
+                        try:
+                            await self.close_session(session_id)
+                        except Exception as e:
+                            logger.warning(f"Failed to close dead session {session_id}: {e}")
+
+                elif isinstance(instance, K8sBrowserInstance):
+                    # K8s pod health check via CDP connectivity
+                    try:
+                        import aiohttp
+
+                        async with aiohttp.ClientSession() as cs:
+                            async with cs.get(
+                                f"{instance.cdp_url}/json/version",
+                                timeout=aiohttp.ClientTimeout(total=3),
+                            ) as resp:
+                                if resp.status != 200:
+                                    raise Exception(f"CDP returned {resp.status}")
+                    except Exception as e:
+                        logger.error(f"K8s pod {instance.pod_name} CDP unhealthy for {session_id}: {e}")
+                        try:
+                            await self.close_session(session_id)
+                        except Exception as close_err:
+                            logger.warning(f"Failed to close dead K8s session {session_id}: {close_err}")
+
+            # Mixed recycling: restart idle K8s pods after threshold
+            if self.browser_pool.mode == "k8s" and self.browser_pool._k8s_pool:
+                k8s_pool = self.browser_pool._k8s_pool
+                for pod_name in list(k8s_pool.get_idle_pods()):
+                    # Find when this pod became idle (approximate: check if it's in any active session)
+                    is_allocated = any(
+                        s.browser_instance.pod_name == pod_name
+                        for s in self.sessions.values()
+                        if hasattr(s.browser_instance, 'pod_name')
+                    )
+                    if is_allocated:
+                        continue  # Pod is actually in use, shouldn't be in idle list
+
+                    # For idle pods, we track approximate idle time via a simple heuristic:
+                    # If a pod has been in the free pool across multiple health check cycles (>threshold),
+                    # it's safe to restart. We use a simple counter approach.
+                    # For now, rely on the caller to set idle timestamp via KeyManager.pod_idle_since.
+                    pass  # Idle restart handled by KeyManager integration in app.py
+
+            # Check for idle K8s pods that need restart (via KeyManager if available)
+            try:
+                km = getattr(self, '_key_manager', None)
+                if km and idle_restart_threshold > 0:
+                    pod_idle = await km.get_all_pod_idle_since()
+                    for pod_name, idle_since in list(pod_idle.items()):
+                        if now - idle_since > idle_restart_threshold:
+                            logger.info(
+                                f"Pod {pod_name} idle for {(now - idle_since):.0f}s "
+                                f"(>{idle_restart_threshold}s), restarting..."
+                            )
+                            if k8s_pool := self.browser_pool._k8s_pool:
+                                await k8s_pool.restart_pod(pod_name)
+                            # Remove from store
+                            try:
+                                from agent_browser.state.store import KEY_POD_IDLE_SINCE
+                                await km.store.hdel(KEY_POD_IDLE_SINCE, pod_name)
+                            except Exception:
+                                pass
+            except Exception as e:
+                logger.warning("KeyManager idle pod check failed: %s", e)
 
     async def shutdown(self):
         """Shutdown all sessions."""
@@ -470,16 +702,97 @@ class SessionPoolManager:
 
     # ============ Atomic operation methods ============
 
+    async def _recover_session(self, session_id: str) -> UserSession | None:
+        """Recover a session created on another replica using shared store data.
+
+        Looks up the session's pod allocation in the ConfigMap, reconstructs
+        a K8sBrowserInstance, and stores it locally so subsequent requests on
+        this replica can serve it.
+        """
+        from agent_browser.models import K8sBrowserInstance
+
+        try:
+            allocated = await self.store.get_allocated_pods()
+            pod_name = allocated.get(session_id)
+            if not pod_name:
+                return None
+
+            # Resolve pod IP from K8s API
+            if self.browser_pool.mode != "k8s" or not self.browser_pool._k8s_pool:
+                return None
+
+            k8s_pool = self.browser_pool._k8s_pool
+            all_pods = await k8s_pool._discover_pods()
+            pod_ip = None
+            for n, ip in all_pods:
+                if n == pod_name:
+                    pod_ip = ip
+                    break
+
+            if not pod_ip:
+                logger.warning("Cannot recover session %s: pod %s not found", session_id, pod_name)
+                return None
+
+            cdp_url = f"http://{pod_ip}:80/cdp"
+            instance = K8sBrowserInstance(
+                instance_id=pod_name,
+                cdp_url=cdp_url,
+                cdp_port=19222,
+                session_id=session_id,
+                pod_name=pod_name,
+                novnc_url=f"http://{pod_ip}:80",
+            )
+
+            # Recover metadata from shared store if available
+            meta_user_id = "recovered"
+            meta_profile_dir = ""
+            meta_created_at = time.time()
+            if hasattr(self.store, 'get_session_meta'):
+                try:
+                    meta = await self.store.get_session_meta(session_id)
+                    if meta:
+                        meta_user_id = meta.get("user_id", "recovered")
+                        meta_profile_dir = meta.get("profile_dir", "")
+                        meta_created_at = meta.get("created_at", time.time())
+                except Exception:
+                    pass
+
+            session = UserSession(
+                session_id=session_id,
+                user_id=meta_user_id,
+                browser_instance=instance,
+                profile_dir=meta_profile_dir,
+                created_at=meta_created_at,
+                last_activity=time.time(),
+            )
+            self.sessions[session_id] = session
+            logger.info("Recovered session %s from shared store (pod %s)", session_id, pod_name)
+            return session
+
+        except Exception as e:
+            logger.warning("Session recovery failed for %s: %s", session_id, e)
+            return None
+
     async def _get_page(self, session_id: str) -> Page:
-        """Get the Playwright Page object for a session (supports Local and Docker instances)."""
+        """Get the Playwright Page object for a session (supports Local, Docker, and K8s instances).
+
+        For K8s/Docker mode, if the session is not found locally (created on another
+        replica), attempts to recover it from the shared store and reconnect via CDP.
+        """
         session = self.sessions.get(session_id)
         if not session:
-            raise SessionNotFoundError(f"Session not found: {session_id}")
+            # Try to recover session from shared store (multi-replica support)
+            session = await self._recover_session(session_id)
+            if not session:
+                raise SessionNotFoundError(f"Session not found: {session_id}")
 
         instance = session.browser_instance
 
         if isinstance(instance, DockerBrowserInstance):
             return await self._get_docker_page(session_id, instance)
+
+        if isinstance(instance, K8sBrowserInstance):
+            return await self._get_k8s_page(session_id, instance)
 
         # LocalBrowserInstance: use existing Playwright objects directly
         browser = instance.browser
@@ -555,6 +868,58 @@ class SessionPoolManager:
 
         raise ConnectionError(f"Failed to connect to Docker CDP at {instance.cdp_url} after 3 attempts: {last_error}")
 
+    async def _get_k8s_page(self, session_id: str, instance: K8sBrowserInstance) -> Page:
+        """Get Page from K8s browser pod via CDP (with retry).
+
+        Similar to _get_docker_page but targets K8s pod DNS addresses.
+        Reuses the same _docker_connections cache for CDP connection reuse.
+        """
+        # Reuse existing CDP connection
+        if session_id in self._docker_connections:
+            pw, browser = self._docker_connections[session_id]
+            try:
+                contexts = browser.contexts
+                if contexts and contexts[0].pages:
+                    return contexts[0].pages[0]
+            except Exception:
+                old_pw, old_browser = self._docker_connections.pop(session_id, (None, None))
+                if old_browser:
+                    with contextlib.suppress(Exception):
+                        await old_browser.close()
+                if old_pw:
+                    with contextlib.suppress(Exception):
+                        await old_pw.stop()
+
+        # Establish new CDP connection (K8s pods may need extra time after allocation)
+        last_error = None
+        for attempt in range(3):
+            try:
+                pw = await async_playwright().start()
+                browser = await pw.chromium.connect_over_cdp(instance.cdp_url)
+                self._docker_connections[session_id] = (pw, browser)
+
+                contexts = browser.contexts
+                if contexts and contexts[0].pages:
+                    return contexts[0].pages[0]
+                context = contexts[0] if contexts else await browser.new_context()
+                return await context.new_page()
+            except Exception as e:
+                last_error = e
+                logger.warning(f"K8s CDP connect attempt {attempt + 1}/3 failed: {e}")
+                if session_id in self._docker_connections:
+                    _, failed_browser = self._docker_connections.pop(session_id, (None, None))
+                    try:
+                        if failed_browser:
+                            await failed_browser.close()
+                    except Exception:
+                        pass
+                    with contextlib.suppress(Exception):
+                        await pw.stop()
+                if attempt < 2:
+                    await asyncio.sleep(3 * (attempt + 1))
+
+        raise ConnectionError(f"Failed to connect to K8s CDP at {instance.cdp_url} after 3 attempts: {last_error}")
+
     async def navigate(self, session_id: str, request: NavigateRequest) -> dict:
         """Page navigation."""
         page = await self._get_page(session_id)
@@ -581,46 +946,135 @@ class SessionPoolManager:
 
         return {"status": "ok", "url": page.url, "title": await page.title()}
 
-    async def snapshot(self, session_id: str, interactive_only: bool = True) -> SnapshotResponse:
-        """Get DOM snapshot."""
+    async def snapshot(self, session_id: str, interactive_only: bool = True,
+                       iframe_selector: str | None = None) -> SnapshotResponse:
+        """Get DOM snapshot.
+
+        Args:
+            interactive_only: Only include interactive elements (default True).
+            iframe_selector: CSS selector for iframes to also capture elements from.
+                When provided, elements inside matching iframes are included with
+                viewport-relative bounding_box coordinates. Fully backward compatible
+                (default None = original behavior, no iframe traversal).
+        """
         page = await self._get_page(session_id)
 
-        # Inject data-ab-ref attribute and return element list, ensure ref is bound to DOM (prevent position drift issues)
-        elements_script = """
-        () => {
-            const selectors = 'button, a, input, textarea, select, [role="button"], [onclick]';
-            const allElements = [];
-            let refIndex = 0;
+        if iframe_selector:
+            # Enhanced script with iframe penetration
+            safe_sel = json.dumps(iframe_selector)
+            elements_script = f"""
+            () => {{
+                const selectors = 'button, a, input, textarea, select, [role="button"], [onclick]';
+                const allElements = [];
+                let refIndex = 0;
 
-            document.querySelectorAll(selectors).forEach(el => {
-                if (el.offsetParent === null && el.getClientRects().length === 0) return;
+                // Top-level document elements
+                document.querySelectorAll(selectors).forEach(el => {{
+                    if (el.offsetParent === null && el.getClientRects().length === 0) return;
 
-                const ref = '@e' + refIndex;
-                el.setAttribute('data-ab-ref', ref);
-                refIndex++;
+                    const ref = '@e' + refIndex;
+                    el.setAttribute('data-ab-ref', ref);
+                    refIndex++;
 
-                const rect = el.getBoundingClientRect();
-                allElements.push({
-                    ref: ref,
-                    tag: el.tagName.toLowerCase(),
-                    text: (el.textContent || el.value || el.placeholder || '').substring(0, 100).trim(),
-                    role: el.getAttribute('role') || el.tagName.toLowerCase(),
-                    type: el.type || null,
-                    placeholder: el.placeholder || null,
-                    href: el.href || null,
-                    is_visible: rect.width > 0 && rect.height > 0,
-                    is_enabled: !el.disabled,
-                    bounding_box: {x: rect.x, y: rect.y, width: rect.width, height: rect.height}
+                    const rect = el.getBoundingClientRect();
+                    allElements.push({{
+                        ref: ref,
+                        tag: el.tagName.toLowerCase(),
+                        text: (el.textContent || el.value || el.placeholder || '').substring(0, 100).trim(),
+                        role: el.getAttribute('role') || el.tagName.toLowerCase(),
+                        type: el.type || null,
+                        placeholder: el.placeholder || null,
+                        href: el.href || null,
+                        is_visible: rect.width > 0 && rect.height > 0,
+                        is_enabled: !el.disabled,
+                        bounding_box: {{x: rect.x, y: rect.y, width: rect.width, height: rect.height}}
+                    }});
+                }});
+
+                // Iframe penetration: traverse inside matching iframes
+                document.querySelectorAll({safe_sel}).forEach(iframe => {{
+                    try {{
+                        const doc = iframe.contentDocument;
+                        if (!doc) return;
+                        const iframeRect = iframe.getBoundingClientRect();
+                        const iframeName = iframe.getAttribute('name') || iframe.id || '';
+
+                        doc.querySelectorAll(selectors).forEach(el => {{
+                            if (el.offsetParent === null && el.getClientRects().length === 0) return;
+
+                            const ref = '@e' + refIndex;
+                            el.setAttribute('data-ab-ref', ref);
+                            refIndex++;
+
+                            const rect = el.getBoundingClientRect();
+                            allElements.push({{
+                                ref: ref,
+                                tag: el.tagName.toLowerCase(),
+                                text: (el.textContent || el.value || el.placeholder || '').substring(0, 100).trim(),
+                                role: el.getAttribute('role') || el.tagName.toLowerCase(),
+                                type: el.type || null,
+                                placeholder: el.placeholder || null,
+                                href: el.href || null,
+                                is_visible: rect.width > 0 && rect.height > 0,
+                                is_enabled: !el.disabled,
+                                bounding_box: {{
+                                    x: Math.round(iframeRect.x + rect.x),
+                                    y: Math.round(iframeRect.y + rect.y),
+                                    width: rect.width,
+                                    height: rect.height
+                                }},
+                                iframe: iframeName
+                            }});
+                        }});
+                    }} catch(e) {{
+                        // Cross-origin iframe: silently skip
+                    }}
+                }});
+
+                return {{
+                    url: window.location.href,
+                    title: document.title,
+                    elements: allElements
+                }};
+            }}
+            """
+        else:
+            # Original script (unchanged for backward compatibility)
+            elements_script = """
+            () => {
+                const selectors = 'button, a, input, textarea, select, [role="button"], [onclick]';
+                const allElements = [];
+                let refIndex = 0;
+
+                document.querySelectorAll(selectors).forEach(el => {
+                    if (el.offsetParent === null && el.getClientRects().length === 0) return;
+
+                    const ref = '@e' + refIndex;
+                    el.setAttribute('data-ab-ref', ref);
+                    refIndex++;
+
+                    const rect = el.getBoundingClientRect();
+                    allElements.push({
+                        ref: ref,
+                        tag: el.tagName.toLowerCase(),
+                        text: (el.textContent || el.value || el.placeholder || '').substring(0, 100).trim(),
+                        role: el.getAttribute('role') || el.tagName.toLowerCase(),
+                        type: el.type || null,
+                        placeholder: el.placeholder || null,
+                        href: el.href || null,
+                        is_visible: rect.width > 0 && rect.height > 0,
+                        is_enabled: !el.disabled,
+                        bounding_box: {x: rect.x, y: rect.y, width: rect.width, height: rect.height}
+                    });
                 });
-            });
 
-            return {
-                url: window.location.href,
-                title: document.title,
-                elements: allElements
-            };
-        }
-        """
+                return {
+                    url: window.location.href,
+                    title: document.title,
+                    elements: allElements
+                };
+            }
+            """
 
         result = await page.evaluate(elements_script)
 
@@ -639,17 +1093,28 @@ class SessionPoolManager:
         await self._stealth.pre_action("click")
         await self._stealth.random_mouse_move(page)
 
-        # Validate ref format
-        if not request.ref.startswith("@e"):
-            raise ValueError(f"Invalid ref format: {request.ref}")
+        if request.x is not None and request.y is not None:
+            # Coordinate-based click (for iframe content or arbitrary positions)
+            await page.mouse.click(
+                request.x, request.y,
+                button=request.button,
+                click_count=request.click_count,
+                delay=request.delay,
+            )
+        elif request.ref:
+            # Ref-based click (existing behavior)
+            if not request.ref.startswith("@e"):
+                raise ValueError(f"Invalid ref format: {request.ref}")
 
-        # Find element via data-ab-ref attribute (stable, immune to DOM position changes)
-        element = await page.query_selector(f'[data-ab-ref="{request.ref}"]')
-        if not element:
-            raise ValueError(f"Element {request.ref} not found. DOM may have changed since snapshot.")
+            # Find element via data-ab-ref attribute (stable, immune to DOM position changes)
+            element = await page.query_selector(f'[data-ab-ref="{request.ref}"]')
+            if not element:
+                raise ValueError(f"Element {request.ref} not found. DOM may have changed since snapshot.")
 
-        # Execute click
-        await element.click(button=request.button, click_count=request.click_count, delay=request.delay)
+            # Execute click
+            await element.click(button=request.button, click_count=request.click_count, delay=request.delay)
+        else:
+            raise ValueError("Click requires either 'ref' or both 'x' and 'y' parameters")
 
         session = self.sessions.get(session_id)
         if session:

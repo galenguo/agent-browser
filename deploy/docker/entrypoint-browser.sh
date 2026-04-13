@@ -46,6 +46,19 @@ websockify \
 sleep 1
 echo "[browser-container] noVNC started → http://<host>:6080/vnc.html"
 
+# ── 3.5 启动反向代理（CDP + noVNC）───────────────
+echo "[browser-container] Starting reverse proxy on :80..."
+python -m agent_browser.browser.auth_proxy \
+    > /tmp/auth_proxy.log 2>&1 &
+AUTH_PID=$!
+sleep 1
+if ! kill -0 $AUTH_PID 2>/dev/null; then
+    echo "[browser-container] ERROR: Auth proxy failed to start"
+    cat /tmp/auth_proxy.log
+    exit 1
+fi
+echo "[browser-container] Auth proxy started (pid=$AUTH_PID) → http://<host>:80"
+
 # ── 4. 启动 CloakBrowser ───────────────────────────────────────
 echo "[browser-container] Starting CloakBrowser..."
 echo "[browser-container] Profile directory: ${PROFILE_STORAGE}"
@@ -55,7 +68,7 @@ import asyncio
 import os
 import sys
 sys.path.insert(0, '/app/src')
-from browser.stealth_launcher import launch_stealth_browser
+from agent_browser.browser.stealth_launcher import launch_stealth_browser
 
 async def main():
     profile_dir = os.getenv('PROFILE_STORAGE', '/data/profiles')
