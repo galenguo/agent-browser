@@ -494,18 +494,26 @@ class SkillBrowser:
         self,
         session_id: str,
         interactive_only: bool = False,
+        iframe_selector: str | None = None,
     ) -> dict[str, Any]:
         """Get page snapshot with @eN element references.
 
         Args:
             session_id: Session ID.
             interactive_only: If True, only include interactive elements.
+            iframe_selector: CSS selector for iframes to penetrate (e.g. ``"iframe"``,
+                ``"#my-frame"``). When set, elements inside matching iframes are
+                included with viewport-absolute bounding_box coordinates and an
+                ``iframe`` field identifying the frame. Cross-origin iframes are
+                silently skipped.
 
         Returns:
             Dict with ``url``, ``title``, ``elements`` (list of
-            ``{ref, text, role}`` dicts).
+            ``{ref, text, role, bounding_box, iframe?}`` dicts).
         """
         params: dict[str, Any] = {"interactive_only": interactive_only}
+        if iframe_selector is not None:
+            params["iframe_selector"] = iframe_selector
         return await self._request(
             "POST",
             f"/sessions/{session_id}/snapshot",

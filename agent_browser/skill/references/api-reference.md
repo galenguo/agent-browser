@@ -212,6 +212,7 @@ async def snapshot(
     self,
     session_id: str,
     interactive_only: bool = False,
+    iframe_selector: str | None = None,
 ) -> dict[str, Any]
 ```
 
@@ -221,6 +222,7 @@ async def snapshot(
 |-----------|------|---------|-------------|
 | `session_id` | `str` | | Session ID. |
 | `interactive_only` | `bool` | `False` | When `True`, only return interactive elements (inputs, buttons, links); skip static text. |
+| `iframe_selector` | `str \| None` | `None` | CSS selector for iframes to penetrate (e.g. `"iframe"`, `"#my-frame"`). Elements inside matching iframes are included with viewport-absolute `bounding_box` and an `iframe` field. Cross-origin iframes are silently skipped. |
 
 **Returns:** `dict` with:
 
@@ -228,7 +230,7 @@ async def snapshot(
 |-----|------|-------------|
 | `url` | `str` | Current page URL. |
 | `title` | `str` | Page title. |
-| `elements` | `list[dict]` | Each element has `ref` (`"@e0"`), `text`, and `role` (`"button"`, `"input"`, `"link"`, etc.). |
+| `elements` | `list[dict]` | Each element has `ref` (`"@e0"`), `text`, `role`, `bounding_box`, and optionally `iframe` (frame name/id when element is inside an iframe). |
 
 ```python
 snap = await sb.snapshot(sid)
@@ -236,13 +238,20 @@ snap = await sb.snapshot(sid)
 #   "url": "https://example.com",
 #   "title": "Example Domain",
 #   "elements": [
-#     {"ref": "@e0", "text": "More information...", "role": "link"},
-#     {"ref": "@e1", "text": "", "role": "input"},
+#     {"ref": "@e0", "text": "More information...", "role": "link", "bounding_box": {...}},
 #   ]
 # }
 
 # Only interactive elements
 snap = await sb.snapshot(sid, interactive_only=True)
+
+# Penetrate iframes (same-origin only)
+snap = await sb.snapshot(sid, iframe_selector="iframe")
+# iframe elements include: {"ref": "@e5", ..., "bounding_box": {"x": 120, "y": 300, "width": 80, "height": 30}, "iframe": "login-frame"}
+# Click by coordinates (works for both main-frame and iframe elements):
+el = snap["elements"][5]
+bb = el["bounding_box"]
+await sb.click(sid, x=bb["x"] + bb["width"] / 2, y=bb["y"] + bb["height"] / 2)
 ```
 
 ---

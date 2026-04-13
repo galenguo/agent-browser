@@ -100,6 +100,10 @@ await sb.go_back(sid)
 ```python
 snap = await sb.snapshot(sid, interactive_only=False)
 # → {url, title, elements: [{ref, text, role, type, is_visible, bounding_box}]}
+
+# Penetrate iframes (same-origin only):
+snap = await sb.snapshot(sid, iframe_selector="iframe")
+# Elements inside iframes include: {ref, ..., bounding_box: {x,y,w,h}, iframe: "frame-name"}
 ```
 
 ### Interaction
