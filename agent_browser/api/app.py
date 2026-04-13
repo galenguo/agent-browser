@@ -345,7 +345,7 @@ async def create_session(req: CreateSessionRequest, api_key: str = Depends(requi
         # Build VNC URL from session token
         vnc_token = session.vnc_token if session else ""
         vnc_base = os.environ.get("VNC_BASE_URL", "")
-        vnc_url = f"{vnc_base}/vnc/{vnc_token}/" if vnc_base and vnc_token else None
+        vnc_url = f"{vnc_base}/vnc/{vnc_token}/vnc.html?autoconnect=1&resize=scale" if vnc_base and vnc_token else None
 
         resp = {"session_id": sid, "user_id": req.user_id, "vnc_url": vnc_url, "vnc_token": vnc_token}
         if node_info:
