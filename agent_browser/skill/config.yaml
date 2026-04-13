@@ -11,13 +11,13 @@ service:
   # - K8s + Traefik:       http://api.agent-browser.local
   # - K8s + PortForward:   http://localhost:8888
   # - Remote server:        http://your-server:8000
-  url: "http://192.168.0.99:30801"
+  url: "http://agent-browser-api.vpc-dale.gimcyun.com"
 
   # API authentication key (leave empty if server doesn't require auth)
   api_key: "ab_f2d637aa9d3741d8f48784cb90a9b6fb"
 
   # HTTP request timeout in seconds
-  timeout: 120
+  timeout: 600
 
 # Interaction mode: "llm" (ReAct step-by-step) or "agent" (autonomous)
 # Affects run_task() default behavior
