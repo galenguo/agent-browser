@@ -333,49 +333,6 @@ await sb.scroll(sid, "down", 500)
 await sb.scroll(sid, "up", 300)
 ```
 
-### `hover`
-
-Move the mouse over an element center. Useful for revealing dropdowns, tooltips, or hover menus.
-
-```python
-async def hover(self, session_id: str, ref: str) -> None
-```
-
-**Parameters:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `session_id` | `str` | Session ID. |
-| `ref` | `str` | Element reference (`"@eN"`). |
-
-**Returns:** `None`
-
-```python
-await sb.hover(sid, "@e4")
-```
-
-### `select_option`
-
-Select an option in a `<select>` element by ref.
-
-```python
-async def select_option(self, session_id: str, ref: str, value: str) -> None
-```
-
-**Parameters:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `session_id` | `str` | Session ID. |
-| `ref` | `str` | Element reference (`"@eN"`). |
-| `value` | `str` | Option value to select. |
-
-**Returns:** `None`
-
-```python
-await sb.select_option(sid, "@e6", "option_value")
-```
-
 ### `press_key`
 
 Press a keyboard key.

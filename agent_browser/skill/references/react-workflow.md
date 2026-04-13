@@ -82,8 +82,6 @@ await sb.go_back(sid)
 # Interaction
 await sb.click(sid, "@e3")                              # Click button/link
 await sb.fill(sid, "@e0", "query")                      # Fill input
-await sb.select_option(sid, "@e6", "option_value")      # Dropdown
-await sb.hover(sid, "@e4")                              # Hover (reveal submenu etc.)
 await sb.press_key(sid, "Enter")                        # Keyboard
 
 # Movement

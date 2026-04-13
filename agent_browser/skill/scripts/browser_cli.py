@@ -574,35 +574,6 @@ class SkillBrowser:
             {"direction": direction, "amount": amount},
         )
 
-    async def hover(self, session_id: str, ref: str) -> None:
-        """Move mouse over an element.
-
-        Args:
-            session_id: Session ID.
-            ref: Element reference (``@eN``).
-        """
-        await self._request(
-            "POST",
-            f"/sessions/{session_id}/mouse/move",
-            {"ref": ref},
-        )
-
-    async def select_option(
-        self, session_id: str, ref: str, value: str
-    ) -> None:
-        """Select an option in a ``<select>`` element.
-
-        Args:
-            session_id: Session ID.
-            ref: Element reference (``@eN``).
-            value: Option value to select.
-        """
-        await self._request(
-            "POST",
-            f"/sessions/{session_id}/select",
-            {"ref": ref, "value": value},
-        )
-
     async def press_key(self, session_id: str, key: str) -> None:
         """Press a keyboard key.
 

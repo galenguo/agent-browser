@@ -650,46 +650,7 @@ class SessionPoolManager:
                         except Exception as close_err:
                             logger.warning(f"Failed to close dead K8s session {session_id}: {close_err}")
 
-            # Mixed recycling: restart idle K8s pods after threshold
-            if self.browser_pool.mode == "k8s" and self.browser_pool._k8s_pool:
-                k8s_pool = self.browser_pool._k8s_pool
-                for pod_name in list(k8s_pool.get_idle_pods()):
-                    # Find when this pod became idle (approximate: check if it's in any active session)
-                    is_allocated = any(
-                        s.browser_instance.pod_name == pod_name
-                        for s in self.sessions.values()
-                        if hasattr(s.browser_instance, 'pod_name')
-                    )
-                    if is_allocated:
-                        continue  # Pod is actually in use, shouldn't be in idle list
-
-                    # For idle pods, we track approximate idle time via a simple heuristic:
-                    # If a pod has been in the free pool across multiple health check cycles (>threshold),
-                    # it's safe to restart. We use a simple counter approach.
-                    # For now, rely on the caller to set idle timestamp via KeyManager.pod_idle_since.
-                    pass  # Idle restart handled by KeyManager integration in app.py
-
-            # Check for idle K8s pods that need restart (via KeyManager if available)
-            try:
-                km = getattr(self, '_key_manager', None)
-                if km and idle_restart_threshold > 0:
-                    pod_idle = await km.get_all_pod_idle_since()
-                    for pod_name, idle_since in list(pod_idle.items()):
-                        if now - idle_since > idle_restart_threshold:
-                            logger.info(
-                                f"Pod {pod_name} idle for {(now - idle_since):.0f}s "
-                                f"(>{idle_restart_threshold}s), restarting..."
-                            )
-                            if k8s_pool := self.browser_pool._k8s_pool:
-                                await k8s_pool.restart_pod(pod_name)
-                            # Remove from store
-                            try:
-                                from agent_browser.state.store import KEY_POD_IDLE_SINCE
-                                await km.store.hdel(KEY_POD_IDLE_SINCE, pod_name)
-                            except Exception:
-                                pass
-            except Exception as e:
-                logger.warning("KeyManager idle pod check failed: %s", e)
+            # Mixed recycling: idle pod restart is handled by K8sBrowserNodeManager's warm pool loop
 
     async def shutdown(self):
         """Shutdown all sessions."""
@@ -729,20 +690,12 @@ class SessionPoolManager:
                 return None
 
             # Resolve pod IP from K8s API
-            if self.browser_pool.mode != "k8s" or not self.browser_pool._k8s_pool:
+            if self.browser_pool.mode != "k8s" or not self.browser_pool._k8s_manager:
                 return None
 
-            k8s_pool = self.browser_pool._k8s_pool
-            all_pods = await k8s_pool._discover_pods()
-            pod_ip = None
-            for n, ip in all_pods:
-                if n == pod_name:
-                    pod_ip = ip
-                    break
-
-            if not pod_ip:
-                logger.warning("Cannot recover session %s: pod %s not found", session_id, pod_name)
-                return None
+            k8s_manager = self.browser_pool._k8s_manager
+            await k8s_manager._reconcile_existing_pods()
+            pod_ip = await k8s_manager._get_pod_ip(pod_name)
 
             cdp_url = f"http://{pod_ip}:80/cdp"
             instance = K8sBrowserInstance(
