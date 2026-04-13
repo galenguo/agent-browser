@@ -260,16 +260,36 @@ class K8sSharedState(StateStore):
         return self._v1
 
     async def _read_state(self) -> tuple[dict, str]:
-        """Read current state from ConfigMap. Returns (state_dict, resourceVersion)."""
+        """Read current state from ConfigMap. Returns (state_dict, resourceVersion).
+        Auto-creates the ConfigMap if it doesn't exist yet."""
         v1 = self._get_v1()
         loop = __import__("asyncio").get_event_loop()
 
         def _do_read():
-            cm = v1.read_namespaced_config_map(
-                self.configmap_name, self.namespace
-            )
-            raw = cm.data.get("state.json", "{}")
-            return json.loads(raw), cm.metadata.resource_version
+            try:
+                cm = v1.read_namespaced_config_map(
+                    self.configmap_name, self.namespace
+                )
+                raw = cm.data.get("state.json", "{}")
+                return json.loads(raw), cm.metadata.resource_version
+            except Exception as e:
+                # Auto-create on 404
+                status = getattr(e, "status", None)
+                if status == 404:
+                    from kubernetes import client as k8s_client
+                    body = k8s_client.V1ConfigMap(
+                        api_version="v1",
+                        kind="ConfigMap",
+                        metadata=k8s_client.V1ObjectMeta(
+                            name=self.configmap_name,
+                            namespace=self.namespace,
+                        ),
+                        data={"state.json": "{}"},
+                    )
+                    cm = v1.create_namespaced_config_map(self.namespace, body)
+                    logger.info("Created state ConfigMap %s", self.configmap_name)
+                    return {}, cm.metadata.resource_version
+                raise
 
         return await loop.run_in_executor(None, _do_read)
 
