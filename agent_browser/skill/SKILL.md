@@ -103,14 +103,42 @@ snap = await sb.snapshot(sid, interactive_only=False)
 
 # Penetrate iframes (same-origin only):
 snap = await sb.snapshot(sid, iframe_selector="iframe")
-# Elements inside iframes include: {ref, ..., bounding_box: {x,y,w,h}, iframe: "frame-name"}
+# iframe elements have: {ref, ..., bounding_box: {x,y,w,h}, iframe: "frame-name"}
+# Note: Use coordinate-based click for iframe elements (see "Working with iframes")
 ```
+
+### Working with iframes
+
+iframe elements require coordinate-based interaction since ref-based methods (`fill`, `click` by ref) only work in the main frame.
+
+**Pattern:**
+
+```python
+# 1. Snapshot with iframe penetration (same-origin only)
+snap = await sb.snapshot(sid, iframe_selector="iframe")
+# or target specific iframes: iframe_selector="iframe.login-frame"
+
+# 2. Find element inside iframe (has "iframe" field)
+for el in snap["elements"]:
+    if el.get("iframe") and "Login" in el.get("text", ""):
+        bb = el["bounding_box"]
+        # 3. Click by viewport-absolute coordinates
+        await sb.click(sid, x=bb["x"] + bb["width"]/2, y=bb["y"] + bb["height"]/2)
+        break
+```
+
+**Limitations:**
+- Cross-origin iframes are silently skipped (browser security)
+- `fill(sid, ref)` won't work for iframe elements (use coordinate click + `press_key`)
+- `evaluate()` runs in main frame only (no `evaluate_in_frame` exists)
+
+**See:** `references/api-reference.md` for complete iframe documentation.
 
 ### Interaction
 
 ```python
-await sb.click(sid, ref="@e3")              # click by element ref
-await sb.click(sid, x=150.0, y=300.0)       # click by coordinates
+await sb.click(sid, ref="@e3")              # click by element ref (main frame only)
+await sb.click(sid, x=150.0, y=300.0)       # click by coordinates (works for iframes too)
 await sb.fill(sid, "@e1", "text")           # fill input
 await sb.scroll(sid, direction="down", amount=500)
 await sb.press_key(sid, "Enter")            # Enter, Tab, Escape, ArrowDown, etc.
