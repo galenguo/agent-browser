@@ -393,7 +393,369 @@ await sb.wait_for_selector(sid, ".search-results", timeout=10000)
 
 ---
 
-## JavaScript Execution
+## Search & Discovery
+
+### `search_page`
+
+Search page text content using regex or plain text. Returns matches with context and element path.
+
+```python
+async def search_page(
+    self,
+    session_id: str,
+    pattern: str,
+    case_sensitive: bool = False,
+    is_regex: bool = False,
+    max_results: int = 10,
+    context_chars: int = 100,
+    css_scope: str | None = None,
+) -> dict
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `session_id` | `str` | | Session ID. |
+| `pattern` | `str` | | Search pattern (regex or plain text). |
+| `case_sensitive` | `bool` | `False` | Case-sensitive search. |
+| `is_regex` | `bool` | `False` | Treat pattern as regex. |
+| `max_results` | `int` | `10` | Max matches to return. |
+| `context_chars` | `int` | `100` | Context characters around each match. |
+| `css_scope` | `str \| None` | `None` | Limit search to this CSS subtree. |
+
+**Returns:** `dict` with `matches` list and `total` count.
+
+```python
+results = await sb.search_page(sid, "Python")
+# {"matches": [{match_text: "Python", context: "...Python...", element_path: "div > p", char_position: 42}], "total": 5}
+
+# Regex search
+results = await sb.search_page(sid, r"\\d{4}-\\d{2}-\\d{2}", is_regex=True)
+
+# Scoped search
+results = await sb.search_page(sid, "login", css_scope="#main-content")
+```
+
+### `find_elements`
+
+Find elements matching a CSS selector with metadata (tag, text, bounding box, visibility).
+
+```python
+async def find_elements(
+    self,
+    session_id: str,
+    selector: str,
+    max_results: int = 50,
+) -> dict
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `session_id` | `str` | | Session ID. |
+| `selector` | `str` | | CSS selector string. |
+| `max_results` | `int` | `50` | Max elements to return. |
+
+**Returns:** `dict` with `elements` list and `total` count.
+
+```python
+result = await sb.find_elements(sid, "a[href]")
+# {"elements": [{index: 0, tag: "a", text: "Click here", id: "", class_name: "btn",
+#   bounding_box: {x: 10, y: 20, w: 100, h: 30}, visible: True}], "total": 42}
+```
+
+---
+
+## Dropdown Handling
+
+### `get_dropdown_options`
+
+Get all options from a `<select>` element.
+
+```python
+async def get_dropdown_options(self, session_id: str, ref: str) -> list[dict]
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | `str` | Session ID. |
+| `ref` | `str` | Element reference (`"@eN"`). |
+
+**Returns:** `list[dict]` with `{index, value, text, selected, disabled}` per option.
+
+```python
+options = await sb.get_dropdown_options(sid, "@e5")
+# [{index: 0, value: "us", text: "United States", selected: True, disabled: False}, ...]
+for opt in options:
+    print(f"{opt['text']} (value={opt['value']})")
+```
+
+### `select_dropdown_option`
+
+Select a dropdown option by visible text (not value).
+
+```python
+async def select_dropdown_option(self, session_id: str, ref: str, option_text: str) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | `str` | Session ID. |
+| `ref` | `str` | Element reference (`"@eN"`). |
+| `option_text` | `str` | Visible text of the option to select. |
+
+```python
+await sb.select_dropdown_option(sid, "@e5", "Canada")
+```
+
+---
+
+## File & Media
+
+### `upload_file`
+
+Upload files to an `<input type=file>` element.
+
+```python
+async def upload_file(self, session_id: str, ref: str, file_paths: list[str]) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | `str` | Session ID. |
+| `ref` | `str` | Element reference (`"@eN"`). |
+| `file_paths` | `list[str]` | Absolute file paths to upload. |
+
+```python
+await sb.upload_file(sid, "@e10", ["/path/to/resume.pdf", "/path/to/photo.png"])
+```
+
+### `screenshot`
+
+Take a screenshot of the page or specific element. Returns base64-encoded image data.
+
+```python
+async def screenshot(
+    self,
+    session_id: str,
+    ref: str | None = None,
+    full_page: bool = True,
+    format: str = "png",
+) -> dict
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `session_id` | `str` | | Session ID. |
+| `ref` | `str \| None` | `None` | Element reference for element screenshot. `None` = full page. |
+| `full_page` | `bool` | `True` | Capture full scrollable page. |
+| `format` | `str` | `"png"` | `"png"` or `"jpeg"`. |
+
+**Returns:** `dict` with `image` (base64), `format`, and `size`.
+
+```python
+result = await sb.screenshot(sid)
+# {"image": "iVBORw0KGgoAAAANSUhEUg...", "format": "png", "size": 123456}
+
+# Element screenshot
+result = await sb.screenshot(sid, ref="@e3")
+
+# JPEG with quality
+result = await sb.screenshot(sid, format="jpeg", quality=85)
+```
+
+### `save_as_pdf`
+
+Save current page as PDF. Returns file path.
+
+```python
+async def save_as_pdf(
+    self,
+    session_id: str,
+    output_path: str | None = None,
+    landscape: bool = False,
+) -> dict
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `session_id` | `str` | | Session ID. |
+| `output_path` | `str \| None` | `None` | Output file path (auto-generated if `None`). |
+| `landscape` | `bool` | `False` | Landscape orientation. |
+
+**Returns:** `dict` with `path` to saved PDF.
+
+```python
+pdf_path = await sb.save_as_pdf(sid)
+pdf_path = await sb.save_as_pdf(sid, output_path="/tmp/report.pdf", landscape=True)
+```
+
+---
+
+## Advanced Interaction
+
+### `send_keys`
+
+Send complex key sequences with modifier keys.
+
+```python
+async def send_keys(self, session_id: str, keys: str) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | `str` | Session ID. |
+| `keys` | `str` | Key sequence with modifiers (`"Meta+a"`, `"Shift+Home"`, `"Control+c"`). |
+
+```python
+await sb.send_keys(sid, "Meta+a")        # Select all
+await sb.send_keys(sid, "Control+c")     # Copy
+await sb.send_keys(sid, "Shift+End")      # Select to end of line
+await sb.send_keys(sid, "Tab")            # Tab to next field
+```
+
+### `scroll_to_text`
+
+Scroll the page until text becomes visible.
+
+```python
+async def scroll_to_text(self, session_id: str, text: str, max_scrolls: int = 10) -> bool
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `session_id` | `str` | | Session ID. |
+| `text` | `str` | | Text to find. |
+| `max_scrolls` | `int` | `10` | Max scroll attempts. |
+
+**Returns:** `bool` -- `True` if text was found and made visible.
+
+```python
+found = await sb.scroll_to_text(sid, "Results found")
+if not found:
+    print("Text not found on page")
+```
+
+---
+
+## Tab Management
+
+### `get_tabs_info`
+
+Get info about all open tabs in the session.
+
+```python
+async def get_tabs_info(self, session_id: str) -> list[dict]
+```
+
+**Returns:** `list[dict]` with `{index, url, title}` per tab.
+
+```python
+tabs = await sb.get_tabs_info(sid)
+# [{index: 0, url: "https://example.com", title: "Example"}, ...]
+```
+
+### `open_tab`
+
+Open a new tab. Optionally navigate to URL.
+
+```python
+async def open_tab(self, session_id: str, url: str | None = None) -> int
+```
+
+**Returns:** `int` -- index of the new tab.
+
+```python
+idx = await sb.open_tab(sid)                    # Blank tab
+idx = await sb.open_tab(sid, url="https://example.com")  # Open + navigate
+```
+
+### `switch_tab`
+
+Switch to a tab by index.
+
+```python
+async def switch_tab(self, session_id: str, index: int) -> None
+```
+
+```python
+await sb.switch_tab(sid, index=1)  # Switch to second tab
+```
+
+### `close_tab`
+
+Close a tab. Closes last tab if no index given.
+
+```python
+async def close_tab(self, session_id: str, index: int | None = None) -> None
+```
+
+```python
+await sb.close_tab(sid)           # Close last tab
+await sb.close_tab(sid, index=0)    # Close first tab
+```
+
+---
+
+## Data Extraction
+
+### `extract_content`
+
+Extract content from the page or a specific element.
+
+```python
+async def extract_content(
+    self,
+    session_id: str,
+    selector: str | None = None,
+    extract_type: str = "text",
+) -> str
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `session_id` | `str` | | Session ID. |
+| `selector` | `str \| None` | `None` | CSS scope (None = entire page). |
+| `extract_type` | `str` | `"text"` | `"text"`, `"html"`, `"links"`, `"images"`. |
+
+**Returns:** `str` -- extracted content.
+
+```python
+# Full page text
+text = await sb.extract_content(sid)
+
+# HTML source
+html = await sb.extract_content(sid, extract_type="html")
+
+# All links as JSON
+links_json = await sb.extract_content(sid, extract_type="links")
+
+# All images as JSON
+images_json = await sb.extract_content(sid, extract_type="images")
+
+# Section-specific extraction
+section = await sb.extract_content(sid, selector="#content", extract_type="text")
+```
+
+---
 
 ### `evaluate`
 

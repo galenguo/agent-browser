@@ -1195,3 +1195,107 @@ class SessionPoolManager:
             session.mark_activity()
 
         return {"status": "ok", "key": key}
+
+    # ── New Actions (browser-use coverage) ──────────────────────
+
+    async def search_page(
+        self, session_id: str, pattern: str, **kwargs,
+    ) -> dict:
+        """Search page text content."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "search_page"):
+            return await backend.search_page(session_id, pattern, **kwargs)
+        raise NotImplementedError("search_page not supported")
+
+    async def find_elements(self, session_id: str, selector: str, **kwargs) -> dict:
+        """Find elements by CSS selector."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "find_elements"):
+            return await backend.find_elements(session_id, selector, **kwargs)
+        raise NotImplementedError("find_elements not supported")
+
+    async def get_dropdown_options(self, session_id: str, ref: str) -> list[dict]:
+        """Get dropdown options."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "get_dropdown_options"):
+            return await backend.get_dropdown_options(session_id, ref)
+        raise NotImplementedError("get_dropdown_options not supported")
+
+    async def select_dropdown_option(self, session_id: str, ref: str, option_text: str) -> None:
+        """Select dropdown option by text."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "select_dropdown_option"):
+            return await backend.select_dropdown_option(session_id, ref, option_text)
+        raise NotImplementedError("select_dropdown_option not supported")
+
+    async def upload_file(self, session_id: str, ref: str, file_paths: list[str]) -> None:
+        """Upload files to file input."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "upload_file"):
+            return await backend.upload_file(session_id, ref, file_paths)
+        raise NotImplementedError("upload_file not supported")
+
+    async def screenshot(self, session_id: str, **kwargs) -> bytes:
+        """Take screenshot."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "screenshot"):
+            return await backend.screenshot(session_id, **kwargs)
+        raise NotImplementedError("screenshot not supported")
+
+    async def save_as_pdf(self, session_id: str, **kwargs) -> str:
+        """Save page as PDF."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "save_as_pdf"):
+            return await backend.save_as_pdf(session_id, **kwargs)
+        raise NotImplementedError("save_as_pdf not supported")
+
+    async def send_keys(self, session_id: str, keys: str) -> None:
+        """Send complex key sequence."""
+        page = await self._get_page(session_id)
+        await page.keyboard.press(keys)
+
+        session = self.sessions.get(session_id)
+        if session:
+            session.mark_activity()
+
+    async def scroll_to_text(self, session_id: str, text: str, **kwargs) -> bool:
+        """Scroll until text is visible."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "scroll_to_text"):
+            return await backend.scroll_to_text(session_id, text, **kwargs)
+        raise NotImplementedError("scroll_to_text not supported")
+
+    async def switch_tab(self, session_id: str, index: int) -> None:
+        """Switch tab by index."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "switch_tab"):
+            return await backend.switch_tab(session_id, index)
+        raise NotImplementedError("switch_tab not supported")
+
+    async def open_tab(self, session_id: str, url: str | None = None) -> int:
+        """Open new tab."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "open_tab"):
+            return await backend.open_tab(session_id, url=url)
+        raise NotImplementedError("open_tab not supported")
+
+    async def close_tab(self, session_id: str, index: int | None = None) -> None:
+        """Close tab."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "close_tab"):
+            return await backend.close_tab(session_id, index=index)
+        raise NotImplementedError("close_tab not supported")
+
+    async def extract_content(self, session_id: str, **kwargs) -> str:
+        """Extract content from page."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "extract_content"):
+            return await backend.extract_content(session_id, **kwargs)
+        raise NotImplementedError("extract_content not supported")
+
+    async def get_tabs_info(self, session_id: str) -> list[dict]:
+        """Get info about all tabs."""
+        backend = self.browser_pool.get_backend(session_id)
+        if hasattr(backend, "get_tabs_info"):
+            return await backend.get_tabs_info(session_id)
+        raise NotImplementedError("get_tabs_info not supported")

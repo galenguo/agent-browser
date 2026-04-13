@@ -411,6 +411,75 @@ class StealthMiddleware:
             **kwargs,
         )
 
+    # ── New Actions (delegate to backend) ──────────────────────
+
+    async def search_page(
+        self, session_id: str, pattern: str, **kwargs,
+    ) -> dict:
+        if hasattr(self._backend, "search_page"):
+            return await self._backend.search_page(session_id, pattern, **kwargs)
+        raise NotImplementedError("search_page() not supported by current backend")
+
+    async def find_elements(self, session_id: str, selector: str, **kwargs) -> list[dict]:
+        if hasattr(self._backend, "find_elements"):
+            return await self._backend.find_elements(session_id, selector, **kwargs)
+        raise NotImplementedError("find_elements() not supported by current backend")
+
+    async def get_dropdown_options(self, session_id: str, ref: str) -> list[dict]:
+        if hasattr(self._backend, "get_dropdown_options"):
+            return await self._backend.get_dropdown_options(session_id, ref)
+        raise NotImplementedError("get_dropdown_options() not supported by current backend")
+
+    async def select_dropdown_option(self, session_id: str, ref: str, option_text: str) -> None:
+        if hasattr(self._backend, "select_dropdown_option"):
+            return await self._backend.select_dropdown_option(session_id, ref, option_text)
+        raise NotImplementedError("select_dropdown_option() not supported by current backend")
+
+    async def upload_file(self, session_id: str, ref: str, file_paths: list[str]) -> None:
+        if hasattr(self._backend, "upload_file"):
+            return await self._backend.upload_file(session_id, ref, file_paths)
+        raise NotImplementedError("upload_file() not supported by current backend")
+
+    async def screenshot(self, session_id: str, **kwargs) -> bytes:
+        if hasattr(self._backend, "screenshot"):
+            return await self._backend.screenshot(session_id, **kwargs)
+        raise NotImplementedError("screenshot() not supported by current backend")
+
+    async def save_as_pdf(self, session_id: str, **kwargs) -> str:
+        if hasattr(self._backend, "save_as_pdf"):
+            return await self._backend.save_as_pdf(session_id, **kwargs)
+        raise NotImplementedError("save_as_pdf() not supported by current backend")
+
+    async def scroll_to_text(self, session_id: str, text: str, **kwargs) -> bool:
+        if hasattr(self._backend, "scroll_to_text"):
+            return await self._backend.scroll_to_text(session_id, text, **kwargs)
+        raise NotImplementedError("scroll_to_text() not supported by current backend")
+
+    async def switch_tab(self, session_id: str, index: int) -> None:
+        if hasattr(self._backend, "switch_tab"):
+            return await self._backend.switch_tab(session_id, index)
+        raise NotImplementedError("switch_tab() not supported by current backend")
+
+    async def open_tab(self, session_id: str, url: str | None = None) -> int:
+        if hasattr(self._backend, "open_tab"):
+            return await self._backend.open_tab(session_id, url=url)
+        raise NotImplementedError("open_tab() not supported by current backend")
+
+    async def close_tab(self, session_id: str, index: int | None = None) -> None:
+        if hasattr(self._backend, "close_tab"):
+            return await self._backend.close_tab(session_id, index=index)
+        raise NotImplementedError("close_tab() not supported by current backend")
+
+    async def extract_content(self, session_id: str, **kwargs) -> str:
+        if hasattr(self._backend, "extract_content"):
+            return await self._backend.extract_content(session_id, **kwargs)
+        raise NotImplementedError("extract_content() not supported by current backend")
+
+    async def get_tabs_info(self, session_id: str) -> list[dict]:
+        if hasattr(self._backend, "get_tabs_info"):
+            return await self._backend.get_tabs_info(session_id)
+        raise NotImplementedError("get_tabs_info() not supported by current backend")
+
     # ── Property access ──
 
     @property

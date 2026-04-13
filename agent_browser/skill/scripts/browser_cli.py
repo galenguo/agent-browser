@@ -614,6 +614,240 @@ class SkillBrowser:
             {"selector": selector, "timeout": timeout},
         )
 
+    # ── New Actions (browser-use coverage) ─────────────────────────
+
+    async def search_page(
+        self,
+        session_id: str,
+        pattern: str,
+        case_sensitive: bool = False,
+        is_regex: bool = False,
+        max_results: int = 10,
+        context_chars: int = 100,
+        css_scope: str | None = None,
+    ) -> dict:
+        """Search page text content using regex or plain text.
+
+        Args:
+            session_id: Session ID.
+            pattern: Search pattern (regex or plain text).
+            case_sensitive: Case-sensitive search (default False).
+            is_regex: Treat pattern as regex (default False).
+            max_results: Max matches to return (default 10).
+            context_chars: Context characters around each match (default 100).
+            css_scope: Limit search to this CSS subtree (default entire page).
+
+        Returns:
+            Dict with ``matches`` list and ``total`` count.
+        """
+        return await self._request("POST", f"/sessions/{session_id}/search", {
+            "pattern": pattern,
+            "case_sensitive": case_sensitive,
+            "is_regex": is_regex,
+            "max_results": max_results,
+            "context_chars": context_chars,
+            "css_scope": css_scope,
+        })
+
+    async def find_elements(
+        self,
+        session_id: str,
+        selector: str,
+        max_results: int = 50,
+    ) -> dict:
+        """Find elements matching a CSS selector with metadata.
+
+        Args:
+            session_id: Session ID.
+            selector: CSS selector string.
+            max_results: Max elements to return (default 50).
+
+        Returns:
+            Dict with ``elements`` list and ``total`` count.
+        """
+        return await self._request("POST", f"/sessions/{session_id}/find_elements", {
+            "selector": selector,
+            "max_results": max_results,
+        })
+
+    async def get_dropdown_options(self, session_id: str, ref: str) -> list[dict]:
+        """Get options from a <select> element.
+
+        Args:
+            session_id: Session ID.
+            ref: Element reference (``@eN``).
+
+        Returns:
+            List of ``{index, value, text, selected, disabled}`` dicts.
+        """
+        result = await self._request("POST", f"/sessions/{session_id}/dropdown/options", {"ref": ref})
+        return result.get("options", [])
+
+    async def select_dropdown_option(self, session_id: str, ref: str, option_text: str) -> None:
+        """Select a dropdown option by visible text.
+
+        Args:
+            session_id: Session ID.
+            ref: Element reference (``@eN``).
+            option_text: Visible text of option to select.
+        """
+        await self._request("POST", f"/sessions/{session_id}/dropdown/select", {
+            "ref": ref,
+            "option_text": option_text,
+        })
+
+    async def upload_file(self, session_id: str, ref: str, file_paths: list[str]) -> None:
+        """Upload files to an <input type=file> element.
+
+        Args:
+            session_id: Session ID.
+            ref: Element reference (``@eN``).
+            file_paths: List of absolute file paths.
+        """
+        await self._request("POST", f"/sessions/{session_id}/upload", {
+            "ref": ref,
+            "file_paths": file_paths,
+        })
+
+    async def screenshot(
+        self,
+        session_id: str,
+        ref: str | None = None,
+        full_page: bool = True,
+        format: str = "png",
+    ) -> dict:
+        """Take a screenshot of page or element.
+
+        Args:
+            session_id: Session ID.
+            ref: Element reference for element screenshot (None = full page).
+            full_page: Capture full page scroll (default True).
+            format: Image format (``png`` or ``jpeg``, default ``png``).
+
+        Returns:
+            Dict with ``image`` (base64), ``format``, and ``size``.
+        """
+        return await self._request("POST", f"/sessions/{session_id}/screenshot", {
+            "ref": ref,
+            "full_page": full_page,
+            "format": format,
+        } if ref else None)
+
+    async def save_as_pdf(
+        self,
+        session_id: str,
+        output_path: str | None = None,
+        landscape: bool = False,
+    ) -> dict:
+        """Save current page as PDF.
+
+        Args:
+            session_id: Session ID.
+            output_path: Output file path (auto-generated if None).
+            landscape: Landscape orientation (default False).
+
+        Returns:
+            Dict with ``path`` to saved PDF.
+        """
+        return await self._request("POST", f"/sessions/{session_id}/pdf", {
+            "output_path": output_path,
+            "landscape": landscape,
+        } if output_path else None)
+
+    async def send_keys(self, session_id: str, keys: str) -> None:
+        """Send complex key sequence (e.g., 'Meta+a', 'Shift+Home').
+
+        Args:
+            session_id: Session ID.
+            keys: Key sequence with optional modifiers.
+        """
+        await self._request("POST", f"/sessions/{session_id}/keys/send", {"keys": keys})
+
+    async def scroll_to_text(self, session_id: str, text: str, max_scrolls: int = 10) -> bool:
+        """Scroll until text becomes visible.
+
+        Args:
+            session_id: Session ID.
+            text: Text to find.
+            max_scrolls: Max scroll attempts (default 10).
+
+        Returns:
+            True if text was found and made visible.
+        """
+        result = await self._request("POST", f"/sessions/{session_id}/scroll/text", {
+            "text": text,
+            "max_scrolls": max_scrolls,
+        })
+        return result.get("found", False)
+
+    async def switch_tab(self, session_id: str, index: int) -> None:
+        """Switch to tab by index.
+
+        Args:
+            session_id: Session ID.
+            index: Tab index (0-based).
+        """
+        await self._request("POST", f"/sessions/{session_id}/tabs/switch", {"index": index})
+
+    async def open_tab(self, session_id: str, url: str | None = None) -> int:
+        """Open new tab. Optionally navigate to URL.
+
+        Args:
+            session_id: Session ID.
+            url: URL to navigate to (None = blank tab).
+
+        Returns:
+            Index of new tab.
+        """
+        result = await self._request("POST", f"/sessions/{session_id}/tabs/open", {
+            "url": url,
+        } if url else None)
+        return result.get("index", 0)
+
+    async def close_tab(self, session_id: str, index: int | None = None) -> None:
+        """Close tab by index (closes last tab if index is None).
+
+        Args:
+            session_id: Session ID.
+            index: Tab index (None = last tab).
+        """
+        body = {"index": index} if index is not None else {}
+        await self._request("POST", f"/sessions/{session_id}/tabs/close", body)
+
+    async def get_tabs_info(self, session_id: str) -> list[dict]:
+        """Get info about all open tabs.
+
+        Args:
+            session_id: Session ID.
+
+        Returns:
+            List of ``{index, url, title}`` dicts.
+        """
+        result = await self._request("GET", f"/sessions/{session_id}/tabs")
+        return result.get("tabs", [])
+
+    async def extract_content(
+        self,
+        session_id: str,
+        selector: str | None = None,
+        extract_type: str = "text",
+    ) -> str:
+        """Extract content from page or element.
+
+        Args:
+            session_id: Session ID.
+            selector: CSS scope (None = entire page).
+            extract_type: ``text``, ``html``, ``links``, ``images`` (default ``text``).
+
+        Returns:
+            Extracted content string.
+        """
+        result = await self._request("POST", f"/sessions/{session_id}/extract", {
+            "selector": selector,
+            "extract_type": extract_type,
+        })
+        return result.get("content", "")
+
     # ── JavaScript Execution ─────────────────────────────────────────
 
     async def evaluate(

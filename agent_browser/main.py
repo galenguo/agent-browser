@@ -511,6 +511,143 @@ async def go_back(session_id: str):
     await page.go_back()
 
 
+# ── New Actions (browser-use coverage) ─────────────────────
+
+
+async def search_page(
+    session_id: str,
+    pattern: str,
+    case_sensitive: bool = False,
+    is_regex: bool = False,
+    max_results: int = 10,
+    context_chars: int = 100,
+    css_scope: str | None = None,
+) -> dict:
+    """Search page text content using regex or plain text.
+
+    Returns matches with context, element path, and character position.
+    """
+    mw = await _ensure_middleware()
+    return await mw.search_page(
+        session_id, pattern, case_sensitive=case_sensitive, is_regex=is_regex,
+        max_results=max_results, context_chars=context_chars, css_scope=css_scope,
+    )
+
+
+async def find_elements(
+    session_id: str,
+    selector: str,
+    max_results: int = 50,
+) -> list[dict]:
+    """Find elements matching a CSS selector with metadata.
+
+    Returns list of {index, tag, text, id, class_name, bounding_box, visible}.
+    """
+    mw = await _ensure_middleware()
+    return await mw.find_elements(session_id, selector, max_results=max_results)
+
+
+async def get_dropdown_options(session_id: str, ref: str) -> list[dict]:
+    """Get options list from a <select> element.
+
+    Returns [{index, value, text, selected, disabled}, ...]
+    """
+    mw = await _ensure_middleware()
+    return await mw.get_dropdown_options(session_id, ref)
+
+
+async def select_dropdown_option(session_id: str, ref: str, option_text: str) -> None:
+    """Select a dropdown option by visible text (not value)."""
+    mw = await _ensure_middleware()
+    return await mw.select_dropdown_option(session_id, ref, option_text)
+
+
+async def upload_file(session_id: str, ref: str, file_paths: list[str]) -> None:
+    """Upload files to an <input type=file> element."""
+    mw = await _ensure_middleware()
+    return await mw.upload_file(session_id, ref, file_paths)
+
+
+async def screenshot(
+    session_id: str,
+    ref: str | None = None,
+    full_page: bool = True,
+    format: str = "png",
+    quality: int | None = None,
+) -> bytes:
+    """Take a screenshot of the page or specific element.
+
+    Returns image bytes (PNG or JPEG).
+    """
+    mw = await _ensure_middleware()
+    return await mw.screenshot(
+        session_id, ref=ref, full_page=full_page, format=format, quality=quality,
+    )
+
+
+async def save_as_pdf(
+    session_id: str,
+    output_path: str | None = None,
+    landscape: bool = False,
+    **kwargs,
+) -> str:
+    """Save current page as PDF. Returns file path."""
+    mw = await _ensure_middleware()
+    return await mw.save_as_pdf(session_id, output_path=output_path, landscape=landscape, **kwargs)
+
+
+async def send_keys(session_id: str, keys: str) -> None:
+    """Send complex key sequence (e.g., 'Meta+a', 'Shift+Home', 'Control+c')."""
+    page = await _get_page(session_id)
+    await page.keyboard_press(keys)
+
+
+async def scroll_to_text(session_id: str, text: str, max_scrolls: int = 10) -> bool:
+    """Scroll until text becomes visible. Returns True if found."""
+    mw = await _ensure_middleware()
+    return await mw.scroll_to_text(session_id, text, max_scrolls=max_scrolls)
+
+
+async def switch_tab(session_id: str, index: int) -> None:
+    """Switch to tab by index (0-based)."""
+    mw = await _ensure_middleware()
+    return await mw.switch_tab(session_id, index)
+
+
+async def open_tab(session_id: str, url: str | None = None) -> int:
+    """Open new tab. Optionally navigate to URL. Returns new tab index."""
+    mw = await _ensure_middleware()
+    return await mw.open_tab(session_id, url=url)
+
+
+async def close_tab(session_id: str, index: int | None = None) -> None:
+    """Close tab by index. Closes last tab if index is None."""
+    mw = await _ensure_middleware()
+    return await mw.close_tab(session_id, index=index)
+
+
+async def extract_content(
+    session_id: str,
+    selector: str | None = None,
+    extract_type: str = "text",
+    max_length: int | None = None,
+) -> str:
+    """Extract content from page or element.
+
+    Types: text, html, links, images, attributes.
+    """
+    mw = await _ensure_middleware()
+    return await mw.extract_content(
+        session_id, selector=selector, extract_type=extract_type, max_length=max_length,
+    )
+
+
+async def get_tabs_info(session_id: str) -> list[dict]:
+    """Get info about all open tabs: [{index, url, title}, ...]."""
+    mw = await _ensure_middleware()
+    return await mw.get_tabs_info(session_id)
+
+
 async def run_task(
     session_id: str,
     task: str,

@@ -188,6 +188,159 @@ class WaitRequest(BaseModel):
     state: str = "visible"  # visible | hidden | attached | detached
 
 
+# ============ New Action Request Models (browser-use coverage) ============
+
+
+class SearchPageRequest(BaseModel):
+    """Search page text content using regex or plain text."""
+
+    pattern: str
+    case_sensitive: bool = False
+    is_regex: bool = False
+    max_results: int = 10
+    context_chars: int = 100
+    css_scope: str | None = None  # Limit search to this CSS selector's subtree
+
+
+class FindElementsRequest(BaseModel):
+    """Find elements matching a CSS selector."""
+
+    selector: str
+    max_results: int = 50
+    return_attributes: list[str] | None = None  # Extra attributes to include
+
+
+class GetDropdownOptionsRequest(BaseModel):
+    """Get options from a <select> element."""
+
+    ref: str  # Element reference (@eN)
+
+
+class SelectDropdownOptionRequest(BaseModel):
+    """Select a dropdown option by visible text (not value)."""
+
+    ref: str  # Element reference (@eN)
+    option_text: str  # Visible text of the option to select
+
+
+class UploadFileRequest(BaseModel):
+    """Upload files to an <input type=file> element."""
+
+    ref: str  # Element reference (@eN)
+    file_paths: list[str]  # Absolute file paths to upload
+
+
+class ScreenshotRequest(BaseModel):
+    """Take a screenshot of the page or element."""
+
+    ref: str | None = None  # Element reference (None = full page)
+    full_page: bool = True
+    format: str = "png"  # png | jpeg
+    quality: int | None = None  # JPEG quality (1-100), None for PNG
+    type: str = "png"  # Deprecated alias for format
+
+
+class SendKeysRequest(BaseModel):
+    """Send a complex key sequence (modifiers + keys)."""
+
+    keys: str  # e.g., "Meta+a", "Shift+Home", "Control+c", "Tab"
+
+
+class ScrollToTextRequest(BaseModel):
+    """Scroll the page until text becomes visible."""
+
+    text: str
+    max_scrolls: int = 10
+    scroll_amount: int = 500  # pixels per scroll
+
+
+class TabActionRequest(BaseModel):
+    """Multi-tab management request."""
+
+    index: int | None = None  # Tab index (for switch/close)
+    url: str | None = None  # URL to navigate (for open_tab)
+
+
+class ExtractContentRequest(BaseModel):
+    """Extract content from the page or element."""
+
+    selector: str | None = None  # CSS scope (None = entire page)
+    extract_type: str = "text"  # text | html | markdown | attributes | links | images
+    max_length: int | None = None  # Max characters to return
+
+
+class StructuredOutputRequest(BaseModel):
+    """Extract structured data using JSON schema validation."""
+
+    schema: dict  # JSON Schema for the output
+    prompt: str = ""  # Optional extraction instructions
+
+
+class SaveAsPdfRequest(BaseModel):
+    """Save the current page as PDF."""
+
+    output_path: str | None = None  # File path (None = auto-generate)
+    landscape: bool = False
+    format: str = "A4"
+    print_background: bool = True
+    margin_top: str = "1cm"
+    margin_bottom: str = "1cm"
+    margin_left: str = "1cm"
+    margin_right: str = "1cm"
+
+
+# ============ BrowserProfile Configuration Models ============
+
+
+class ProxySettingsModel(BaseModel):
+    """Proxy configuration for browser session."""
+
+    server: str  # e.g., "http://proxy.example.com:8080" or "socks5://host:1080"
+    username: str | None = None
+    password: str | None = None
+    bypass: str | None = None  # Comma-separated hosts to bypass
+
+
+class ViewportSettingsModel(BaseModel):
+    """Viewport/window size configuration."""
+
+    width: int = 1280
+    height: int = 720
+
+
+class WatchdogConfigModel(BaseModel):
+    """Per-session watchdog configuration."""
+
+    captcha_solver: bool = True
+    crash_detection: bool = True
+    download_tracking: bool = False
+    har_recording: bool = False
+    permission_handling: bool = True
+    popup_handling: bool = True
+    video_recording: bool = False
+    screenshot_monitoring: bool = False
+    security_monitoring: bool = False
+
+
+class SessionProfileConfig(BaseModel):
+    """Extended session creation parameters (BrowserProfile subset)."""
+
+    viewport: ViewportSettingsModel | None = None
+    proxy: ProxySettingsModel | None = None
+    user_agent: str | None = None
+    headless: bool | None = None
+    record_video_dir: str | None = None
+    record_har_path: str | None = None
+    allowed_domains: list[str] | None = None
+    prohibited_domains: list[str] | None = None
+    enable_extensions: bool | None = None
+    demo_mode: bool | None = None
+    auto_download_pdfs: bool | None = None
+    device_scale_factor: float | None = None
+    window_size: ViewportSettingsModel | None = None
+    watchdog: WatchdogConfigModel | None = None
+
+
 # ============ Atomic operation response models ============
 
 

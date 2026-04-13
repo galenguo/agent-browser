@@ -49,13 +49,23 @@ from agent_browser.api.auth import load_keys, require_api_key
 from agent_browser.models import (
     ClickRequest,
     EvaluateRequest,
+    ExtractContentRequest,
     FillRequest,
+    FindElementsRequest,
+    GetDropdownOptionsRequest,
     K8sBrowserInstance,
     NavigateRequest,
     ResourceExhaustedError,
+    SaveAsPdfRequest,
     ScrollRequest,
+    SearchPageRequest,
+    SelectDropdownOptionRequest,
+    SendKeysRequest,
     SessionNotFoundError,
     SnapshotResponse,
+    ScreenshotRequest,
+    TabActionRequest,
+    UploadFileRequest,
     UserSession,
     WaitRequest,
 )
@@ -164,6 +174,18 @@ def get_key_manager() -> KeyManager:
 class CreateSessionRequest(BaseModel):
     user_id: str
     browser_mode: str = "local"
+    # Extended profile config (BrowserProfile subset)
+    viewport: dict | None = None  # {width, height}
+    proxy: dict | None = None  # {server, username, password}
+    user_agent: str | None = None
+    headless: bool | None = None
+    record_video_dir: str | None = None
+    allowed_domains: list[str] | None = None
+    prohibited_domains: list[str] | None = None
+    enable_extensions: bool | None = None
+    demo_mode: bool | None = None
+    device_scale_factor: float | None = None
+    watchdog: dict | None = None  # Watchdog config (captcha_solver, crash_detection, etc.)
 
 
 class TaskSubmitRequest(BaseModel):
@@ -537,6 +559,256 @@ async def keyboard_press(session_id: str, req: KeyPressRequest, api_key: str = D
         return await pool.keyboard_press(session_id, key=req.key)
     except SessionNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+# ── New Action Endpoints (browser-use coverage) ─────────────────
+
+
+@app.post("/sessions/{session_id}/search")
+async def search_page(session_id: str, req: SearchPageRequest, api_key: str = Depends(require_api_key)):
+    """Search page text content using regex or plain text."""
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        return await pool.search_page(
+            session_id,
+            pattern=req.pattern,
+            case_sensitive=req.case_sensitive,
+            is_regex=req.is_regex,
+            max_results=req.max_results,
+            context_chars=req.context_chars,
+            css_scope=req.css_scope,
+        )
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except Exception as e:
+        logger.warning("Search failed for session %s: %s", session_id, e)
+        raise HTTPException(status_code=500, detail={"error": "search_failed", "message": str(e)})
+
+
+@app.post("/sessions/{session_id}/find_elements")
+async def find_elements(session_id: str, req: FindElementsRequest, api_key: str = Depends(require_api_key)):
+    """Find elements matching a CSS selector."""
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        return await pool.find_elements(
+            session_id, selector=req.selector, max_results=req.max_results,
+            return_attributes=req.return_attributes,
+        )
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except Exception as e:
+        logger.warning("find_elements failed for session %s: %s", session_id, e)
+        raise HTTPException(status_code=500, detail={"error": "find_elements_failed", "message": str(e)})
+
+
+@app.post("/sessions/{session_id}/dropdown/options")
+async def get_dropdown_options_endpoint(
+    session_id: str, req: GetDropdownOptionsRequest, api_key: str = Depends(require_api_key),
+):
+    """Get options from a <select> element."""
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        return {"options": await pool.get_dropdown_options(session_id, req.ref)}
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/sessions/{session_id}/dropdown/select")
+async def select_dropdown_option_endpoint(
+    session_id: str, req: SelectDropdownOptionRequest, api_key: str = Depends(require_api_key),
+):
+    """Select a dropdown option by visible text."""
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        await pool.select_dropdown_option(session_id, req.ref, req.option_text)
+        return {}
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/sessions/{session_id}/upload")
+async def upload_file(session_id: str, req: UploadFileRequest, api_key: str = Depends(require_api_key)):
+    """Upload files to an <input type=file> element."""
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        await pool.upload_file(session_id, req.ref, req.file_paths)
+        return {}
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=f"File not found: {e}")
+
+
+@app.post("/sessions/{session_id}/screenshot")
+async def screenshot(session_id: str, req: ScreenshotRequest | None = None, api_key: str = Depends(require_api_key)):
+    """Take a screenshot of page or element. Returns base64-encoded image."""
+    import base64
+
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        kwargs = {}
+        if req:
+            kwargs = {
+                "ref": req.ref,
+                "full_page": req.full_page,
+                "format": getattr(req, 'format', None) or getattr(req, 'type', 'png'),
+                "quality": req.quality,
+            }
+        image_bytes = await pool.screenshot(session_id, **kwargs)
+        return {
+            "image": base64.b64encode(image_bytes).decode(),
+            "format": kwargs.get("format", "png"),
+            "size": len(image_bytes),
+        }
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except Exception as e:
+        logger.warning("Screenshot failed for session %s: %s", session_id, e)
+        raise HTTPException(status_code=500, detail={"error": "screenshot_failed", "message": str(e)})
+
+
+@app.post("/sessions/{session_id}/pdf")
+async def save_as_pdf(session_id: str, req: SaveAsPdfRequest | None = None, api_key: str = Depends(require_api_key)):
+    """Save current page as PDF."""
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        kwargs = {}
+        if req:
+            kwargs = {
+                "output_path": req.output_path,
+                "landscape": req.landscape,
+                "format": req.format,
+                "print_background": req.print_background,
+                "margin_top": req.margin_top,
+                "margin_bottom": req.margin_bottom,
+                "margin_left": req.margin_left,
+                "margin_right": req.margin_right,
+            }
+        path = await pool.save_as_pdf(session_id, **kwargs)
+        return {"path": path}
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except Exception as e:
+        logger.warning("PDF export failed for session %s: %s", session_id, e)
+        raise HTTPException(status_code=500, detail={"error": "pdf_failed", "message": str(e)})
+
+
+@app.post("/sessions/{session_id}/keys/send")
+async def send_keys(session_id: str, req: SendKeysRequest, api_key: str = Depends(require_api_key)):
+    """Send complex key sequence (modifiers + keys)."""
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        await pool.send_keys(session_id, req.keys)
+        return {}
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+
+@app.post("/sessions/{session_id}/scroll/text")
+async def scroll_to_text(session_id: str, text: str, max_scrolls: int = 10, api_key: str = Depends(require_api_key)):
+    """Scroll until text becomes visible."""
+    from agent_browser.models import ScrollToTextRequest
+
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        found = await pool.scroll_to_text(session_id, text, max_scrolls=max_scrolls)
+        return {"found": found}
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+
+# ── Tab Management Endpoints ────────────────────────────────────────
+
+
+@app.post("/sessions/{session_id}/tabs/switch")
+async def switch_tab(session_id: str, req: TabActionRequest, api_key: str = Depends(require_api_key)):
+    """Switch to tab by index."""
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        if req.index is None:
+            raise HTTPException(status_code=400, detail="index is required for switch_tab")
+        await pool.switch_tab(session_id, req.index)
+        return {}
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except IndexError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/sessions/{session_id}/tabs/open")
+async def open_tab(session_id: str, req: TabActionRequest, api_key: str = Depends(require_api_key)):
+    """Open new tab (optionally navigate to URL)."""
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        index = await pool.open_tab(session_id, url=req.url)
+        return {"index": index}
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+
+@app.post("/sessions/{session_id}/tabs/close")
+async def close_tab(session_id: str, req: TabActionRequest, api_key: str = Depends(require_api_key)):
+    """Close tab by index (or last tab if index omitted)."""
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        await pool.close_tab(session_id, index=req.index)
+        return {}
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except (ValueError, IndexError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/sessions/{session_id}/tabs")
+async def list_tabs(session_id: str, api_key: str = Depends(require_api_key)):
+    """Get info about all open tabs."""
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        tabs = await pool.get_tabs_info(session_id)
+        return {"tabs": tabs}
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+
+# ── Data Extraction Endpoints ───────────────────────────────────────
+
+
+@app.post("/sessions/{session_id}/extract")
+async def extract_content(session_id: str, req: ExtractContentRequest, api_key: str = Depends(require_api_key)):
+    """Extract content from page or element."""
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        content = await pool.extract_content(
+            session_id,
+            selector=req.selector,
+            extract_type=req.extract_type,
+            max_length=req.max_length,
+        )
+        return {"content": content}
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except Exception as e:
+        logger.warning("Extract failed for session %s: %s", session_id, e)
+        raise HTTPException(status_code=500, detail={"error": "extract_failed", "message": str(e)})
 
 
 # ── VNC Proxy ─────────────────────────────────────────────────────────
