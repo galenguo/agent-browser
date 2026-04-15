@@ -71,6 +71,7 @@ from agent_browser.models import (
     WaitRequest,
 )
 from agent_browser.session.pool_manager import SessionPoolManager
+from agent_browser.state.store import KEY_ALLOCATIONS
 
 logger = logging.getLogger(__name__)
 
@@ -352,7 +353,6 @@ async def create_session(req: CreateSessionRequest, api_key: str = Depends(requi
     km = get_key_manager()
 
     # 1:1 binding: check if this api_key already has an active session
-    from agent_browser.state.store import KEY_ALLOCATIONS
     existing_sid = await km.store.hget(KEY_ALLOCATIONS, api_key)
     if existing_sid:
         existing_session = pool.sessions.get(existing_sid)

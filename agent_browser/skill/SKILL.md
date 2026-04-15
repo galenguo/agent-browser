@@ -131,12 +131,38 @@ All commands return JSON:
 
 ## Installation Notes
 
-`agent-browser install-skill` installs:
-- `~/.claude/skills/agent-browser/` skill files
-- `~/.local/bin/agent-browser` shim command
+Run once to install the skill and create the CLI shim:
 
-If `agent-browser` command is not found, add `~/.local/bin` to PATH:
+```bash
+agent-browser install-skill
+```
+
+### macOS / Linux
+
+Shim is created at `~/.local/bin/agent-browser`.
+
+If `agent-browser` command is not found, add to PATH:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
+
+Add that line to `~/.bashrc`, `~/.zshrc`, or equivalent to persist across sessions.
+
+### Windows
+
+Shim is created at `%APPDATA%\Python\Scripts\agent-browser.bat`.
+
+If `agent-browser` command is not found, add to PATH via PowerShell (run once as admin):
+
+```powershell
+$scripts = "$env:APPDATA\Python\Scripts"
+[Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$scripts", "User")
+```
+
+Or add `%APPDATA%\Python\Scripts` manually via System Properties → Environment Variables.
+
+### Daemon Auto-Start
+
+The daemon starts automatically on first command and stops after 30 minutes of inactivity.
+No manual daemon management is needed during normal use.
