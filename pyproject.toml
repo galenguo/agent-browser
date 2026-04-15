@@ -1,6 +1,6 @@
 [project]
 name = "agent-browser"
-version = "0.2.0"
+version = "0.2.1"
 description = "Anti-detection browser automation framework built on browser-use"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -61,7 +61,8 @@ dev = [
 ]
 
 [project.scripts]
-agent-browser = "agent_browser.cli.main:app"
+agent-browser = "agent_browser.cli.main:cli"
+agent-browser-daemon = "agent_browser.skill.daemon:main"
 
 [project.urls]
 Homepage = "https://github.com/your-org/agent-browser"
@@ -237,8 +238,10 @@ exclude = ["tests*", "docs*", "examples*", "scripts*", "adapters*", "data*", "do
 [tool.setuptools.package-data]
 agent_browser = [
     "skill/SKILL.md",
-    "skill/references/*.md",
-    "skill/scripts/*.py",
+    "skill/config.yaml",
+    "skill/daemon.py",
+    "skill/cli.py",
+    "skill/scripts/doctor.py",
     "extension/manifest.json",
     "extension/background.js",
     "extension/popup.html",
