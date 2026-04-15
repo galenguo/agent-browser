@@ -81,13 +81,17 @@ class SessionPoolManager:
                 pass
 
         self.browser_pool = BrowserInstancePool(mode=effective_mode)
-        self._stealth = StealthEnhancer()
+        from agent_browser.stealth.profiles import profile_from_env
+        self._stealth = StealthEnhancer(profile=profile_from_env())
+        self._backend = None  # Lazy LocalCDPBackend for operation delegation
 
         self._monitor_task = None
         self._health_check_task = None
         self._create_lock = asyncio.Lock()
         # CDP connection cache: session_id -> (playwright, browser) — shared by Docker and K8s modes
         self._cdp_connections: dict[str, tuple] = {}
+        # Track which sessions have had JS stealth patches injected
+        self._stealth_injected: set[str] = set()
 
         logger.info(
             f"SessionPoolManager initialized: "
@@ -226,6 +230,7 @@ class SessionPoolManager:
         llm_config: dict,
         max_steps: int = 50,
         agent_config: dict | None = None,
+        intelligence: str = "agent",
     ) -> str:
         """Submit a task to the specified session."""
         session = self.sessions.get(session_id)
@@ -249,6 +254,18 @@ class SessionPoolManager:
         # Build Agent kwargs from agent_config
         agent_kwargs = self._build_agent_kwargs(agent_config)
 
+        # LLM mode: return tool list without starting Agent
+        if intelligence != "agent":
+            task_id = f"task_{uuid4().hex[:8]}"
+            session.tasks[task_id] = {
+                "status": "ready",
+                "task": task,
+                "mode": "llm",
+                "tools": ["snapshot", "click", "fill", "scroll", "go_back", "hover", "press_key"],
+                "created_at": time.time(),
+            }
+            return task_id
+
         # Rebuild BrowserSession per task (avoid state corruption after previous task cleanup)
         browser_session = BrowserSession(
             browser_profile=BrowserProfile(
@@ -266,6 +283,13 @@ class SessionPoolManager:
             browser_session=browser_session,
             **agent_kwargs,
         )
+
+        # Register stealth actions (human-like delays + Bezier mouse + human typing)
+        try:
+            from agent_browser.stealth.actions import register_stealth_actions
+            register_stealth_actions(agent.controller, self._stealth)
+        except Exception as e:
+            logger.warning("Failed to register stealth actions for Agent: %s", e)
 
         task_id = f"task_{uuid4().hex[:8]}"
 
@@ -435,6 +459,11 @@ class SessionPoolManager:
                             browser_session=new_bs,
                             **agent_kwargs,
                         )
+                        try:
+                            from agent_browser.stealth.actions import register_stealth_actions
+                            register_stealth_actions(new_agent.controller, self._stealth)
+                        except Exception:
+                            pass
                         current_agent = new_agent
                         current_bs = new_bs
 
@@ -493,12 +522,19 @@ class SessionPoolManager:
         if not session:
             raise SessionNotFoundError(f"Session not found: {session_id}")
 
+        # Build VNC URL from session token (same logic as API create_session)
+        vnc_token = session.vnc_token
+        vnc_base = os.environ.get("VNC_BASE_URL", "")
+        vnc_url = f"{vnc_base}/vnc/{vnc_token}/vnc.html?autoconnect=1&resize=scale" if vnc_base and vnc_token else None
+
         return {
             "session_id": session.session_id,
             "user_id": session.user_id,
             "created_at": session.created_at,
             "last_activity": session.last_activity,
             "idle_time": time.time() - session.last_activity,
+            "vnc_url": vnc_url,
+            "vnc_token": vnc_token,
             "tasks": {
                 task_id: {
                     "status": task_info["status"],
@@ -517,6 +553,11 @@ class SessionPoolManager:
         sessions (created on another replica) by always attempting
         shared-store cleanup (pod release + counter decrement).
         """
+        # Unregister from backend delegation (before popping session)
+        if self._backend is not None:
+            self._backend.unregister_session(session_id)
+            self._stealth_injected.discard(session_id)
+
         session = self.sessions.pop(session_id, None)
 
         if session:
@@ -592,6 +633,20 @@ class SessionPoolManager:
                     except Exception:
                         pass
                 logger.info("Leaked allocations cleaned up (counter fixed)")
+
+            # Also clean orphaned key bindings (key -> session that no longer exists)
+            try:
+                from agent_browser.state.store import KEY_ALLOCATIONS
+                allocations = await self.store.hgetall(KEY_ALLOCATIONS)
+                for api_key, sid in allocations.items():
+                    if sid not in self.sessions:
+                        await self.store.release_key(api_key)
+                        logger.info(
+                            "Cleaned orphaned key binding: %s -> %s",
+                            api_key[:8], sid[:8],
+                        )
+            except Exception as e:
+                logger.warning("Failed to clean orphaned key bindings: %s", e)
         except Exception as e:
             logger.warning("Leaked allocation cleanup failed: %s", e)
 
@@ -659,6 +714,20 @@ class SessionPoolManager:
                             except Exception:
                                 pass
                         logger.info("Periodic cleanup done (counter fixed)")
+
+                    # Also clean orphaned key bindings
+                    try:
+                        from agent_browser.state.store import KEY_ALLOCATIONS
+                        allocations = await self.store.hgetall(KEY_ALLOCATIONS)
+                        for api_key, sid in allocations.items():
+                            if sid not in self.sessions:
+                                await self.store.release_key(api_key)
+                                logger.info(
+                                    "Periodic: cleaned orphaned key binding: %s -> %s",
+                                    api_key[:8], sid[:8],
+                                )
+                    except Exception as e:
+                        logger.warning("Periodic key binding cleanup failed: %s", e)
                 except Exception as e:
                     logger.warning("Periodic cleanup failed: %s", e)
 
@@ -686,13 +755,14 @@ class SessionPoolManager:
                     try:
                         import aiohttp
 
-                        async with aiohttp.ClientSession() as cs:
-                            async with cs.get(
-                                f"{instance.cdp_url}/json/version",
-                                timeout=aiohttp.ClientTimeout(total=3),
-                            ) as resp:
-                                if resp.status != 200:
-                                    raise Exception(f"CDP returned {resp.status}")
+                        if not hasattr(self, '_health_cs') or self._health_cs is None or self._health_cs.closed:
+                            self._health_cs = aiohttp.ClientSession()
+                        async with self._health_cs.get(
+                            f"{instance.cdp_url}/json/version",
+                            timeout=aiohttp.ClientTimeout(total=3),
+                        ) as resp:
+                            if resp.status != 200:
+                                raise Exception(f"CDP returned {resp.status}")
                     except Exception as e:
                         logger.error(f"K8s pod {instance.pod_name} CDP unhealthy for {session_id}: {e}")
                         try:
@@ -744,7 +814,10 @@ class SessionPoolManager:
                 return None
 
             k8s_manager = self.browser_pool._k8s_manager
-            await k8s_manager._reconcile_existing_pods()
+            # Fast path: check local registry first, fall back to full reconciliation
+            existing = await k8s_manager.get_pod_info(pod_name)
+            if not existing:
+                await k8s_manager._reconcile_existing_pods()
             pod_ip = await k8s_manager._get_pod_ip(pod_name)
 
             cdp_url = f"http://{pod_ip}:80/cdp"
@@ -935,9 +1008,67 @@ class SessionPoolManager:
 
         raise ConnectionError(f"Failed to connect to K8s CDP at {instance.cdp_url} after 3 attempts: {last_error}")
 
+    # ── Backend delegation infrastructure ───────────────────────
+
+    def _get_backend(self):
+        """Get or lazily create a LocalCDPBackend instance (logic delegate only).
+
+        The backend is used purely for operation delegation -- it does NOT
+        manage browser connections (pool_manager handles that via _get_page).
+        """
+        if self._backend is None:
+            from agent_browser.browser.local import LocalCDPBackend, LocalSession
+
+            backend = LocalCDPBackend.__new__(LocalCDPBackend)
+            backend._sessions = {}
+            # Store classes for _ensure_backend_session
+            backend._LocalSession = LocalSession
+            self._backend = backend
+        return self._backend
+
+    async def _ensure_backend_session(self, session_id: str) -> None:
+        """Lazily register a session in the LocalCDPBackend on first delegation.
+
+        Called by delegated methods before invoking backend operations.
+        Uses page.context (Playwright built-in) to resolve BrowserContext
+        for tab operations -- works for Local, Docker, and K8s modes.
+
+        Also injects JS stealth patches + timing noise to ensure API-path
+        pages have the same anti-detection baseline as CLI-path pages.
+        """
+        backend = self._get_backend()
+        if session_id in backend._sessions:
+            return
+        page = await self._get_page(session_id)
+        await self._inject_stealth_if_needed(session_id, page)
+        await backend.register_session(session_id, page, page.context)
+
+    async def _inject_stealth_if_needed(self, session_id: str, page) -> None:
+        """Inject JS stealth patches + timing noise once per session.
+
+        Safe to call multiple times -- skips if already injected.
+        Called by _ensure_backend_session (delegated path) and by
+        direct interactive methods (navigate/click/fill/scroll) via
+        their pre_action helper.
+        """
+        if session_id in self._stealth_injected:
+            return
+        self._stealth_injected.add(session_id)
+        try:
+            from agent_browser.stealth.patches import inject_stealth_patches
+            await inject_stealth_patches(page)
+        except Exception as e:
+            logger.warning("Stealth JS patches failed for %s: %s", session_id[:8], e)
+        try:
+            from agent_browser.stealth.enhancer import StealthEnhancer as _SE
+            await _SE.inject_timing_noise(page)
+        except Exception as e:
+            logger.warning("Stealth timing noise failed for %s: %s", session_id[:8], e)
+
     async def navigate(self, session_id: str, request: NavigateRequest) -> dict:
         """Page navigation."""
         page = await self._get_page(session_id)
+        await self._inject_stealth_if_needed(session_id, page)
 
         await self._stealth.pre_action("navigate")
 
@@ -1216,6 +1347,7 @@ class SessionPoolManager:
     async def go_back(self, session_id: str, wait_until: str = "domcontentloaded", timeout: int = 10000) -> dict:
         """Go back to previous page."""
         page = await self._get_page(session_id)
+        await self._stealth.pre_action("navigate")
         await page.go_back(wait_until=wait_until, timeout=timeout)
 
         session = self.sessions.get(session_id)
@@ -1227,6 +1359,7 @@ class SessionPoolManager:
     async def mouse_move(self, session_id: str, x: float, y: float) -> dict:
         """Move mouse."""
         page = await self._get_page(session_id)
+        await self._stealth.pre_action("general")
         await page.mouse.move(x, y)
 
         session = self.sessions.get(session_id)
@@ -1238,6 +1371,7 @@ class SessionPoolManager:
     async def keyboard_press(self, session_id: str, key: str) -> dict:
         """Press key."""
         page = await self._get_page(session_id)
+        await self._stealth.pre_action("input")
         await page.keyboard.press(key)
 
         session = self.sessions.get(session_id)
@@ -1246,106 +1380,87 @@ class SessionPoolManager:
 
         return {"status": "ok", "key": key}
 
-    # ── New Actions (browser-use coverage) ──────────────────────
+    # ── New Actions (delegated to LocalCDPBackend) ─────────────────
 
     async def search_page(
         self, session_id: str, pattern: str, **kwargs,
     ) -> dict:
-        """Search page text content."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "search_page"):
-            return await backend.search_page(session_id, pattern, **kwargs)
-        raise NotImplementedError("search_page not supported")
+        """Search page text content (supports regex, plain text)."""
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().search_page(session_id, pattern, **kwargs)
 
     async def find_elements(self, session_id: str, selector: str, **kwargs) -> dict:
-        """Find elements by CSS selector."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "find_elements"):
-            return await backend.find_elements(session_id, selector, **kwargs)
-        raise NotImplementedError("find_elements not supported")
+        """Find elements by CSS selector with metadata."""
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().find_elements(session_id, selector, **kwargs)
 
     async def get_dropdown_options(self, session_id: str, ref: str) -> list[dict]:
-        """Get dropdown options."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "get_dropdown_options"):
-            return await backend.get_dropdown_options(session_id, ref)
-        raise NotImplementedError("get_dropdown_options not supported")
+        """Get dropdown options from a <select> element."""
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().get_dropdown_options(session_id, ref)
 
     async def select_dropdown_option(self, session_id: str, ref: str, option_text: str) -> None:
-        """Select dropdown option by text."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "select_dropdown_option"):
-            return await backend.select_dropdown_option(session_id, ref, option_text)
-        raise NotImplementedError("select_dropdown_option not supported")
+        """Select dropdown option by visible text."""
+        await self._stealth.pre_action("input")
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().select_dropdown_option(session_id, ref, option_text)
 
     async def upload_file(self, session_id: str, ref: str, file_paths: list[str]) -> None:
-        """Upload files to file input."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "upload_file"):
-            return await backend.upload_file(session_id, ref, file_paths)
-        raise NotImplementedError("upload_file not supported")
+        """Upload files to <input type=file> element."""
+        await self._stealth.pre_action("input")
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().upload_file(session_id, ref, file_paths)
 
     async def screenshot(self, session_id: str, **kwargs) -> bytes:
-        """Take screenshot."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "screenshot"):
-            return await backend.screenshot(session_id, **kwargs)
-        raise NotImplementedError("screenshot not supported")
+        """Take screenshot (full page or element by ref)."""
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().screenshot(session_id, **kwargs)
 
     async def save_as_pdf(self, session_id: str, **kwargs) -> str:
-        """Save page as PDF."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "save_as_pdf"):
-            return await backend.save_as_pdf(session_id, **kwargs)
-        raise NotImplementedError("save_as_pdf not supported")
+        """Save current page as PDF. Returns file path."""
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().save_as_pdf(session_id, **kwargs)
 
     async def send_keys(self, session_id: str, keys: str) -> None:
-        """Send complex key sequence."""
-        page = await self._get_page(session_id)
-        await page.keyboard.press(keys)
+        """Send complex key sequence (e.g., 'Meta+a', 'Shift+Home')."""
+        await self._stealth.pre_action("input")
+        await self._ensure_backend_session(session_id)
+        await self._get_backend().send_keys(session_id, keys)
 
         session = self.sessions.get(session_id)
         if session:
             session.mark_activity()
 
     async def scroll_to_text(self, session_id: str, text: str, **kwargs) -> bool:
-        """Scroll until text is visible."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "scroll_to_text"):
-            return await backend.scroll_to_text(session_id, text, **kwargs)
-        raise NotImplementedError("scroll_to_text not supported")
+        """Scroll until text becomes visible. Returns True if found."""
+        await self._stealth.pre_action("scroll")
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().scroll_to_text(session_id, text, **kwargs)
 
     async def switch_tab(self, session_id: str, index: int) -> None:
-        """Switch tab by index."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "switch_tab"):
-            return await backend.switch_tab(session_id, index)
-        raise NotImplementedError("switch_tab not supported")
+        """Switch to tab by index."""
+        await self._stealth.pre_action("general")
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().switch_tab(session_id, index)
 
     async def open_tab(self, session_id: str, url: str | None = None) -> int:
-        """Open new tab."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "open_tab"):
-            return await backend.open_tab(session_id, url=url)
-        raise NotImplementedError("open_tab not supported")
+        """Open new tab. Returns new tab index."""
+        await self._stealth.pre_action("navigate")
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().open_tab(session_id, url=url)
 
     async def close_tab(self, session_id: str, index: int | None = None) -> None:
-        """Close tab."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "close_tab"):
-            return await backend.close_tab(session_id, index=index)
-        raise NotImplementedError("close_tab not supported")
+        """Close tab by index (or last tab if None)."""
+        await self._stealth.pre_action("general")
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().close_tab(session_id, index=index)
 
     async def extract_content(self, session_id: str, **kwargs) -> str:
-        """Extract content from page."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "extract_content"):
-            return await backend.extract_content(session_id, **kwargs)
-        raise NotImplementedError("extract_content not supported")
+        """Extract content from page (text/html/links/images)."""
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().extract_content(session_id, **kwargs)
 
     async def get_tabs_info(self, session_id: str) -> list[dict]:
-        """Get info about all tabs."""
-        backend = self.browser_pool.get_backend(session_id)
-        if hasattr(backend, "get_tabs_info"):
-            return await backend.get_tabs_info(session_id)
-        raise NotImplementedError("get_tabs_info not supported")
+        """Get info about all open tabs."""
+        await self._ensure_backend_session(session_id)
+        return await self._get_backend().get_tabs_info(session_id)

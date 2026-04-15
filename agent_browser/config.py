@@ -54,6 +54,7 @@ class SkillConfig:
     # Stealth
     stealth_enabled: bool = True
     stealth_mode: Literal["full", "vanilla"] = "full"
+    stealth_profile: str = "off"  # "full" | "balanced" | "minimal" | "off"
     #   full:    CloakBrowser + full 6-layer anti-detection stack + StealthEnhancer behavior simulation
     #   vanilla: Standard Playwright + only StealthEnhancer delay behavior (no CloakBrowser needed)
     warmup_enabled: bool = False
@@ -369,6 +370,8 @@ def _apply_env_overrides(cfg: SkillConfig) -> SkillConfig:
         cfg.stealth_enabled = v.lower() in ("1", "true", "yes")
     if (v := os.getenv("AGENT_BROWSER_STEALTH_MODE")) and v in ("full", "vanilla"):
         cfg.stealth_mode = v
+    if v := os.getenv("AGENT_BROWSER_STEALTH_PROFILE"):
+        cfg.stealth_profile = v
     if v := os.getenv("AGENT_BROWSER_EXTENSION_ENABLED"):
         cfg.extension_enabled = v.lower() in ("1", "true", "yes")
     return cfg
@@ -420,6 +423,8 @@ def _apply_yaml_overrides(cfg: SkillConfig, yaml_data: dict) -> SkillConfig:
         mode_val = stealth["mode"]
         if mode_val in ("full", "vanilla"):
             cfg.stealth_mode = mode_val
+    if "profile" in stealth:
+        cfg.stealth_profile = stealth["profile"]
     if "warmup" in stealth:
         cfg.warmup_enabled = stealth["warmup"]
 

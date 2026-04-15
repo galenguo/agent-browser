@@ -1,12 +1,14 @@
 """Shared state store abstraction.
 
-Two implementations:
-1. K8sSharedState — backs state in a K8s ConfigMap with optimistic
+Three implementations:
+1. RedisStateStore — Redis-backed (recommended for production K8s deployments).
+   Uses Lua scripts for atomic key allocation/release.
+2. K8sSharedState — backs state in a K8s ConfigMap with optimistic
    concurrency control (CAS via resourceVersion). Zero new dependencies.
-2. InMemoryStateStore — plain Python dicts (default / fallback when no
-   K8s ConfigMap available).
+3. InMemoryStateStore — plain Python dicts (default / fallback when no
+   Redis or K8s ConfigMap available).
 
-Both expose the same async interface so KeyManager, K8sBrowserPool, and
+All expose the same async interface so KeyManager, K8sBrowserPool, and
 SessionPoolManager can switch between backends without code changes.
 """
 
@@ -29,6 +31,9 @@ KEY_POD_IDLE_SINCE = "pod_idle_since"
 KEY_POOL_ALLOCATED = "allocated_pods"
 KEY_SESSION_COUNTER = "session_counter"
 KEY_SESSION_META = "session_meta"
+
+# Redis key prefix (avoids collision with other apps in shared Redis)
+REDIS_PREFIX = "ab"
 
 # CAS retry config
 MAX_CAS_RETRIES = 10
@@ -215,8 +220,223 @@ class InMemoryStateStore(StateStore):
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# K8s ConfigMap-backed implementation (CAS via resourceVersion)
+# Redis-backed implementation (recommended for production K8s)
 # ═══════════════════════════════════════════════════════════════════════
+
+
+class RedisStateStore(StateStore):
+    """Redis-backed shared state store.
+
+    Uses ``redis.asyncio`` for non-blocking I/O and Lua scripts for
+    atomic compound operations (allocate_key, release_key, etc.).
+
+    Key layout (all prefixed with ``{REDIS_PREFIX}:``):
+      - ``ab:allocations``         (Hash) api_key → session_id
+      - ``ab:key_to_pod``          (Hash) api_key → pod_name
+      - ``ab:pod_idle_since``      (Hash) pod_name → timestamp
+      - ``ab:allocated_pods``      (Hash) session_id → pod_name
+      - ``ab:session_counter``     (String) integer counter
+      - ``ab:session_meta:{sid}``  (Hash) per-session metadata
+    """
+
+    def __init__(self, redis_url: str | None = None):
+        import redis.asyncio as aioredis
+
+        url = redis_url or os.getenv("REDIS_URL")
+        if not url:
+            raise ValueError("REDIS_URL or redis_url argument is required")
+        self._redis: aioredis.Redis = aioredis.from_url(
+            url, decode_responses=True,
+        )
+        logger.info("RedisStateStore connected to %s", url.split("@")[-1])
+
+    def _k(self, key: str) -> str:
+        """Prefix a logical key with the Redis namespace."""
+        return f"{REDIS_PREFIX}:{key}"
+
+    # ── Hash primitives ─────────────────────────────────────────────
+
+    async def hget(self, key: str, field: str) -> str | None:
+        return await self._redis.hget(self._k(key), field)
+
+    async def hset(self, key: str, field: str, value: str) -> None:
+        await self._redis.hset(self._k(key), field, value)
+
+    async def hdel(self, key: str, *fields: str) -> None:
+        if fields:
+            await self._redis.hdel(self._k(key), *fields)
+
+    async def hexists(self, key: str, field: str) -> bool:
+        return bool(await self._redis.hexists(self._k(key), field))
+
+    async def hgetall(self, key: str) -> dict[str, str]:
+        return await self._redis.hgetall(self._k(key))
+
+    # ── KeyManager operations (atomic via Lua) ──────────────────────
+
+    # Lua: allocate_key — atomic check + set
+    _LUA_ALLOCATE_KEY = """
+local alloc_key = KEYS[1]
+local k2p_key    = KEYS[2]
+local idle_key   = KEYS[3]
+local api_key    = ARGV[1]
+local session_id = ARGV[2]
+local pod_name   = ARGV[3]
+
+local existing = redis.call('HGET', alloc_key, api_key)
+if existing and existing ~= session_id then
+    return redis.error_reply('CONFLICT: key bound to ' .. existing)
+end
+
+redis.call('HSET', alloc_key, api_key, session_id)
+if pod_name and pod_name ~= '' then
+    redis.call('HSET', k2p_key, api_key, pod_name)
+    redis.call('HDEL', idle_key, pod_name)
+end
+return 1
+"""
+
+    async def allocate_key(
+        self, api_key: str, session_id: str, pod_name: str = ""
+    ) -> None:
+        try:
+            await self._redis.eval(
+                self._LUA_ALLOCATE_KEY, 3,
+                self._k(KEY_ALLOCATIONS),
+                self._k(KEY_KEY_TO_POD),
+                self._k(KEY_POD_IDLE_SINCE),
+                api_key, session_id, pod_name or "",
+            )
+        except Exception as e:
+            if "CONFLICT" in str(e):
+                from fastapi import HTTPException
+                raise HTTPException(status_code=409, detail=str(e)) from e
+            raise
+
+    # Lua: release_key — atomic remove + mark pod idle
+    _LUA_RELEASE_KEY = """
+local k2p_key    = KEYS[1]
+local alloc_key  = KEYS[2]
+local idle_key   = KEYS[3]
+local api_key    = ARGV[1]
+
+local pod = redis.call('HGET', k2p_key, api_key)
+redis.call('HDEL', k2p_key, api_key)
+redis.call('HDEL', alloc_key, api_key)
+if pod and pod ~= '' then
+    redis.call('HSET', idle_key, pod, ARGV[2])
+end
+return pod or ''
+"""
+
+    async def release_key(self, api_key: str) -> str | None:
+        pod = await self._redis.eval(
+            self._LUA_RELEASE_KEY, 3,
+            self._k(KEY_KEY_TO_POD),
+            self._k(KEY_ALLOCATIONS),
+            self._k(KEY_POD_IDLE_SINCE),
+            api_key, str(time.time()),
+        )
+        return pod or None
+
+    async def get_key_for_session(self, session_id: str) -> str | None:
+        # Redis HGETALL on allocations is small, scan for matching session_id
+        allocs = await self.hgetall(KEY_ALLOCATIONS)
+        for k, sid in allocs.items():
+            if sid == session_id:
+                return k
+        return None
+
+    # ── K8sBrowserPool operations ───────────────────────────────────
+
+    async def allocate_pod(self, session_id: str, pod_name: str) -> None:
+        key = self._k(KEY_POOL_ALLOCATED)
+        # Check for double allocation
+        existing = await self._redis.hgetall(key)
+        for sid, pn in existing.items():
+            if pn == pod_name and sid != session_id:
+                raise RuntimeError(
+                    f"Pod {pod_name} already allocated to session {sid}"
+                )
+        await self._redis.hset(key, session_id, pod_name)
+
+    async def release_pod(self, session_id: str) -> str | None:
+        key = self._k(KEY_POOL_ALLOCATED)
+        pod = await self._redis.hget(key, session_id)
+        if pod:
+            await self._redis.hdel(key, session_id)
+            logger.info("release_pod(%s): removed=%s", session_id, pod)
+        else:
+            logger.info("release_pod(%s): no pod found", session_id)
+        return pod
+
+    async def get_allocated_pods(self) -> dict[str, str]:
+        return await self.hgetall(KEY_POOL_ALLOCATED)
+
+    # ── Session counter (atomic INCR/DECR) ──────────────────────────
+
+    async def incr_session_count(self) -> int:
+        return await self._redis.incr(self._k(KEY_SESSION_COUNTER))
+
+    async def decr_session_count(self) -> int:
+        # Redis DECR goes negative; clamp at 0
+        val = await self._redis.decr(self._k(KEY_SESSION_COUNTER))
+        if val < 0:
+            await self._redis.set(self._k(KEY_SESSION_COUNTER), 0)
+            val = 0
+        logger.info("decr_session_count: now=%d", val)
+        return val
+
+    async def get_session_count(self) -> int:
+        val = await self._redis.get(self._k(KEY_SESSION_COUNTER))
+        return int(val) if val else 0
+
+    async def try_acquire_session_slot(self, max_concurrent: int) -> bool:
+        # Lua: atomic check-and-increment
+        script = """
+local key = KEYS[1]
+local max = tonumber(ARGV[1])
+local current = tonumber(redis.call('GET', key) or '0')
+if current >= max then
+    return 0
+end
+redis.call('INCR', key)
+return 1
+"""
+        result = await self._redis.eval(
+            script, 1, self._k(KEY_SESSION_COUNTER), str(max_concurrent),
+        )
+        return bool(result)
+
+    # ── Session metadata ────────────────────────────────────────────
+
+    async def save_session_meta(
+        self, session_id: str, user_id: str, profile_dir: str,
+    ) -> None:
+        await self._redis.hset(
+            self._k(f"{KEY_SESSION_META}:{session_id}"),
+            mapping={
+                "user_id": user_id,
+                "profile_dir": profile_dir,
+                "created_at": str(time.time()),
+            },
+        )
+
+    async def get_session_meta(self, session_id: str) -> dict | None:
+        data = await self._redis.hgetall(
+            self._k(f"{KEY_SESSION_META}:{session_id}")
+        )
+        return data if data else None
+
+    async def remove_session_meta(self, session_id: str) -> None:
+        await self._redis.delete(
+            self._k(f"{KEY_SESSION_META}:{session_id}")
+        )
+
+    # ── Lifecycle ───────────────────────────────────────────────────
+
+    async def close(self) -> None:
+        await self._redis.aclose()
 
 
 class K8sSharedState(StateStore):
@@ -584,10 +804,16 @@ def create_state_store() -> StateStore:
     """Create appropriate StateStore based on environment.
 
     Priority:
-    1. If ``KUBERNETES_SERVICE_HOST`` is set (running inside K8s) and the
+    1. If ``REDIS_URL`` is set → ``RedisStateStore`` (recommended for
+       production K8s deployments with shared Redis)
+    2. If ``KUBERNETES_SERVICE_HOST`` is set (running inside K8s) and the
        state ConfigMap is readable → ``K8sSharedState``
-    2. Otherwise → ``InMemoryStateStore`` (backward-compatible default)
+    3. Otherwise → ``InMemoryStateStore`` (backward-compatible default)
     """
+    if os.getenv("REDIS_URL"):
+        logger.info("REDIS_URL set, using RedisStateStore")
+        return RedisStateStore()
+
     if os.getenv("KUBERNETES_SERVICE_HOST"):
         ns = os.getenv("KUBERNETES_NAMESPACE", "agent-browser")
         logger.info(

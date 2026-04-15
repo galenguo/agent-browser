@@ -118,12 +118,12 @@ class TestConfigDefaults:
     """SkillConfig has sensible defaults."""
 
     def test_default_is_cli_local_llm(self):
-        """Default config is CLI + local + LLM."""
+        """Default config is API + remote + LLM."""
         from agent_browser.config import SkillConfig
 
         cfg = SkillConfig()
-        assert cfg.calling_mode == "cli"
-        assert cfg.browser_mode == "local"
+        assert cfg.calling_mode == "api"
+        assert cfg.browser_mode == "remote"
         assert cfg.intelligence == "llm"
 
     def test_default_cdp_url(self):

@@ -14,3 +14,9 @@ data:
   BROWSER_HEADLESS_SVC: "agent-browser-br-headless.agent-browser.svc.cluster.local"
   WARM_POOL_SIZE: "3"
   BR_IDLE_TIMEOUT_SECONDS: "3600"
+
+  # Stealth profile: "off" (default, fast) | "balanced" | "minimal" | "full"
+  AGENT_BROWSER_STEALTH_PROFILE: "off"
+
+  # BR pod resource tuning
+  BR_SHM_SIZE: "512Mi"

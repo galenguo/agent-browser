@@ -25,6 +25,9 @@ BR_HEADLESS_SVC = os.getenv(
 WARM_POOL_SIZE = int(os.getenv("WARM_POOL_SIZE", "3"))
 BR_IDLE_TIMEOUT = int(os.getenv("BR_IDLE_TIMEOUT_SECONDS", "3600"))
 STORAGE_CLASS = os.getenv("STORAGE_CLASS", "rook-ceph-block")
+BR_SHM_SIZE = os.getenv("BR_SHM_SIZE", "512Mi")
+BR_MEM_REQUEST = os.getenv("BR_MEM_REQUEST", "512Mi")
+BR_MEM_LIMIT = os.getenv("BR_MEM_LIMIT", "4Gi")
 CLOAKBROWSER_PATH = os.getenv(
     "CLOAKBROWSER_PATH",
     "/root/.cloakbrowser/chromium-145.0.7632.159.7/chrome",
@@ -59,6 +62,7 @@ class K8sBrowserNodeManager:
         self._lock = asyncio.Lock()
         self._warm_lock = asyncio.Lock()  # Serializes warm pool replenishment
         self._warm_task: asyncio.Task | None = None
+        self._http_session: "aiohttp.ClientSession | None" = None
 
     def start(self):
         """Start background warm-pool maintenance task."""
@@ -67,11 +71,15 @@ class K8sBrowserNodeManager:
         logger.info("K8sBrowserNodeManager started")
 
     async def _reconcile_and_warm(self):
-        """Discover existing idle BR pods from k8s, then fill warm pool."""
+        """Discover existing idle BR pods from k8s, then fill warm pool to minimum size."""
         # Brief delay to allow DNS to propagate after pod startup
         await asyncio.sleep(5)
         await self._reconcile_existing_pods()
-        await self._ensure_warm_pool()
+        # Only fill to WARM_POOL_SIZE at startup; after that, rely on natural reuse + trim
+        async with self._lock:
+            idle_count = sum(1 for p in self._pods.values() if not p.busy)
+        if idle_count < WARM_POOL_SIZE:
+            await self._ensure_warm_pool()
 
     async def allocate(self, session_id: str):
         """Find idle warm pod or create a new one, start browser, return K8sBrowserInstance."""
@@ -134,25 +142,22 @@ class K8sBrowserNodeManager:
             session_id=session_id,
         )
         logger.info(f"Allocated br pod {pod.pod_name} for session {session_id}")
-
-        # Replenish warm pool in background
-        asyncio.create_task(self._ensure_warm_pool())
         return instance
 
     async def release(self, session_id: str, pod_name: str):
-        """Stop browser and delete the br pod + PVC."""
+        """Stop browser and return pod to idle pool. Delete only if stop fails."""
         async with self._lock:
-            pod = self._pods.pop(pod_name, None)
+            pod = self._pods.get(pod_name)
 
         if not pod:
             logger.warning(f"release: pod {pod_name} not found in registry")
-            # Still attempt deletion in case it exists in k8s
             await self._delete_br_pod(pod_name)
             return
 
-        # Stop browser (best-effort)
+        # Stop browser
         import aiohttp
 
+        stop_ok = False
         try:
             async with aiohttp.ClientSession() as http:
                 async with http.post(
@@ -160,26 +165,56 @@ class K8sBrowserNodeManager:
                     timeout=aiohttp.ClientTimeout(total=10),
                 ) as resp:
                     logger.info(f"browser/stop on {pod_name}: {resp.status}")
+                    stop_ok = resp.status == 200
         except Exception as e:
             logger.warning(f"browser/stop failed for {pod_name}: {e}")
 
-        await self._delete_br_pod(pod_name)
-        logger.info(f"Released and deleted br pod {pod_name}")
+        if not stop_ok:
+            # Pod in bad state — delete it
+            async with self._lock:
+                self._pods.pop(pod_name, None)
+            await self._delete_br_pod(pod_name)
+            logger.info(f"Deleted unhealthy br pod {pod_name}")
+            return
 
-        # Replenish warm pool
-        asyncio.create_task(self._ensure_warm_pool())
+        # Return pod to idle pool
+        async with self._lock:
+            if pod_name in self._pods:
+                self._pods[pod_name].busy = False
+                self._pods[pod_name].session_id = None
+                self._pods[pod_name].last_idle_at = time.time()
+        logger.info(f"Returned br pod {pod_name} to idle pool")
+
+        # Trim excess idle pods in background
+        asyncio.create_task(self._trim_excess_idle())
+
+    def _get_http_session(self):
+        """Lazy-initialised shared aiohttp session (reused across health checks)."""
+        import aiohttp
+
+        if self._http_session is None or self._http_session.closed:
+            self._http_session = aiohttp.ClientSession()
+        return self._http_session
 
     async def shutdown(self):
-        """Cancel warm-pool background task."""
+        """Cancel warm-pool background task and close shared HTTP session."""
         if self._warm_task:
             self._warm_task.cancel()
             try:
                 await self._warm_task
             except asyncio.CancelledError:
                 pass
+        if self._http_session and not self._http_session.closed:
+            await self._http_session.close()
+            self._http_session = None
         logger.info("K8sBrowserNodeManager shutdown complete")
 
     # ── Internal helpers ─────────────────────────────────────────────
+
+    async def get_pod_info(self, pod_name: str) -> BrPodInfo | None:
+        """Look up a single pod by name (no K8s API call, local registry only)."""
+        async with self._lock:
+            return self._pods.get(pod_name)
 
     async def _get_pod_ip(self, pod_name: str) -> str:
         """Get pod IP address from k8s API."""
@@ -260,6 +295,11 @@ class K8sBrowserNodeManager:
                             ),
                             # Bind CDP to all interfaces so CP can connect via headless DNS
                             k8s_client.V1EnvVar(name="CDP_BIND_ADDRESS", value="0.0.0.0"),
+                            # Propagate stealth profile to BR pod
+                            k8s_client.V1EnvVar(
+                                name="AGENT_BROWSER_STEALTH_PROFILE",
+                                value=os.getenv("AGENT_BROWSER_STEALTH_PROFILE", "off"),
+                            ),
                         ],
                         env_from=[
                             k8s_client.V1EnvFromSource(
@@ -269,8 +309,8 @@ class K8sBrowserNodeManager:
                             )
                         ],
                         resources=k8s_client.V1ResourceRequirements(
-                            requests={"memory": "512Mi", "cpu": "500m"},
-                            limits={"memory": "4Gi", "cpu": "2000m"},
+                            requests={"memory": BR_MEM_REQUEST, "cpu": "500m"},
+                            limits={"memory": BR_MEM_LIMIT, "cpu": "2000m"},
                         ),
                         volume_mounts=[
                             k8s_client.V1VolumeMount(mount_path="/dev/shm", name="shm"),
@@ -292,7 +332,7 @@ class K8sBrowserNodeManager:
                     k8s_client.V1Volume(
                         name="shm",
                         empty_dir=k8s_client.V1EmptyDirVolumeSource(
-                            medium="Memory", size_limit="256Mi"
+                            medium="Memory", size_limit=BR_SHM_SIZE
                         ),
                     ),
                     k8s_client.V1Volume(
@@ -322,16 +362,16 @@ class K8sBrowserNodeManager:
         import aiohttp
 
         start = time.time()
+        cs = self._get_http_session()
         while time.time() - start < timeout:
             try:
-                async with aiohttp.ClientSession() as http:
-                    async with http.get(
-                        f"{pod_url}/health",
-                        timeout=aiohttp.ClientTimeout(total=3),
-                    ) as resp:
-                        if resp.status == 200:
-                            logger.info(f"br pod {pod_name} is ready")
-                            return
+                async with cs.get(
+                    f"{pod_url}/health",
+                    timeout=aiohttp.ClientTimeout(total=3),
+                ) as resp:
+                    if resp.status == 200:
+                        logger.info(f"br pod {pod_name} is ready")
+                        return
             except Exception:
                 pass
             await asyncio.sleep(3)
@@ -352,6 +392,8 @@ class K8sBrowserNodeManager:
 
     async def _reconcile_existing_pods(self):
         """Discover existing idle BR pods in k8s and register them in the warm pool."""
+        import aiohttp
+
         try:
             pods = await asyncio.get_event_loop().run_in_executor(
                 None,
@@ -361,6 +403,7 @@ class K8sBrowserNodeManager:
                 ),
             )
             registered = 0
+            cs = self._get_http_session()
             for pod in pods.items:
                 pod_name = pod.metadata.name
                 phase = pod.status.phase if pod.status else None
@@ -368,20 +411,27 @@ class K8sBrowserNodeManager:
                     continue
                 pod_url = f"http://{pod_name}.agent-browser-br-headless.{BR_NAMESPACE}.svc.cluster.local:8080"
                 # Check if pod is actually idle (not serving a browser session)
+                # Retry with longer timeout to handle DNS propagation delays
                 busy = False
-                try:
-                    import aiohttp
-                    async with aiohttp.ClientSession() as http:
-                        async with http.get(
+                health_ok = False
+                for attempt in range(3):
+                    try:
+                        async with cs.get(
                             f"{pod_url}/health",
-                            timeout=aiohttp.ClientTimeout(total=3),
+                            timeout=aiohttp.ClientTimeout(total=10),
                         ) as resp:
                             if resp.status == 200:
                                 data = await resp.json()
                                 busy = data.get("busy", False)
-                            else:
-                                continue  # Not ready yet, skip
-                except Exception:
+                                health_ok = True
+                                break
+                    except Exception as e:
+                        if attempt < 2:
+                            await asyncio.sleep(2)
+                        else:
+                            logger.warning(f"Failed to reach {pod_name} after 3 attempts: {e}")
+
+                if not health_ok:
                     continue  # Not reachable, skip
 
                 info = BrPodInfo(pod_name=pod_name, pod_url=pod_url, busy=busy)
@@ -395,44 +445,67 @@ class K8sBrowserNodeManager:
             logger.error(f"Failed to reconcile existing br pods: {e}")
 
     async def _ensure_warm_pool(self):
-        """Ensure warm pool has WARM_POOL_SIZE idle pods (create if needed, serialized)."""
+        """Ensure warm pool has WARM_POOL_SIZE idle pods (create in parallel)."""
         async with self._warm_lock:
             async with self._lock:
                 idle_count = sum(1 for p in self._pods.values() if not p.busy)
                 needed = max(0, WARM_POOL_SIZE - idle_count)
 
+            if needed <= 0:
+                return
+
             logger.debug(f"Warm pool check: idle={idle_count}, needed={needed}")
-            for _ in range(needed):
-                try:
-                    pod = await self._create_br_pod()
-                    async with self._lock:
-                        self._pods[pod.pod_name] = pod
-                    logger.info(f"Warm pool: created idle br pod {pod.pod_name}")
-                except Exception as e:
-                    logger.error(f"Failed to create warm br pod: {e}")
+
+            async def _create_and_register():
+                pod = await self._create_br_pod()
+                async with self._lock:
+                    self._pods[pod.pod_name] = pod
+                logger.info(f"Warm pool: created idle br pod {pod.pod_name}")
+
+            results = await asyncio.gather(
+                *[_create_and_register() for _ in range(needed)],
+                return_exceptions=True,
+            )
+            for r in results:
+                if isinstance(r, Exception):
+                    logger.error(f"Failed to create warm br pod: {r}")
+
+    async def _trim_excess_idle(self):
+        """Delete idle pods beyond WARM_POOL_SIZE (oldest idle first)."""
+        to_delete: list[BrPodInfo] = []
+        async with self._lock:
+            idle_pods = [p for p in self._pods.values() if not p.busy]
+            if len(idle_pods) <= WARM_POOL_SIZE:
+                return
+            idle_pods.sort(key=lambda p: p.last_idle_at)
+            for p in idle_pods[WARM_POOL_SIZE:]:
+                self._pods.pop(p.pod_name, None)
+                to_delete.append(p)
+
+        for pod in to_delete:
+            logger.info(f"Trimming excess idle br pod {pod.pod_name}")
+            await self._delete_br_pod(pod.pod_name)
 
     async def _warm_pool_loop(self):
-        """Background task: maintain warm pool + idle-timeout cleanup (runs every 60s)."""
+        """Background task: idle-timeout cleanup + trim excess idle pods (runs every 60s)."""
         while True:
             await asyncio.sleep(60)
             try:
-                # Reclaim excess idle pods that exceeded idle timeout (keep at least WARM_POOL_SIZE)
+                # Delete idle pods that have exceeded idle timeout
                 to_reclaim: list[BrPodInfo] = []
                 async with self._lock:
                     idle_pods = [p for p in self._pods.values() if not p.busy]
-                    # Excess pods beyond warm pool size that are stale
-                    excess = idle_pods[WARM_POOL_SIZE:]
                     to_reclaim = [
-                        p for p in excess if time.time() - p.last_idle_at > BR_IDLE_TIMEOUT
+                        p for p in idle_pods if time.time() - p.last_idle_at > BR_IDLE_TIMEOUT
                     ]
                     for p in to_reclaim:
                         self._pods.pop(p.pod_name, None)
 
                 for pod in to_reclaim:
-                    logger.info(f"Idle timeout: reclaiming excess br pod {pod.pod_name}")
+                    logger.info(f"Idle timeout: reclaiming br pod {pod.pod_name}")
                     await self._delete_br_pod(pod.pod_name)
 
-                # Replenish to keep warm pool healthy
-                await self._ensure_warm_pool()
+                # Trim any excess idle pods beyond WARM_POOL_SIZE
+                await self._trim_excess_idle()
             except Exception as e:
                 logger.error(f"Warm pool loop error: {e}")

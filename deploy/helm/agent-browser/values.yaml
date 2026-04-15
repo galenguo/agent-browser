@@ -83,6 +83,8 @@ config:
   profileStorage: "/data/profiles"
   logLevel: "INFO"
   headless: false
+  # Stealth profile: "off" (fast) | "balanced" | "minimal" | "full" (max anti-detection)
+  stealthProfile: "off"
 
 # Secret 配置（通过 values 文件或 --set 传入）
 secrets:
@@ -112,7 +114,7 @@ readinessProbe:
 # 共享内存
 shm:
   enabled: true
-  size: 128Mi
+  size: 512Mi
 
 # Node 选择器
 nodeSelector: {}

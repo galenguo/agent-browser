@@ -118,8 +118,9 @@ class LocalCDPBackend(BrowserBackend):
         if config.stealth_enabled:
             try:
                 from agent_browser.stealth.enhancer import StealthEnhancer
+                from agent_browser.stealth.profiles import profile_from_env
 
-                self._stealth = StealthEnhancer()
+                self._stealth = StealthEnhancer(profile=profile_from_env())
             except ImportError:
                 logger.debug("StealthEnhancer not available")
 
@@ -375,6 +376,33 @@ class LocalCDPBackend(BrowserBackend):
         with contextlib.suppress(Exception):
             await session.browser_context.close()
         logger.info(f"Session deleted: {session_id}")
+
+    async def register_session(
+        self,
+        session_id: str,
+        page: "Page",
+        browser_context: Any | None = None,
+    ) -> None:
+        """Register externally-managed session (from SessionPoolManager).
+
+        Wraps the given Playwright Page in a LocalSession, enabling
+        pool_manager to delegate operations to this backend.
+        Lifecycle (connect/close) is managed by the external caller.
+        """
+        page_handle = PlaywrightPageHandle(page)
+        self._sessions[session_id] = LocalSession(
+            page_handle=page_handle,
+            browser_context=browser_context or page.context,
+            dom_indices=[],
+        )
+        logger.info(f"External session registered: {session_id}")
+
+    def unregister_session(self, session_id: str) -> None:
+        """Unregister an externally-managed session without closing the page.
+
+        Lifecycle is managed by the external caller (pool_manager).
+        """
+        self._sessions.pop(session_id, None)
 
     async def get_page(self, session_id: str) -> PlaywrightPageHandle:
         """Get the page handle for a session."""

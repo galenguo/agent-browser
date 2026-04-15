@@ -36,12 +36,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+redis = [
+    "redis[hiredis]>=5.0",
+]
 cloak = [
     "cloakbrowser>=0.3.0",
     "patchright>=0.1.0",
 ]
 full = [
     "agent-browser[cloak]",
+    "agent-browser[redis]",
     "langchain-openai>=0.1",
     "langchain-anthropic>=0.1",
     "fastapi>=0.100",

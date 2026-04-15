@@ -16,9 +16,10 @@ are never exposed to the client.
 ```
 SkillBrowserError
   status_code=0   API service not reachable
-  status_code=403  Authentication failed
+  status_code=401  Authentication failed
   status_code=404  Session not found
   status_code=409  Conflict (API key bound to another session)
+  status_code=503  Pool exhausted (no browser instances available)
   status_code=*    Element @eN not found (message-based)
   status_code=*    Task timeout / stuck (result-based)
 ```
@@ -31,7 +32,7 @@ SkillBrowserError caught
   +-- status_code == 0?
   |     +-- Yes -> E1: API unreachable -> diagnose() -> check config.yaml
   |
-  +-- status_code == 403?
+  +-- status_code == 401?
   |     +-- Yes -> E2: Auth failed -> check api_key in config.yaml
   |
   +-- status_code == 404 and "session" in message?
@@ -87,9 +88,9 @@ except SkillBrowserError as e:
 
 ---
 
-### E2: Authentication Failed (403)
+### E2: Authentication Failed (401)
 
-**Symptom**: `SkillBrowserError` with `status_code=403`.
+**Symptom**: `SkillBrowserError` with `status_code=401`.
 
 **Cause**: The API server requires an API key, and the key provided is
 missing, incorrect, or expired.
@@ -101,7 +102,7 @@ sb = SkillBrowser()
 try:
     await sb.create_session()
 except SkillBrowserError as e:
-    if e.status_code == 403:
+    if e.status_code == 401:
         # Check that api_key is configured
         report = await sb.diagnose()
         for check in report["checks"]:
@@ -283,6 +284,34 @@ if result.get("status") == "stuck":
 **User action needed**: Yes. This almost always requires human intervention --
 solving a CAPTCHA, completing a login, or choosing an alternative strategy.
 
+---
+
+### E8: Pool Exhausted (503)
+
+**Symptom**: `SkillBrowserError` with `status_code=503` and message
+containing "pool" or "Resource exhausted".
+
+**Cause**: All browser instances are occupied. The server cannot allocate
+a new browser for the requested session.
+
+**Recovery**:
+
+```python
+sb = SkillBrowser()
+try:
+    sid = await sb.create_session()
+except SkillBrowserError as e:
+    if e.status_code == 503:
+        # The client auto-deletes the user's own stale sessions first.
+        # If still failing, the pool is genuinely full.
+        import asyncio
+        await asyncio.sleep(10)
+        sid = await sb.create_session()  # retry
+```
+
+**User action needed**: Wait a moment and retry. If the error persists,
+contact the server administrator to increase the pool size.
+
 ## General Recovery Flow
 
 Every error follows the same three-stage process:
@@ -290,7 +319,7 @@ Every error follows the same three-stage process:
 ```
 1. CLASSIFY
    Inspect SkillBrowserError.status_code and message text.
-   Match to E1-E7 above.
+   Match to E1-E8 above.
 
 2. ATTEMPT AUTO-FIX (up to 3 times)
    E1 -> sb.diagnose() + report errors
@@ -300,6 +329,7 @@ Every error follows the same three-stage process:
    E5 -> delete old session or use new API key
    E6 -> increase total_timeout or simplify task
    E7 -> gather context (no auto-fix possible)
+   E8 -> wait and retry
 
 3. FAILS 3x -> PRESENT TO USER
    After 3 consecutive auto-recovery failures, stop and present:
@@ -317,7 +347,7 @@ indefinitely:
 | Situation | Why | What to tell the user |
 |-----------|-----|----------------------|
 | API unreachable after `diagnose()` | Server may be down or URL wrong | "Browser service is not reachable. Start the API server or edit config.yaml." |
-| 403 auth failed after key check | Key is invalid or revoked | "API key was rejected. Update api_key in config.yaml." |
+| 401 auth failed after key check | Key is invalid or revoked | "API key was rejected. Update api_key in config.yaml." |
 | Agent stuck (E7) | CAPTCHA / login / anti-bot | "Agent is stuck and needs human help. Open the page manually to resolve the block, then retry." |
 | Element not found after 3 retries | Page structure changed unexpectedly | "Cannot find the target element. The page may have changed. Review the current snapshot and choose a different element." |
 | Session lost 3 times in a row | Server instability | "Sessions keep expiring. The API server may be restarting. Wait and try again." |

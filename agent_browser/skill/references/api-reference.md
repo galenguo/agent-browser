@@ -838,12 +838,12 @@ result = await sb.run_task(
 )
 # result = {"status": "completed", "result": "...", "steps": [...]}
 
-# Explicit agent mode with fine-grained config
+# With fine-grained agent_config
 result = await sb.run_task(
     sid,
     task="Fill out the contact form",
-    intelligence="agent",
     max_steps=20,
+    # intelligence defaults to config.yaml — do NOT override
     agent_config={
         "enable_planning": True,
         "use_judge": True,
@@ -860,7 +860,6 @@ result = await sb.run_task(
 result = await sb.run_task(
     sid,
     task="Click the third search result",
-    intelligence="llm",
     poll_interval=2.0,
 )
 ```

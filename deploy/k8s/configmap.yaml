@@ -22,3 +22,6 @@ data:
 
   # 浏览器配置
   HEADLESS: "false"
+
+  # Stealth profile: "off" (default, fast) | "balanced" | "minimal" | "full"
+  AGENT_BROWSER_STEALTH_PROFILE: "off"

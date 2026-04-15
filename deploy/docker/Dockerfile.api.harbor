@@ -1,14 +1,17 @@
-FROM registry-cn-gimc-local.gimccloud.com/bitnami/os-shell:12-debian-12-r43
+FROM registry-cn-gimc-local.gimccloud.com/docker.io/library/python:3.11-slim
+
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 python3.11-venv python3-pip gcc curl \
+    gcc python3-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY deploy/docker/requirements-api.txt .
-RUN python3.11 -m pip install --upgrade pip setuptools wheel && \
-    python3.11 -m pip install --no-cache-dir --timeout 120 --retries 5 -r requirements-api.txt
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir --timeout 120 --retries 5 -r requirements-api.txt
 
 COPY agent_browser/ /app/agent_browser/
 
@@ -20,4 +23,4 @@ ENV PYTHONUNBUFFERED=1 \
 
 EXPOSE 8000
 
-CMD ["python3.11", "-m", "uvicorn", "agent_browser.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "agent_browser.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -280,21 +280,19 @@ class BrowserInstancePool:
             pass  # Fall back to original URL
 
         start = asyncio.get_event_loop().time()
-        while asyncio.get_event_loop().time() - start < timeout:
-            try:
-                async with (
-                    aiohttp.ClientSession() as session,
-                    session.get(
+        async with aiohttp.ClientSession() as session:
+            while asyncio.get_event_loop().time() - start < timeout:
+                try:
+                    async with session.get(
                         f"{check_url}/json/version",
                         timeout=aiohttp.ClientTimeout(total=2),
-                    ) as resp,
-                ):
-                    if resp.status == 200:
-                        logger.info(f"CDP ready at {cdp_url}")
-                        return
-            except Exception:
-                pass
-            await asyncio.sleep(1)
+                    ) as resp:
+                        if resp.status == 200:
+                            logger.info(f"CDP ready at {cdp_url}")
+                            return
+                except Exception:
+                    pass
+                await asyncio.sleep(1)
 
         raise TimeoutError(f"CDP not ready at {cdp_url} after {timeout}s")
 

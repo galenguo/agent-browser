@@ -353,7 +353,20 @@ class SkillBrowser:
         except Exception:
             pass
 
-    async def create_session(self, user_id: str = "") -> str:
+    async def create_session(
+        self,
+        user_id: str = "",
+        *,
+        viewport: dict | None = None,
+        proxy: dict | None = None,
+        user_agent: str | None = None,
+        headless: bool | None = None,
+        allowed_domains: list[str] | None = None,
+        prohibited_domains: list[str] | None = None,
+        enable_extensions: bool | None = None,
+        demo_mode: bool | None = None,
+        device_scale_factor: float | None = None,
+    ) -> str:
         """Create a new browser session, reusing a cached session if still valid.
 
         Checks the local session cache first. If a cached session_id exists and
@@ -362,6 +375,15 @@ class SkillBrowser:
 
         Args:
             user_id: Optional user identifier for the session.
+            viewport: Viewport size dict ``{width, height}``.
+            proxy: Proxy config dict ``{server, username?, password?}``.
+            user_agent: Custom User-Agent string.
+            headless: Run browser in headless mode.
+            allowed_domains: Only allow navigation to these domain patterns.
+            prohibited_domains: Block navigation to these domain patterns.
+            enable_extensions: Enable Chrome extensions.
+            demo_mode: Demo mode (highlights elements, slows actions).
+            device_scale_factor: Device scale factor (e.g. 2.0 for Retina).
 
         Returns:
             The session ID string.
@@ -381,6 +403,20 @@ class SkillBrowser:
         import uuid
 
         body: dict[str, Any] = {"user_id": user_id or f"skill_{uuid.uuid4().hex[:8]}"}
+        # Forward optional profile params to API
+        for key, val in [
+            ("viewport", viewport),
+            ("proxy", proxy),
+            ("user_agent", user_agent),
+            ("headless", headless),
+            ("allowed_domains", allowed_domains),
+            ("prohibited_domains", prohibited_domains),
+            ("enable_extensions", enable_extensions),
+            ("demo_mode", demo_mode),
+            ("device_scale_factor", device_scale_factor),
+        ]:
+            if val is not None:
+                body[key] = val
         try:
             result = await self._request("POST", "/sessions/create", body)
         except SkillBrowserError as e:
@@ -715,23 +751,31 @@ class SkillBrowser:
         ref: str | None = None,
         full_page: bool = True,
         format: str = "png",
+        quality: int | None = None,
     ) -> dict:
         """Take a screenshot of page or element.
+
+        **IMPORTANT**: This method is expensive (transfers base64 image data).
+        Only call it when the user **explicitly asks** to see the page
+        ("截图", "截屏", "screenshot", "show me the page", "看看页面").
+        For all automated observation in ReAct loops, use ``snapshot()`` instead.
 
         Args:
             session_id: Session ID.
             ref: Element reference for element screenshot (None = full page).
             full_page: Capture full page scroll (default True).
             format: Image format (``png`` or ``jpeg``, default ``png``).
+            quality: JPEG quality 0-100 (only for jpeg format, default None).
 
         Returns:
             Dict with ``image`` (base64), ``format``, and ``size``.
         """
-        return await self._request("POST", f"/sessions/{session_id}/screenshot", {
-            "ref": ref,
-            "full_page": full_page,
-            "format": format,
-        } if ref else None)
+        body: dict[str, Any] = {"full_page": full_page, "format": format}
+        if ref is not None:
+            body["ref"] = ref
+        if quality is not None:
+            body["quality"] = quality
+        return await self._request("POST", f"/sessions/{session_id}/screenshot", body)
 
     async def save_as_pdf(
         self,
@@ -749,10 +793,10 @@ class SkillBrowser:
         Returns:
             Dict with ``path`` to saved PDF.
         """
-        return await self._request("POST", f"/sessions/{session_id}/pdf", {
-            "output_path": output_path,
-            "landscape": landscape,
-        } if output_path else None)
+        body: dict[str, Any] = {"landscape": landscape}
+        if output_path is not None:
+            body["output_path"] = output_path
+        return await self._request("POST", f"/sessions/{session_id}/pdf", body)
 
     async def send_keys(self, session_id: str, keys: str) -> None:
         """Send complex key sequence (e.g., 'Meta+a', 'Shift+Home').
@@ -985,14 +1029,16 @@ class SkillBrowser:
         return self._api_url
 
     async def get_session_info(self, session_id: str) -> dict[str, Any]:
-        """Get full session info including noVNC URL.
+        """Get full session info including VNC URL.
 
         Args:
             session_id: Session ID.
 
         Returns:
-            Dict with session details and ``browser_node`` containing
-            ``novnc_url`` if available.
+            Dict with session details. Top-level fields include
+            ``vnc_url`` (noVNC proxy URL) and ``vnc_token``.
+            ``browser_node`` contains instance details (may also include
+            ``novnc_url`` for K8s/Docker deployments).
         """
         return await self._request("GET", f"/sessions/{session_id}")
 

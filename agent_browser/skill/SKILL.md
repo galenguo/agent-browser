@@ -13,6 +13,16 @@ description: >
 
 # Agent Browser
 
+> **CRITICAL RULE — READ THIS FIRST:**
+>
+> **Never switch execution mode.** Read `sb._intelligence` from config.yaml and use ONLY that mode.
+> If `sb._intelligence == "llm"`: you MUST drive every step manually (`snapshot → click/fill → snapshot`).
+> Never call `run_task()`. Never pass `intelligence="agent"`.
+> If `sb._intelligence == "agent"`: use `run_task()` exclusively, never drive steps manually.
+>
+> **Never call `screenshot()` in the ReAct loop.** Use `snapshot()` for all observation.
+> `screenshot()` is **forbidden unless the user explicitly asks** to see the page ("截图", "截屏", "screenshot", "show me the page", "看看页面", etc).
+
 ```python
 from agent_browser.skill.scripts.browser_cli import SkillBrowser
 ```
@@ -48,10 +58,17 @@ Config priority: constructor params > `config.yaml` > auto-detect `localhost:800
 
 ## Execution Mode
 
-Read `sb._intelligence` (auto-loaded from `config.yaml`) before starting:
+`sb._intelligence` is auto-loaded from `config.yaml`. The current mode determines your workflow:
 
-- **`llm`** — You drive each step: `snapshot → analyze → click/fill → snapshot → repeat`
-- **`agent`** — Submit task once, server Agent completes it autonomously: `run_task(sid, "...")`
+| `sb._intelligence` | Your workflow | Forbidden |
+|---|---|---|
+| `"llm"` | `snapshot → analyze → click/fill → snapshot → repeat` (you drive every step) | `run_task()`, `intelligence="agent"` |
+| `"agent"` | `run_task(sid, task)` — submit once, server completes autonomously | Manual ReAct steps |
+
+**Do NOT switch modes.** The config.yaml setting is the user's intentional choice.
+
+**Slow pages**: If a page seems slow to load, use `await asyncio.sleep(N)` (up to 10 seconds) before
+re-calling `snapshot()`. Do NOT switch to agent mode because a page is slow.
 
 ---
 
@@ -85,7 +102,7 @@ await sb.delete_session(sid)
 ```python
 sid = await sb.create_session(user_id="")   # returns session_id str; reuses cached session if alive
 await sb.delete_session(sid)
-info = await sb.get_session_info(sid)        # includes browser_node.novnc_url
+info = await sb.get_session_info(sid)        # includes vnc_url, vnc_token, browser_node
 ```
 
 Session creation accepts extended profile parameters (passed to API server):
@@ -188,6 +205,11 @@ await sb.select_dropdown_option(sid, "@e5", "Canada")
 
 ### File & Media
 
+**Screenshot usage rule**: `screenshot()` transfers base64 image data and is slow.
+**Only use it when the user explicitly asks** to see the page ("截图", "截屏", "screenshot",
+"show me the page", "看看页面"). For all ReAct loop observation, use `snapshot()`
+(DOM-based, lightweight). Do NOT call `screenshot()` in any automated loop.
+
 ```python
 # Upload files to <input type=file>
 await sb.upload_file(sid, "@e10", ["/path/to/file1.pdf", "/path/to/file2.png"])
@@ -243,120 +265,22 @@ result = await sb.evaluate_with_retry(sid, "...", retries=3)
 
 ### Agent Mode
 
-Agent mode submits a task to the server-side browser-use Agent, which autonomously
-plans, acts, and verifies completion using an LLM decision loop.
+> **Only relevant when `sb._intelligence == "agent"`.** If your config says `"llm"`, skip this
+> section entirely — you must NOT use `run_task()` or any agent features.
 
-**Basic usage:**
+When in agent mode, submit tasks and the server-side browser-use Agent handles them autonomously:
 
 ```python
 result = await sb.run_task(
     sid,
     task="Search for Python jobs and return top 5 titles",
-    intelligence="agent",   # or "llm"; defaults to config.yaml setting
     max_steps=10,
     total_timeout=300.0,
 )
 # result = {status: "completed"|"failed"|"timeout", result: "...", steps: [...]}
 ```
 
-**With AgentConfig (fine-grained control):**
-
-```python
-result = await sb.run_task(
-    sid,
-    task="Fill out the contact form with user data, then verify submission",
-    intelligence="agent",
-    max_steps=20,
-    agent_config={
-        # Planning: create/revise a todo list for multi-step tasks
-        "enable_planning": True,
-        "planning_replan_on_stall": 3,      # replan after 3 consecutive failures
-        "planning_exploration_limit": 5,     # nudge to plan after 5 steps without one
-
-        # Judge: post-completion LLM validation (verifies success)
-        "use_judge": True,
-
-        # Thinking: extended thinking for models that support it
-        "use_thinking": True,
-
-        # Compaction: keep token usage under control for long tasks
-        "message_compaction": True,          # auto-summarize old messages
-
-        # Reliability tuning
-        "max_failures": 5,                   # retries before giving up
-        "loop_detection_enabled": True,       # detect and break action loops
-
-        # Timeouts (seconds)
-        "llm_timeout": 90,                    # per-LLM-call timeout (None = auto-detect)
-        "step_timeout": 180,                 # per-step timeout (browser + LLM)
-
-        # Fallback: switch model on rate limits
-        "fallback_llm_model": "gpt-4o-mini",
-
-        # Cost tracking
-        "calculate_cost": True,
-    },
-)
-```
-
-**AgentConfig reference:**
-
-| Parameter | Type | Default | When to use |
-|-----------|------|---------|-------------|
-| `enable_planning` | `bool` | `True` | Complex multi-step tasks (fill forms, multi-page flows) |
-| `planning_replan_on_stall` | `int` | `3` | Flaky sites where the agent gets stuck |
-| `planning_exploration_limit` | `int` | `5` | Tasks that need structured exploration first |
-| `use_judge` | `bool` | `True` | When you need quality verification of results |
-| `use_thinking` | `bool` | `True` | Claude/DeepSeek models with extended thinking |
-| `message_compaction` | `bool\|None` | `True` | Long-running tasks (>20 steps) approaching context limit |
-| `max_failures` | `int` | `5` | Unstable sites (increase) or critical accuracy (decrease) |
-| `final_response_after_failure` | `bool` | `True` | Set `False` to fail immediately on max_failures |
-| `loop_detection_enabled` | `bool` | `True` | Always on unless the task is inherently repetitive |
-| `llm_timeout` | `int\|None` | `auto` | Slow models or complex pages may need >90s |
-| `step_timeout` | `int` | `180` | Heavy pages (SPA rendering) may need 300+ |
-| `use_vision` | `bool\|"auto"` | `False` | Vision-capable models (GPT-4o, Claude Sonnet) |
-| `flash_mode` | `bool` | `False` | Only for browser-use's own ChatBrowserUse model |
-| `fallback_llm_model` | `str\|None` | `None` | Production resilience against rate limits |
-| `override_system_message` | `str\|None` | `None` | Complete system prompt replacement (advanced) |
-| `extend_system_message` | `str\|None` | `None` | Add rules/instructions without replacing defaults |
-| `extraction_schema` | `dict\|None` | `None` | JSON schema for structured output format |
-| `calculate_cost` | `bool` | `False` | Token/cost tracking for budget management |
-| `generate_gif` | `bool` | `False` | Debug: animated GIF of session |
-| `save_conversation_path` | `str\|None` | `None` | Debug: save LLM conversation logs |
-| `skill_ids` | `list[str]\|None` | `None` | browser-use skills ecosystem (e.g. `["*"]`) |
-| `sensitive_data` | `dict\|None` | `None` | Credential injection with domain scoping |
-
-**Common AgentConfig patterns:**
-
-```python
-# Robust production config (rate-limit resilient, loop-aware)
-PROD_CONFIG = {
-    "enable_planning": True,
-    "use_judge": True,
-    "message_compaction": True,
-    "fallback_llm_model": "gpt-4o-mini",
-    "loop_detection_enabled": True,
-    "max_failures": 8,
-    "calculate_cost": True,
-}
-
-# Fast/cheap config (simple tasks, cost-sensitive)
-FAST_CONFIG = {
-    "enable_planning": False,
-    "use_judge": False,
-    "use_thinking": False,
-    "message_compaction": False,
-    "max_failures": 3,
-    "max_steps": 10,
-}
-
-# Vision-enabled config (for visual tasks: charts, captchas, layouts)
-VISION_CONFIG = {
-    "use_vision": True,
-    "vision_detail_level": "high",
-    "enable_planning": True,
-}
-```
+For `agent_config` options and detailed usage, see `references/api-reference.md` → **Agent Mode** and **AgentConfig** sections.
 
 ### Diagnostics
 
@@ -369,6 +293,16 @@ report = await sb.diagnose()
 
 ## ReAct Loop (LLM mode)
 
+**Observation rule**: Always use `sb.snapshot()` for observation. It returns structured
+DOM data (element refs, text, roles) without image transfer overhead. `screenshot()` is
+**forbidden unless the user explicitly asks** to see the page ("截图", "截屏", "screenshot",
+"show me the page"). Never call `screenshot()` in automated loops.
+
+**Patience rule**: Pages may load slowly. If `snapshot()` returns few or empty elements,
+the page may still be loading. Wait with `await asyncio.sleep(N)` (N up to 10 seconds),
+then re-snapshot. Do NOT switch to agent mode because a page is slow — stay in llm mode
+and wait.
+
 ```
 snapshot → analyze elements → act (click/fill/scroll) → snapshot → verify → repeat
 ```
@@ -379,8 +313,8 @@ Common patterns:
 - **Search + extract**: `open_page → search_page("keyword") → find_elements(".result") → extract_content(selector=".result-item")`
 - **Upload form**: `open_page → snapshot → upload_file(ref, ["/path/to/file"]) → click(submit)`
 - **Multi-tab workflow**: `open_tab(url) → switch_tab(1) → snapshot(tab=1) → close_tab(1)`
-- **Data export**: `open_page → screenshot() → save_as_pdf()` or `extract_content(type="links")`
-- **Login (QR)**: `open_page → click(QR tab) → get_session_info → tell user to open novnc_url → wait for confirmation`
+- **Data export**: `open_page → extract_content(type="links")` (only use `screenshot()` or `save_as_pdf()` if user explicitly requests visual output)
+- **Login (QR)**: `open_page → click(QR tab) → get_session_info → tell user to open vnc_url → wait for confirmation`
 
 ---
 
@@ -392,7 +326,7 @@ from agent_browser.skill.scripts.browser_cli import SkillBrowserError
 try:
     await sb.click(sid, "@e99")
 except SkillBrowserError as e:
-    # e.status_code: 0=connection, 401=auth, 404=session/element, 500=server
+    # e.status_code: 0=connection, 401=auth, 404=session/element, 409=conflict, 503=pool full, 500=server
     print(e.status_code, e.url)
 ```
 
@@ -401,7 +335,7 @@ Auto-recovery rules:
 - Session 404 → `create_session` again
 - 409 on create → reuse existing session (handled automatically by `create_session`)
 - 503 pool full → cleans current user's sessions, retries (handled automatically)
-- Login / captcha → stop, get `novnc_url` via `get_session_info`, ask user to handle manually
+- Login / captcha → stop, get `vnc_url` via `get_session_info`, ask user to handle manually
 
 ---
 

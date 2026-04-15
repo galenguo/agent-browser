@@ -189,10 +189,16 @@ class CreateSessionRequest(BaseModel):
     watchdog: dict | None = None  # Watchdog config (captcha_solver, crash_detection, etc.)
 
 
+class SnapshotRequest(BaseModel):
+    interactive_only: bool = False
+    iframe_selector: str | None = None
+
+
 class TaskSubmitRequest(BaseModel):
     task: str
     model: str = "glm-5-turbo"
     max_steps: int = 10
+    intelligence: str = "llm"  # "llm" (ReAct) or "agent" (autonomous)
     agent_config: AgentConfig | None = None
 
 
@@ -226,7 +232,8 @@ async def _startup():
     # Initialize state store (triggers K8s ConfigMap connection if in cluster)
     km = get_key_manager()
     try:
-        await km.store.read_cache()
+        if hasattr(km.store, 'read_cache'):
+            await km.store.read_cache()
         logger.info("State store initialized: %s", type(km.store).__name__)
     except Exception as e:
         logger.warning(
@@ -343,6 +350,22 @@ async def list_sessions(api_key: str = Depends(require_api_key)):
 async def create_session(req: CreateSessionRequest, api_key: str = Depends(require_api_key)):
     pool = get_pool()
     km = get_key_manager()
+
+    # 1:1 binding: check if this api_key already has an active session
+    from agent_browser.state.store import KEY_ALLOCATIONS
+    existing_sid = await km.store.hget(KEY_ALLOCATIONS, api_key)
+    if existing_sid:
+        existing_session = pool.sessions.get(existing_sid)
+        if existing_session:
+            raise HTTPException(
+                status_code=409,
+                detail=f"API key already has an active session: {existing_sid}",
+            )
+        else:
+            # Session died but binding is stale — release it
+            logger.warning("Stale binding for key %s -> session %s, releasing", api_key, existing_sid)
+            await km.release(api_key)
+
     try:
         result = await pool.create_session(user_id=req.user_id, owner_key=api_key)
         sid = result[0] if isinstance(result, tuple) else result
@@ -405,7 +428,14 @@ async def get_session(session_id: str, api_key: str = Depends(require_api_key)):
 async def delete_session(session_id: str, api_key: str = Depends(require_api_key)):
     pool = get_pool()
     km = get_key_manager()
-    _get_owned_session(pool, session_id, api_key)
+    session = pool.sessions.get(session_id)
+    if not session:
+        # Session gone but key binding may still exist — release it to avoid orphaned 409
+        logger.warning("Session %s not found locally, releasing key binding anyway", session_id)
+        await km.release(api_key)
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    if session.owner_key and session.owner_key != api_key:
+        raise HTTPException(status_code=403, detail="Access denied: session belongs to another key")
     try:
         await pool.close_session(session_id)
         await km.release(api_key)
@@ -469,14 +499,13 @@ async def get_title(session_id: str, api_key: str = Depends(require_api_key)):
 
 
 @app.post("/sessions/{session_id}/snapshot")
-async def snapshot(session_id: str, interactive_only: bool = False,
-                   iframe_selector: str | None = None,
+async def snapshot(session_id: str, req: SnapshotRequest = SnapshotRequest(),
                    api_key: str = Depends(require_api_key)):
     pool = get_pool()
     _get_owned_session(pool, session_id, api_key)
     try:
-        result = await pool.snapshot(session_id, interactive_only=interactive_only,
-                                     iframe_selector=iframe_selector)
+        result = await pool.snapshot(session_id, interactive_only=req.interactive_only,
+                                     iframe_selector=req.iframe_selector)
         return result.model_dump() if isinstance(result, SnapshotResponse) else result
     except SessionNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
@@ -720,14 +749,12 @@ async def send_keys(session_id: str, req: SendKeysRequest, api_key: str = Depend
 
 
 @app.post("/sessions/{session_id}/scroll/text")
-async def scroll_to_text(session_id: str, text: str, max_scrolls: int = 10, api_key: str = Depends(require_api_key)):
+async def scroll_to_text(session_id: str, req: ScrollToTextRequest, api_key: str = Depends(require_api_key)):
     """Scroll until text becomes visible."""
-    from agent_browser.models import ScrollToTextRequest
-
     pool = get_pool()
     _get_owned_session(pool, session_id, api_key)
     try:
-        found = await pool.scroll_to_text(session_id, text, max_scrolls=max_scrolls)
+        found = await pool.scroll_to_text(session_id, req.text, max_scrolls=req.max_scrolls)
         return {"found": found}
     except SessionNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
@@ -827,7 +854,7 @@ def _get_vnc_target(vnc_token: str) -> str:
                 instance = session.browser_instance
                 if isinstance(instance, K8sBrowserInstance) and instance.pod_name:
                     ns = os.environ.get("BR_NAMESPACE", "agent-browser")
-                    return f"http://{instance.pod_name}.agent-browser-br-headless.{ns}.svc.cluster.local:80"
+                    return f"http://{instance.pod_name}.agent-browser-br-headless.{ns}.svc.cluster.local:6080"
         logger.warning(f"VNC token {vnc_token[:8]}... not matched to any k8s session")
         return "http://localhost:80"
 
@@ -902,6 +929,7 @@ async def submit_task(session_id: str, req: TaskSubmitRequest, api_key: str = De
             llm_config=llm_config,
             max_steps=req.max_steps,
             agent_config=req.agent_config.model_dump() if req.agent_config else None,
+            intelligence=req.intelligence,
         )
         return {"task_id": task_id, "session_id": session_id}
     except SessionNotFoundError:
@@ -936,7 +964,8 @@ async def legacy_create_task(req: TaskSubmitRequest, api_key: str = Depends(requ
         sid = session_id[0] if isinstance(session_id, tuple) else session_id
         llm_config = {"model": req.model}
         task_id = await pool.submit_task(session_id=sid, task=req.task,
-                                         llm_config=llm_config, max_steps=req.max_steps)
+                                         llm_config=llm_config, max_steps=req.max_steps,
+                                         intelligence=req.intelligence)
         return {"task_id": task_id, "session_id": sid}
     except ResourceExhaustedError as e:
         raise HTTPException(status_code=503, detail=str(e))
