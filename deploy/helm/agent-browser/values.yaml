@@ -84,7 +84,7 @@ config:
   logLevel: "INFO"
   headless: false
   # Stealth profile: "off" (fast) | "balanced" | "minimal" | "full" (max anti-detection)
-  stealthProfile: "off"
+  stealthProfile: "minimal"
 
 # Secret 配置（通过 values 文件或 --set 传入）
 secrets:

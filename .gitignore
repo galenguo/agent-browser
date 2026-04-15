@@ -67,6 +67,7 @@ desktop/
 
 # Runtime data (never commit browser profiles or runtime state)
 test-profiles/
+agent_browser/skill/.session_cache.json
 
 # Deployment consolidated under deploy/
 deploy/docker/data/

@@ -363,7 +363,7 @@ async def create_session(req: CreateSessionRequest, api_key: str = Depends(requi
             )
         else:
             # Session died but binding is stale — release it
-            logger.warning("Stale binding for key %s -> session %s, releasing", api_key, existing_sid)
+            logger.warning("Stale binding for key %s -> session %s, releasing", api_key[:8] + "...", existing_sid)
             await km.release(api_key)
 
     try:

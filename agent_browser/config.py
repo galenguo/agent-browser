@@ -54,7 +54,7 @@ class SkillConfig:
     # Stealth
     stealth_enabled: bool = True
     stealth_mode: Literal["full", "vanilla"] = "full"
-    stealth_profile: str = "off"  # "full" | "balanced" | "minimal" | "off"
+    stealth_profile: str = "minimal"  # "full" | "balanced" | "minimal" | "off"
     #   full:    CloakBrowser + full 6-layer anti-detection stack + StealthEnhancer behavior simulation
     #   vanilla: Standard Playwright + only StealthEnhancer delay behavior (no CloakBrowser needed)
     warmup_enabled: bool = False

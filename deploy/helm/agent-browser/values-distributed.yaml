@@ -24,4 +24,4 @@ distributed:
 
 config:
   maxSessions: 50
-  stealthProfile: "off"
+  stealthProfile: "minimal"

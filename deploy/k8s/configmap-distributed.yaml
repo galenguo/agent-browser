@@ -32,7 +32,7 @@ data:
   BROWSER_IDLE_RESTART_MINUTES: "30"
 
   # Stealth profile: "off" (default, fast) | "balanced" | "minimal" | "full" (max anti-detection)
-  AGENT_BROWSER_STEALTH_PROFILE: "off"
+  AGENT_BROWSER_STEALTH_PROFILE: "minimal"
 
   # BR pod resource tuning
   BR_SHM_SIZE: "512Mi"

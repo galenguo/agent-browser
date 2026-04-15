@@ -16,7 +16,7 @@ data:
   BR_IDLE_TIMEOUT_SECONDS: "3600"
 
   # Stealth profile: "off" (default, fast) | "balanced" | "minimal" | "full"
-  AGENT_BROWSER_STEALTH_PROFILE: "off"
+  AGENT_BROWSER_STEALTH_PROFILE: "minimal"
 
   # BR pod resource tuning
   BR_SHM_SIZE: "512Mi"

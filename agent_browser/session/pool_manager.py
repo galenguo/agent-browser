@@ -1021,8 +1021,6 @@ class SessionPoolManager:
 
             backend = LocalCDPBackend.__new__(LocalCDPBackend)
             backend._sessions = {}
-            # Store classes for _ensure_backend_session
-            backend._LocalSession = LocalSession
             self._backend = backend
         return self._backend
 

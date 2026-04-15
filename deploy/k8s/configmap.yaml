@@ -24,4 +24,4 @@ data:
   HEADLESS: "false"
 
   # Stealth profile: "off" (default, fast) | "balanced" | "minimal" | "full"
-  AGENT_BROWSER_STEALTH_PROFILE: "off"
+  AGENT_BROWSER_STEALTH_PROFILE: "minimal"

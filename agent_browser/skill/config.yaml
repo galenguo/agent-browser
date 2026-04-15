@@ -14,7 +14,7 @@ service:
   url: "http://agent-browser-api.vpc-dale.gimcyun.com"
 
   # API authentication key (leave empty if server doesn't require auth)
-  api_key: "ab_c3cf8fe7fc4ebb81e66f92a320368c72"
+  api_key: ""
 
   # HTTP request timeout in seconds
   timeout: 600
