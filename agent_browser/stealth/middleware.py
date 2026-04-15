@@ -258,8 +258,21 @@ class StealthMiddleware:
         stealth_enabled = getattr(config, "stealth_enabled", True)
         if stealth_enabled:
             if StealthEnhancer is not None:
-                self._stealth = StealthEnhancer()
-                logger.info("StealthMiddleware initialized (stealth ON)")
+                # Resolve stealth profile from config or env
+                from agent_browser.stealth.profiles import resolve_stealth_profile, profile_from_env
+
+                profile_name = getattr(config, "stealth_profile", None)
+                try:
+                    profile = resolve_stealth_profile(profile_name) if profile_name else profile_from_env()
+                except ValueError:
+                    logger.warning("Invalid stealth_profile '%s', using env/default", profile_name)
+                    profile = profile_from_env()
+
+                self._stealth = StealthEnhancer(profile=profile)
+                logger.info(
+                    "StealthMiddleware initialized (stealth ON, profile=%s)",
+                    profile.name,
+                )
             else:
                 logger.warning(
                     "StealthEnhancer not available (CloakBrowser not installed); running in pass-through mode"

@@ -12,9 +12,15 @@ stealth interface for BrowserController:
 Corresponds to the "anti-detection (stealth)" guarantee in core features.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import random
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from agent_browser.stealth.profiles import StealthProfile
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +31,10 @@ class StealthEnhancer:
 
     Designed as a plugin for BrowserController, using pre_action / post_action
     to add human-like behavior before and after each atomic operation.
+
+    When a ``StealthProfile`` is provided, all delay/behaviour parameters are
+    loaded from it.  When no profile is given, the legacy hardcoded defaults
+    are used (100 % backward-compatible).
     """
 
     def __init__(
@@ -33,11 +43,37 @@ class StealthEnhancer:
         max_delay: float = 0.5,
         mouse_move: bool = True,
         human_scroll: bool = True,
+        profile: StealthProfile | None = None,
     ):
-        self.min_delay = min_delay
-        self.max_delay = max_delay
-        self.mouse_move = mouse_move
-        self._human_scroll = human_scroll
+        if profile is not None:
+            self._profile = profile
+            self._delay_map: dict[str, tuple[float, float]] = dict(profile.delay_map)
+            self._post_delay_range: tuple[float, float] = profile.post_delay_range
+            self.mouse_move = profile.mouse_move_enabled
+            self._human_scroll = profile.human_scroll_enabled
+            self._human_type_enabled = profile.human_type_enabled
+            self._mouse_move_steps: int = profile.mouse_move_steps
+            self._typing_delay_range: tuple[int, int] = profile.typing_delay_range
+            self._typo_probability: float = profile.typo_probability
+            self._long_pause_probability: float = profile.long_pause_probability
+            # Keep min/max for general fallback
+            general = profile.delay_map.get("general", (min_delay, max_delay))
+            self.min_delay = general[0]
+            self.max_delay = general[1]
+        else:
+            # Legacy path -- exact historical defaults
+            self._profile = None
+            self._delay_map = {}
+            self._post_delay_range = (0.05, 0.2)
+            self.mouse_move = mouse_move
+            self._human_scroll = human_scroll
+            self._human_type_enabled = True
+            self._mouse_move_steps = 20
+            self._typing_delay_range = (50, 250)
+            self._typo_probability = 0.05
+            self._long_pause_probability = 0.10
+            self.min_delay = min_delay
+            self.max_delay = max_delay
 
     # ──────────────────────────────────────────
     # Pre-action delays
@@ -47,22 +83,25 @@ class StealthEnhancer:
         """
         Human delay before an action.
 
-        Different action types have different delay ranges:
-        - navigate: 0.5-1.5s (human thinking about which site to visit)
-        - click: 0.1-0.3s (human clicks after finding target)
-        - input: 0.3-0.8s (human focuses on input field)
-        - extract: 0.0s (extraction needs no delay)
-        - general: uses min_delay/max_delay
+        Different action types have different delay ranges.
+        When a profile is set, delays come from the profile's delay_map;
+        otherwise the legacy hardcoded values are used.
         """
-        delay_map = {
-            "navigate": (0.5, 1.5),
-            "click": (0.1, 0.3),
-            "input": (0.3, 0.8),
-            "scroll": (0.3, 1.0),
-            "extract": (0.0, 0.0),
-            "general": (self.min_delay, self.max_delay),
-        }
-        low, high = delay_map.get(action_type, (self.min_delay, self.max_delay))
+        if self._delay_map:
+            low, high = self._delay_map.get(
+                action_type, self._delay_map.get("general", (0.0, 0.0))
+            )
+        else:
+            # Legacy fallback
+            delay_map = {
+                "navigate": (0.5, 1.5),
+                "click": (0.1, 0.3),
+                "input": (0.3, 0.8),
+                "scroll": (0.3, 1.0),
+                "extract": (0.0, 0.0),
+                "general": (self.min_delay, self.max_delay),
+            }
+            low, high = delay_map.get(action_type, (self.min_delay, self.max_delay))
 
         if low > 0 or high > 0:
             delay = random.uniform(low, high)
@@ -70,8 +109,10 @@ class StealthEnhancer:
 
     async def post_action(self, action_type: str = "general") -> None:
         """Brief pause after an action."""
-        delay = random.uniform(0.05, 0.2)
-        await asyncio.sleep(delay)
+        low, high = self._post_delay_range
+        if low > 0 or high > 0:
+            delay = random.uniform(low, high)
+            await asyncio.sleep(delay)
 
     # ──────────────────────────────────────────
     # Mouse movement
@@ -102,18 +143,22 @@ class StealthEnhancer:
             logger.debug(f"Mouse move failed (non-critical): {e}")
 
     async def _bezier_mouse_move(
-        self, page, start_x: int, start_y: int, end_x: int, end_y: int, steps: int = 20
+        self, page, start_x: int, start_y: int, end_x: int, end_y: int, steps: int | None = None
     ) -> None:
         """Move mouse along a cubic Bezier curve."""
         import math
+
+        actual_steps = steps if steps is not None else self._mouse_move_steps
+        if actual_steps <= 0:
+            return
 
         ctrl1_x = start_x + (end_x - start_x) * 0.25 + random.randint(-80, 80)
         ctrl1_y = start_y + (end_y - start_y) * 0.25 + random.randint(-80, 80)
         ctrl2_x = start_x + (end_x - start_x) * 0.75 + random.randint(-80, 80)
         ctrl2_y = start_y + (end_y - start_y) * 0.75 + random.randint(-80, 80)
 
-        for i in range(steps + 1):
-            t = i / steps
+        for i in range(actual_steps + 1):
+            t = i / actual_steps
             x = (1 - t) ** 3 * start_x + 3 * (1 - t) ** 2 * t * ctrl1_x + 3 * (1 - t) * t**2 * ctrl2_x + t**3 * end_x
             y = (1 - t) ** 3 * start_y + 3 * (1 - t) ** 2 * t * ctrl1_y + 3 * (1 - t) * t**2 * ctrl2_y + t**3 * end_y
             await page.mouse.move(int(x), int(y))
@@ -128,13 +173,19 @@ class StealthEnhancer:
         """
         Realistic typing simulation: variable speed + occasional typo + pause to think.
 
-        Characteristics:
-          - Base speed: 50-250ms per character
-          - 10% chance of long pause (500-1500ms) simulating "thinking"
-          - 5% chance of typo then backspace correction
+        When ``human_type_enabled`` is False in the profile, falls back to a simple
+        Playwright ``fill()`` with no character-by-character delay.
         """
         element = page.locator(selector)
         await element.click()
+
+        if not self._human_type_enabled:
+            # Fast path: use Playwright's native fill
+            if clear_first:
+                await element.fill("")
+            await element.fill(text)
+            return
+
         await asyncio.sleep(random.uniform(0.3, 0.8))
 
         if clear_first:
@@ -143,9 +194,10 @@ class StealthEnhancer:
             await page.keyboard.press("Backspace")
             await asyncio.sleep(random.uniform(0.2, 0.5))
 
+        delay_lo, delay_hi = self._typing_delay_range
         for char in text:
-            # 5% chance of typo then backspace
-            if random.random() < 0.05:
+            # Typo simulation
+            if random.random() < self._typo_probability:
                 wrong_char = random.choice("abcdef1234567890")
                 await page.keyboard.type(wrong_char)
                 await asyncio.sleep(random.uniform(0.08, 0.25))
@@ -153,12 +205,15 @@ class StealthEnhancer:
                 await asyncio.sleep(random.uniform(0.15, 0.4))
 
             # Variable speed typing
-            delay_ms = random.randint(50, 250)
-            # 10% chance of long pause
-            if random.random() < 0.1:
+            delay_ms = random.randint(delay_lo, delay_hi) if delay_hi > 0 else 0
+            # Long pause
+            if random.random() < self._long_pause_probability:
                 delay_ms += random.randint(500, 1500)
 
-            await page.keyboard.type(char, delay=delay_ms)
+            if delay_ms > 0:
+                await page.keyboard.type(char, delay=delay_ms)
+            else:
+                await page.keyboard.type(char)
 
     # ──────────────────────────────────────────
     # Human scrolling

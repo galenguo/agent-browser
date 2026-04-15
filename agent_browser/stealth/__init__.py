@@ -19,6 +19,16 @@ from agent_browser.stealth.patches import (
     inject_stealth_patches,
     verify_patches,
 )
+from agent_browser.stealth.profiles import (
+    BUILTIN_PROFILES,
+    BALANCED_PROFILE,
+    FULL_PROFILE,
+    MINIMAL_PROFILE,
+    OFF_PROFILE,
+    StealthProfile,
+    profile_from_env,
+    resolve_stealth_profile,
+)
 
 __all__ = [
     # Patches (JS runtime property-level)
@@ -29,6 +39,15 @@ __all__ = [
     "CircuitState",
     # Enhancer (Layer 6: human behavior)
     "StealthEnhancer",
+    # Profiles (named delay presets)
+    "StealthProfile",
+    "BUILTIN_PROFILES",
+    "FULL_PROFILE",
+    "BALANCED_PROFILE",
+    "MINIMAL_PROFILE",
+    "OFF_PROFILE",
+    "resolve_stealth_profile",
+    "profile_from_env",
     # Middleware (Layer 7: centralized stealth)
     "StealthMiddleware",
     "StealthPageHandle",
