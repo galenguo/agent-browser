@@ -33,11 +33,11 @@ class TestBuiltinProfiles:
     def test_minimal_profile_long_pause_probability(self):
         assert MINIMAL_PROFILE.long_pause_probability == 0.01
 
-    def test_minimal_profile_warmup_disabled(self):
-        assert MINIMAL_PROFILE.warmup_enabled is False
+    def test_minimal_profile_warmup_enabled(self):
+        assert MINIMAL_PROFILE.warmup_enabled is True
 
-    def test_minimal_profile_human_scroll_disabled(self):
-        assert MINIMAL_PROFILE.human_scroll_enabled is False
+    def test_minimal_profile_human_scroll_enabled(self):
+        assert MINIMAL_PROFILE.human_scroll_enabled is True
 
     def test_off_profile_all_delays_zero(self):
         for action, (lo, hi) in OFF_PROFILE.delay_map.items():

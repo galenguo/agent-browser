@@ -243,11 +243,15 @@ def cmd_open(args: list[str]) -> None:
 
 
 def cmd_snapshot(args: list[str]) -> None:
-    """snapshot [--session <name>] [-i/--interactive]"""
+    """snapshot [--session <name>] [-i/--interactive] [--iframe <selector>]"""
     session_name = _flag(args, "--session")
     interactive = "-i" in args or "--interactive" in args
+    iframe_selector = _flag(args, "--iframe")
     sid = _require_session(session_name)
-    result = _rpc("POST", f"/sessions/{sid}/snapshot", {"interactive_only": interactive})
+    body: dict[str, Any] = {"interactive_only": interactive}
+    if iframe_selector:
+        body["iframe_selector"] = iframe_selector
+    result = _rpc("POST", f"/sessions/{sid}/snapshot", body)
     _ok(result)
 
 
@@ -362,6 +366,202 @@ def cmd_back(args: list[str]) -> None:
     _ok()
 
 
+def cmd_url(args: list[str]) -> None:
+    """url [--session <name>]"""
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+    result = _rpc("GET", f"/sessions/{sid}/url")
+    _ok(result)
+
+
+def cmd_title(args: list[str]) -> None:
+    """title [--session <name>]"""
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+    result = _rpc("GET", f"/sessions/{sid}/title")
+    _ok(result)
+
+
+def cmd_wait(args: list[str]) -> None:
+    """wait <selector> [--timeout <ms>] [--session <name>]"""
+    if not args or args[0].startswith("--"):
+        _err("Usage: agent-browser wait <selector> [--timeout <ms>] [--session <name>]")
+    selector = args[0]
+    timeout = int(_flag(args, "--timeout") or "5000")
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+    result = _rpc("POST", f"/sessions/{sid}/wait", {"selector": selector, "timeout": timeout})
+    _ok(result)
+
+
+def cmd_find(args: list[str]) -> None:
+    """find <selector> [--max N] [--session <name>]"""
+    if not args or args[0].startswith("--"):
+        _err("Usage: agent-browser find <selector> [--max N] [--session <name>]")
+    selector = args[0]
+    max_results = int(_flag(args, "--max") or "50")
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+    result = _rpc("POST", f"/sessions/{sid}/find_elements", {
+        "selector": selector,
+        "max_results": max_results,
+    })
+    _ok(result)
+
+
+def cmd_mouse(args: list[str]) -> None:
+    """mouse <x,y> [--session <name>]"""
+    if not args:
+        _err("Usage: agent-browser mouse <x,y> [--session <name>]")
+    coords = args[0]
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+    try:
+        x, y = coords.split(",", 1)
+        _rpc("POST", f"/sessions/{sid}/mouse/move", {"x": float(x), "y": float(y)})
+    except ValueError:
+        _err(f"Invalid coordinates: {coords}. Expected format: x,y")
+    _ok()
+
+
+def cmd_keys(args: list[str]) -> None:
+    """keys <sequence> [--session <name>]  e.g. keys "Control+c" """
+    if not args or args[0].startswith("--"):
+        _err("Usage: agent-browser keys <sequence> [--session <name>]")
+    sequence = args[0]
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+    _rpc("POST", f"/sessions/{sid}/keys/send", {"keys": sequence})
+    _ok()
+
+
+def cmd_eval(args: list[str]) -> None:
+    """eval <expression> [--session <name>]"""
+    if not args or args[0].startswith("--"):
+        _err("Usage: agent-browser eval <expression> [--session <name>]")
+    expression = args[0]
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+    result = _rpc("POST", f"/sessions/{sid}/evaluate", {"expression": expression})
+    _ok(result)
+
+
+def cmd_upload(args: list[str]) -> None:
+    """upload <ref> <file_path> [--session <name>]"""
+    if len(args) < 2:
+        _err("Usage: agent-browser upload <ref> <file_path> [--session <name>]")
+    ref = args[0]
+    file_path = args[1]
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+    _rpc("POST", f"/sessions/{sid}/upload", {"ref": ref, "file_paths": [file_path]})
+    _ok()
+
+
+def cmd_screenshot(args: list[str]) -> None:
+    """screenshot [--full-page] [--session <name>]"""
+    full_page = "--full-page" in args
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+    result = _rpc("POST", f"/sessions/{sid}/screenshot", {"full_page": full_page})
+    _ok(result)
+
+
+def cmd_pdf(args: list[str]) -> None:
+    """pdf [--output <path>] [--landscape] [--session <name>]"""
+    output_path = _flag(args, "--output")
+    landscape = "--landscape" in args
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+    body: dict[str, Any] = {"landscape": landscape}
+    if output_path:
+        body["output_path"] = output_path
+    result = _rpc("POST", f"/sessions/{sid}/pdf", body)
+    _ok(result)
+
+
+def cmd_tab(args: list[str]) -> None:
+    """tab list|switch|open|close [--session <name>]"""
+    if not args:
+        _err("Usage: agent-browser tab <list|switch <index>|open [url]|close [index]> [--session <name>]")
+    sub = args[0]
+    rest = args[1:]
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+
+    if sub == "list":
+        result = _rpc("GET", f"/sessions/{sid}/tabs")
+        _ok(result)
+
+    elif sub == "switch":
+        if not rest or rest[0].startswith("--"):
+            _err("Usage: agent-browser tab switch <index> [--session <name>]")
+        try:
+            index = int(rest[0])
+        except ValueError:
+            _err(f"Invalid tab index: {rest[0]}")
+        _rpc("POST", f"/sessions/{sid}/tabs/switch", {"index": index})
+        _ok()
+
+    elif sub == "open":
+        url = rest[0] if rest and not rest[0].startswith("--") else None
+        body: dict[str, Any] = {}
+        if url:
+            body["url"] = url
+        result = _rpc("POST", f"/sessions/{sid}/tabs/open", body)
+        _ok(result)
+
+    elif sub == "close":
+        index = None
+        if rest and not rest[0].startswith("--"):
+            try:
+                index = int(rest[0])
+            except ValueError:
+                _err(f"Invalid tab index: {rest[0]}")
+        body = {}
+        if index is not None:
+            body["index"] = index
+        _rpc("POST", f"/sessions/{sid}/tabs/close", body)
+        _ok()
+
+    else:
+        _err(f"Unknown tab subcommand: {sub}. Use: list, switch, open, close")
+
+
+def cmd_dropdown(args: list[str]) -> None:
+    """dropdown options <ref> | dropdown select <ref> <text> [--session <name>]"""
+    if not args:
+        _err("Usage: agent-browser dropdown <options <ref>|select <ref> <text>> [--session <name>]")
+    sub = args[0]
+    rest = args[1:]
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+
+    if sub == "options":
+        if not rest or rest[0].startswith("--"):
+            _err("Usage: agent-browser dropdown options <ref> [--session <name>]")
+        ref = rest[0]
+        result = _rpc("POST", f"/sessions/{sid}/dropdown/options", {"ref": ref})
+        _ok(result)
+
+    elif sub == "select":
+        if len(rest) < 2:
+            _err("Usage: agent-browser dropdown select <ref> <option_text> [--session <name>]")
+        ref = rest[0]
+        # option text may contain spaces; collect until --session
+        text_parts = []
+        i = 1
+        while i < len(rest) and rest[i] != "--session":
+            text_parts.append(rest[i])
+            i += 1
+        option_text = " ".join(text_parts)
+        _rpc("POST", f"/sessions/{sid}/dropdown/select", {"ref": ref, "option_text": option_text})
+        _ok()
+
+    else:
+        _err(f"Unknown dropdown subcommand: {sub}. Use: options, select")
+
+
 def cmd_session(args: list[str]) -> None:
     """session create|list|destroy [--name <name>]"""
     if not args:
@@ -376,7 +576,14 @@ def cmd_session(args: list[str]) -> None:
         if not sid:
             _err(f"No session_id returned: {result}")
         _set_session_id(name, sid)
-        _ok({"name": name, "session_id": sid})
+
+        output = {"name": name, "session_id": sid}
+        if "vnc_url" in result and result.get("vnc_url"):
+            output["vnc_url"] = result["vnc_url"]
+        elif "novnc_url" in result and result.get("novnc_url"):
+            output["vnc_url"] = result["novnc_url"]
+
+        _ok(output)
 
     elif sub == "list":
         result = _rpc("GET", "/sessions")
@@ -504,6 +711,18 @@ COMMANDS: dict[str, Any] = {
     "extract": cmd_extract,
     "run": cmd_run,
     "back": cmd_back,
+    "url": cmd_url,
+    "title": cmd_title,
+    "wait": cmd_wait,
+    "find": cmd_find,
+    "mouse": cmd_mouse,
+    "keys": cmd_keys,
+    "eval": cmd_eval,
+    "upload": cmd_upload,
+    "screenshot": cmd_screenshot,
+    "pdf": cmd_pdf,
+    "tab": cmd_tab,
+    "dropdown": cmd_dropdown,
     "session": cmd_session,
     "daemon": cmd_daemon,
     "doctor": cmd_doctor,
@@ -517,7 +736,7 @@ def main() -> None:
             "Usage: agent-browser <command> [options]\n\n"
             "Commands:\n"
             "  open <url>                Navigate to URL\n"
-            "  snapshot [-i]             Get page snapshot\n"
+            "  snapshot [-i] [--iframe]  Get page snapshot\n"
             "  click <ref>               Click element\n"
             "  fill <ref> <text>         Fill input\n"
             "  scroll <up|down>          Scroll page\n"
@@ -525,6 +744,18 @@ def main() -> None:
             "  extract [--type text]     Extract page content\n"
             "  run \"<task>\"              Run agent task\n"
             "  back                      Navigate back\n"
+            "  url                       Get current URL\n"
+            "  title                     Get page title\n"
+            "  wait <selector>           Wait for selector\n"
+            "  find <selector>           Find elements\n"
+            "  mouse <x,y>               Move mouse\n"
+            "  keys <sequence>           Send key sequence\n"
+            "  eval <expression>         Evaluate JavaScript\n"
+            "  upload <ref> <path>       Upload file\n"
+            "  screenshot [--full-page]  Take screenshot\n"
+            "  pdf [--output <path>]     Save as PDF\n"
+            "  tab list|switch|open|close\n"
+            "  dropdown options|select\n"
             "  session create|list|destroy\n"
             "  daemon status|stop\n"
             "  doctor                    Run environment diagnostics\n\n"
