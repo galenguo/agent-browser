@@ -104,11 +104,11 @@ agent-browser/                          # Project root
 │   │   └── factory.py                 # OpenAI, Anthropic, GLM providers
 │   │
 │   ├── skill/                         # Claude Code skill
-│   │   ├── SKILL.md                   # Skill definition (triggers, modes, error recovery)
+│   │   ├── SKILL.md                   # Skill definition (CLI-only, daemon+shim architecture)
 │   │   ├── config.yaml                # Skill configuration (service URL, API key, mode)
-│   │   ├── scripts/doctor.py          # Environment diagnostic + auto-fix
-│   │   ├── scripts/browser_cli.py     # SkillBrowser client (HTTP facade for Claude Code)
-│   │   └── references/                # Progressive disclosure docs
+│   │   ├── cli.py                     # Skill CLI client (auto-starts daemon, JSON-RPC over Unix socket)
+│   │   ├── daemon.py                  # Skill Daemon (persistent aiohttp session, idle auto-exit)
+│   │   └── scripts/doctor.py          # Environment diagnostic + auto-fix
 │   │
 │   └── utils/                         # Shared utilities
 │       ├── refs_generator.py          # Element reference generation (@e0, @e1)

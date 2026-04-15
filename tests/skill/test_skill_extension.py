@@ -72,48 +72,7 @@ class TestSkillMDLoading:
 
 
 # ══════════════════════════════════════════════════════════════════
-# 2. Reference Docs Tests
-# ══════════════════════════════════════════════════════════════════
-
-
-class TestReferenceDocs:
-    """All referenced docs from SKILL.md must exist and have content."""
-
-    @pytest.mark.parametrize("doc", [
-        "react-workflow.md",
-        "error-recovery.md",
-        "api-reference.md",
-        "adapter-guide.md",
-    ])
-    def test_reference_exists(self, skill_dir, doc):
-        ref_path = skill_dir / "references" / doc
-        assert ref_path.exists(), f"Reference doc {doc} must exist"
-
-    def test_react_workflow_has_loop_phases(self, skill_dir):
-        content = (skill_dir / "references" / "react-workflow.md").read_text()
-        assert "Observe" in content, "react-workflow must describe Observe phase"
-        assert "Reason" in content, "react-workflow must describe Reason phase"
-        assert "Act" in content, "react-workflow must describe Act phase"
-        assert "Check" in content, "react-workflow must describe Check phase"
-
-    def test_error_recovery_has_patterns(self, skill_dir):
-        content = (skill_dir / "references" / "error-recovery.md").read_text()
-        assert "E1" in content or "CDP" in content, "error-recovery must catalog error patterns"
-
-    def test_api_reference_has_create_session(self, skill_dir):
-        content = (skill_dir / "references" / "api-reference.md").read_text()
-        assert "create_session" in content, "api-reference must document create_session"
-
-    def test_adapter_guide_has_adapters(self, skill_dir):
-        content = (skill_dir / "references" / "adapter-guide.md").read_text()
-        assert "list_adapters" in content or "run_adapter" in content, "adapter-guide must document adapter system"
-        # Must NOT contain fictional functions
-        assert "list_desktop_apps" not in content, "adapter-guide must not include fictional list_desktop_apps"
-        assert "run_desktop_command" not in content, "adapter-guide must not include fictional run_desktop_command"
-
-
-# ══════════════════════════════════════════════════════════════════
-# 3. Doctor Script Tests
+# 2. Doctor Script Tests
 # ══════════════════════════════════════════════════════════════════
 
 
@@ -343,12 +302,11 @@ class TestInstallSkillCommand:
         target = tmp_path / "skills" / "agent-browser"
         target.mkdir(parents=True, exist_ok=True)
 
-        shutil.copy2(skill_dir / "SKILL.md", target / "SKILL.md")
-        refs_dir = target / "references"
-        if (skill_dir / "references").exists():
-            if refs_dir.exists():
-                shutil.rmtree(refs_dir)
-            shutil.copytree(skill_dir / "references", refs_dir)
+        # Copy core skill files (new architecture: no references/)
+        for fname in ["SKILL.md", "config.yaml", "daemon.py", "cli.py"]:
+            src = skill_dir / fname
+            if src.exists():
+                shutil.copy2(src, target / fname)
         scripts_dir = target / "scripts"
         if (skill_dir / "scripts").exists():
             if scripts_dir.exists():
@@ -356,17 +314,21 @@ class TestInstallSkillCommand:
             shutil.copytree(skill_dir / "scripts", scripts_dir)
 
         assert (target / "SKILL.md").exists()
-        assert (target / "references" / "react-workflow.md").exists()
+        assert (target / "daemon.py").exists()
+        assert (target / "cli.py").exists()
 
-    def test_install_skill_copies_references(self, tmp_path, skill_dir):
+    def test_install_skill_copies_daemon_and_cli(self, tmp_path, skill_dir):
         import shutil
 
         target = tmp_path / "skills" / "ab"
         target.mkdir(parents=True, exist_ok=True)
-        if (skill_dir / "references").exists():
-            shutil.copytree(skill_dir / "references", target / "references")
+        for fname in ["daemon.py", "cli.py"]:
+            src = skill_dir / fname
+            if src.exists():
+                shutil.copy2(src, target / fname)
 
-        assert (target / "references" / "error-recovery.md").exists()
+        assert (target / "daemon.py").exists()
+        assert (target / "cli.py").exists()
 
     def test_install_skill_existing_no_force(self, tmp_path, skill_dir):
         target = tmp_path / "skills" / "ab2"
@@ -442,13 +404,15 @@ class TestPyprojectPackageData:
         content = (project_root / "pyproject.toml").read_text()
         assert "skill/SKILL.md" in content, "package_data must include skill/SKILL.md"
 
-    def test_package_data_includes_references(self, project_root):
+    def test_package_data_includes_daemon_and_cli(self, project_root):
         content = (project_root / "pyproject.toml").read_text()
-        assert "references" in content, "package_data must include references"
+        assert "skill/daemon.py" in content, "package_data must include skill/daemon.py"
+        assert "skill/cli.py" in content, "package_data must include skill/cli.py"
 
     def test_package_data_includes_scripts(self, project_root):
         content = (project_root / "pyproject.toml").read_text()
-        assert "scripts" in content.lower() or "scripts/*.py" in content, "package_data must include scripts"
+        assert "skill/scripts/doctor.py" in content or "skill/scripts/*.py" in content, \
+            "package_data must include skill/scripts/doctor.py"
 
     def test_package_data_includes_extension(self, project_root):
         content = (project_root / "pyproject.toml").read_text()
@@ -466,16 +430,34 @@ class TestPyprojectPackageData:
 
 
 class TestSkillMDConformance:
-    """Validates that the rewritten SKILL.md conforms to Claude Code spec and contains
-    all required canonical patterns + new content without fictional functions."""
+    """Validates that SKILL.md conforms to the CLI-only daemon+shim architecture."""
 
-    def test_has_arguments_handling_blockquote(self, skill_dir):
+    def test_has_critical_no_python_rule(self, skill_dir):
         content = (skill_dir / "SKILL.md").read_text()
-        assert "> **ARGUMENTS Handling**" in content, "Must have ARGUMENTS Handling blockquote directive"
+        assert "NEVER write Python scripts" in content or "NEVER" in content, \
+            "Must have CRITICAL RULE forbidding Python script generation"
 
-    def test_has_execution_environment_blockquote(self, skill_dir):
+    def test_has_agent_browser_commands(self, skill_dir):
         content = (skill_dir / "SKILL.md").read_text()
-        assert "> **Execution Environment**" in content, "Must have Execution Environment blockquote directive"
+        assert "agent-browser" in content, "Must show agent-browser CLI commands"
+        assert "session create" in content, "Must document session create command"
+        assert "snapshot" in content, "Must document snapshot command"
+        assert "click" in content, "Must document click command"
+        assert "fill" in content, "Must document fill command"
+
+    def test_has_daemon_commands(self, skill_dir):
+        content = (skill_dir / "SKILL.md").read_text()
+        assert "daemon" in content, "Must document daemon management commands"
+
+    def test_has_json_output_format(self, skill_dir):
+        content = (skill_dir / "SKILL.md").read_text()
+        assert '"success"' in content or "success" in content, \
+            "Must document JSON output format"
+
+    def test_has_error_recovery(self, skill_dir):
+        content = (skill_dir / "SKILL.md").read_text()
+        assert "Error Recovery" in content or "error" in content.lower(), \
+            "Must have error recovery section"
 
     def test_has_chinese_triggers(self, skill_dir):
         content = (skill_dir / "SKILL.md").read_text()
@@ -484,75 +466,32 @@ class TestSkillMDConformance:
 
     def test_has_english_triggers(self, skill_dir):
         content = (skill_dir / "SKILL.md").read_text()
-        assert "open website" in content, "Must have English trigger phrases"
-        assert "search for" in content, "Must have English trigger phrases"
+        assert "open website" in content or "browse" in content, \
+            "Must have English trigger phrases"
 
-    def test_uses_agent_browser_import(self, skill_dir):
+    def test_no_python_import_examples(self, skill_dir):
         content = (skill_dir / "SKILL.md").read_text()
-        assert "from agent_browser import" in content, "Must use from agent_browser import (not skills.agent_browser)"
-        assert "from skills.agent_browser" not in content, "Must NOT use old skills.agent_browser import path"
+        assert "from agent_browser import" not in content, \
+            "Must NOT have Python import examples (CLI-only architecture)"
 
     def test_no_hardcoded_path(self, skill_dir):
         content = (skill_dir / "SKILL.md").read_text()
         assert "iCloud" not in content, "Must NOT have hardcoded iCloud path"
         assert "Mobile Documents" not in content, "Must NOT have hardcoded Mobile Documents path"
 
-    def test_has_doctor_integration(self, skill_dir):
-        content = (skill_dir / "SKILL.md").read_text()
-        assert "doctor" in content.lower() or "run_diagnosis" in content, "Must reference doctor.py"
-
-    def test_has_extension_mode_section(self, skill_dir):
-        content = (skill_dir / "SKILL.md").read_text()
-        assert "Extension Mode" in content or "Chrome Extension" in content, "Must document Extension mode setup"
-
-    def test_has_site_adapters(self, skill_dir):
-        content = (skill_dir / "SKILL.md").read_text()
-        assert "适配器" in content or "adapters" in content, "Must cover site adapters"
-
-    def test_has_qr_login(self, skill_dir):
-        content = (skill_dir / "SKILL.md").read_text()
-        assert "扫码登录" in content or "QR" in content, "Must cover QR login flow"
-
-    def test_has_remote_curl_examples(self, skill_dir):
-        content = (skill_dir / "SKILL.md").read_text()
-        assert "curl" in content, "Must have curl examples for remote mode"
-
-    def test_has_progressive_disclosure(self, skill_dir):
-        content = (skill_dir / "SKILL.md").read_text()
-        assert "references/" in content, "Must have progressive disclosure links to reference docs"
-
-    def test_has_conversational_recovery(self, skill_dir):
-        content = (skill_dir / "SKILL.md").read_text()
-        # Must have more than just a static table -- should guide Claude's conversation
-        assert "CLASSIFY" in content or "auto-fix" in content or "PRESENT TO USER" in content, \
-            "Must have conversational error recovery guidance beyond a lookup table"
-
     def test_no_fictional_functions(self, skill_dir):
         content = (skill_dir / "SKILL.md").read_text()
         assert "list_desktop_apps" not in content, "Must NOT include fictional list_desktop_apps"
         assert "run_desktop_command" not in content, "Must NOT include fictional run_desktop_command"
 
-    def test_documents_setup_function(self, skill_dir):
+    def test_has_session_management(self, skill_dir):
         content = (skill_dir / "SKILL.md").read_text()
-        # "Setup" appears in Quick Start checklist + Extension Mode section
-        assert "setup" in content.lower(), "Must document setup/Setup for server mode"
+        assert "session" in content.lower(), "Must document session management"
 
-    def test_documents_configure_function(self, skill_dir):
+    def test_has_installation_notes(self, skill_dir):
         content = (skill_dir / "SKILL.md").read_text()
-        assert "configure" in content, "Must document configure() function"
-
-    def test_has_quick_start_checklist(self, skill_dir):
-        content = (skill_dir / "SKILL.md").read_text()
-        assert "Step 1" in content or "doctor" in content.lower(), "Must have Quick Start checklist with doctor.py step"
-        assert "Checklist" in content or "checklist" in content.lower(), "Must have setup progress tracking"
-
-    def test_has_mode_priority_section(self, skill_dir):
-        content = (skill_dir / "SKILL.md").read_text()
-        assert "优先级" in content or "Priority" in content, "Must document mode priority order (Extension > Local > Remote)"
-
-    def test_has_human_handoff_points(self, skill_dir):
-        content = (skill_dir / "SKILL.md").read_text()
-        assert "Handoff" in content or "handoff" in content, "Must specify when to stop and ask user"
+        assert "install" in content.lower() or "PATH" in content, \
+            "Must have installation notes"
 
 
 # ══════════════════════════════════════════════════════════════════

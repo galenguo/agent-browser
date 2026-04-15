@@ -14,6 +14,7 @@ import asyncio
 import json
 import logging
 import os
+import platform
 from pathlib import Path
 
 import click
@@ -21,7 +22,7 @@ from browser_use.browser import BrowserProfile, BrowserSession
 
 from agent_browser.cli.session_manager import CLISessionManager
 from agent_browser.models import BrowserInstance
-from agent_browser.session.session_manager import SessionContext, UnifiedSessionManager
+from agent_browser.cli.session_manager import SessionContext, UnifiedSessionManager
 from agent_browser.stealth.browser_controller import ActionResult, BrowserController
 
 logger = logging.getLogger(__name__)
@@ -638,16 +639,51 @@ def install_skill(path, force):
     _install_skill(path, force)
 
 
+def _create_shim(cli_path: Path, force: bool = False) -> tuple[Path, bool]:
+    """Create platform-appropriate shim pointing to skill cli.py."""
+    if platform.system() == "Windows":
+        return _create_shim_windows(cli_path, force)
+    return _create_shim_unix(cli_path, force)
+
+
+def _create_shim_unix(cli_path: Path, force: bool) -> tuple[Path, bool]:
+    """Create ~/.local/bin/agent-browser shim (macOS/Linux)."""
+    bin_dir = Path.home() / ".local" / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    shim_path = bin_dir / "agent-browser"
+
+    if shim_path.exists() and not force:
+        return shim_path, False
+
+    shim_path.write_text(f'#!/bin/sh\nexec python "{cli_path}" "$@"\n', encoding="utf-8")
+    shim_path.chmod(0o755)
+    return shim_path, True
+
+
+def _create_shim_windows(cli_path: Path, force: bool) -> tuple[Path, bool]:
+    """Create %APPDATA%\\Python\\Scripts\\agent-browser.bat shim (Windows)."""
+    scripts_dir = Path(os.environ.get("APPDATA", str(Path.home()))) / "Python" / "Scripts"
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+    shim_path = scripts_dir / "agent-browser.bat"
+
+    if shim_path.exists() and not force:
+        return shim_path, False
+
+    shim_path.write_text(f'@echo off\npython "{cli_path}" %*\n', encoding="utf-8")
+    return shim_path, True
+
+
 def _install_skill(custom_path=None, force=False):
-    """Copy SKILL.md and references to Claude Code skills directory."""
+    """Copy skill files to Claude Code skills directory and create CLI shim."""
     import shutil
 
     # Locate skill files within the installed package
     import agent_browser.skill as skill_mod
     skill_dir = Path(skill_mod.__file__).parent
     src_skill_md = skill_dir / "SKILL.md"
-    src_references = skill_dir / "references"
-    src_scripts = skill_dir / "scripts"
+    src_config_yaml = skill_dir / "config.yaml"
+    src_daemon_py = skill_dir / "daemon.py"
+    src_cli_py = skill_dir / "cli.py"
 
     if not src_skill_md.exists():
         click.echo(
@@ -675,43 +711,48 @@ def _install_skill(custom_path=None, force=False):
         )
         return
 
-    # Copy SKILL.md
-    try:
-        shutil.copy2(src_skill_md, target_skill)
-    except (OSError, shutil.Error) as e:
-        click.echo(json.dumps({"status": "error", "error": f"Failed to copy SKILL.md: {e}"}))
-        return
+    # Copy core files
+    for src, dst_name in [
+        (src_skill_md, "SKILL.md"),
+        (src_config_yaml, "config.yaml"),
+        (src_daemon_py, "daemon.py"),
+        (src_cli_py, "cli.py"),
+    ]:
+        if src.exists():
+            try:
+                shutil.copy2(src, target_dir / dst_name)
+            except (OSError, shutil.Error) as e:
+                click.echo(json.dumps({"status": "error", "error": f"Failed to copy {dst_name}: {e}"}))
+                return
 
-    # Copy references/
-    target_refs = target_dir / "references"
-    if src_references.exists():
-        try:
-            if target_refs.exists():
-                shutil.rmtree(target_refs)
-            shutil.copytree(src_references, target_refs)
-        except (OSError, shutil.Error) as e:
-            click.echo(json.dumps({"status": "error", "error": f"Failed to copy references: {e}"}))
-            return
+    # Create ~/.local/bin/agent-browser shim
+    shim_path, shim_updated = _create_shim(target_dir / "cli.py", force=force)
 
-    # Copy scripts/
-    target_scripts = target_dir / "scripts"
-    if src_scripts.exists():
-        try:
-            if target_scripts.exists():
-                shutil.rmtree(target_scripts)
-            shutil.copytree(src_scripts, target_scripts)
-        except (OSError, shutil.Error) as e:
-            click.echo(json.dumps({"status": "error", "error": f"Failed to copy scripts: {e}"}))
-            return
+    payload = {
+        "status": "installed",
+        "message": "Agent Browser skill installed successfully.",
+        "path": str(target_dir),
+        "shim": str(shim_path),
+        "shim_updated": shim_updated,
+        "next_steps": "Restart Claude Code or open a new conversation to use the skill.",
+    }
 
-    click.echo(
-        json.dumps({
-            "status": "installed",
-            "message": "Agent Browser skill installed successfully.",
-            "path": str(target_dir),
-            "next_steps": "Restart Claude Code or open a new conversation to use the skill.",
-        }, ensure_ascii=False)
-    )
+    user_path = os.environ.get("PATH", "")
+    if platform.system() == "Windows":
+        local_bin = str(Path(os.environ.get("APPDATA", str(Path.home()))) / "Python" / "Scripts")
+        path_sep = ";"
+        path_hint = f"Add to system PATH: {local_bin}"
+    else:
+        local_bin = str(Path.home() / ".local" / "bin")
+        path_sep = ":"
+        path_hint = f'export PATH="$HOME/.local/bin:$PATH"'
+
+    if local_bin not in user_path.split(path_sep):
+        payload["path_warning"] = (
+            f"~/.local/bin is not in PATH. Add this to your shell profile: {path_hint}"
+        )
+
+    click.echo(json.dumps(payload, ensure_ascii=False))
 
 
 if __name__ == "__main__":
