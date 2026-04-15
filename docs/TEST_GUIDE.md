@@ -12,14 +12,14 @@
 | 单元测试（Pipeline v2.3） | `unit/test_classifier`, `unit/test_fallback`, `unit/test_debugger`, `unit/test_telemetry`, `unit/test_template_errors` | ~78 | ✅ 完成 |
 | 单元测试（Explore） | `unit/test_explore_analysis`, `unit/test_explore_cascade`, `unit/test_explore_synthesizer` | ~30 | ✅ 完成 |
 | 集成测试 | `integration/` (8 files) | ~50 | ✅ 完成 |
-| 中间件测试 | `stealth/test_stealth_middleware` | 19 | ✅ 完成 |
+| 中间件测试 | `stealth/test_stealth_middleware`, `stealth/test_stealth_profiles` | 41 | ✅ 完成 |
 | 安全测试 | `unit/test_security_hardening`, `unit/test_auth_ownership` | ~20 | ✅ 完成 |
 | 场景测试 | `scenarios/test_scenario_*.py` (7 files) | ~26 | ⚠️ 需真实浏览器 |
 | 浏览器后端测试 | `browser/test_local_backend`, `browser/test_daemon`, `browser/test_anti_detection` | ~25 | ⚠️ 需 CDP 连接 |
 | Skill 测试 | `skill/test_skill_facade`, `skill/test_deploy_wizard_complete` | ~50 | ✅ 完成 |
 | E2E 测试 | `e2e/` (9+ files) | ~40+ | ⚠️ 需 API 服务或浏览器 |
 
-**总计: ~868 测试用例（含 E2E 和真实浏览器测试）**
+**总计: ~966 测试用例（含 E2E 和真实浏览器测试）**
 
 ---
 
@@ -64,7 +64,8 @@ tests/
 │
 ├── stealth/                           # ★ 反检测层测试
 │   ├── test_stealth.py                # StealthEnhancer（人类行为模拟）
-│   └── test_stealth_middleware.py     # StealthMiddleware（熔断器）
+│   ├── test_stealth_middleware.py     # StealthMiddleware（熔断器）
+│   └── test_stealth_profiles.py      # StealthProfile 预设（22 tests）
 │
 ├── browser/                            # ★ 浏览器后端测试（需 CDP）
 │   ├── test_local_backend.py          # LocalCDPBackend

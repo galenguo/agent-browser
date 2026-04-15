@@ -359,7 +359,7 @@ agent_browser/
 ├── client.py        # AgentBrowser OOP interface (session tracking, context manager)
 ├── config.py        # SkillConfig dataclass + mode detection
 ├── browser/         # Backend ABCs + implementations (local, remote, extension)
-├── stealth/         # Anti-detection: middleware, enhancer, actions, patches
+├── stealth/         # Anti-detection: middleware, enhancer, profiles, actions, patches
 ├── pipeline/        # YAML pipeline engine v2.3
 ├── explore/         # Site explorer + adapter synthesizer
 ├── adapters/        # Site adapter loader/runner/validator
@@ -367,7 +367,7 @@ agent_browser/
 ├── session/         # Multi-user session management
 ├── cli/             # Command-line interface (Typer)
 ├── llm/             # LLM factory (OpenAI, Anthropic, GLM)
-├── skill/           # Claude Code skill (SKILL.md, references, doctor script)
+├── skill/           # Claude Code skill (SKILL.md, daemon, cli, doctor script)
 └── utils/           # Shared utilities
 ```
 
@@ -418,6 +418,8 @@ See [`examples/`](examples/) directory:
 - [Contributing Guide](CONTRIBUTING.md) -- Development setup, code style, PR process
 - [Security Policy](SECURITY.md) -- Vulnerability reporting, security best practices
 - [Deployment Guide](deploy/README.md) -- Docker, Kubernetes, Helm deployment
+- [Install Guide](docs/INSTALL.md) -- Platform-specific installation and K8s setup
+- [Test Guide](docs/TEST_GUIDE.md) -- Test architecture, tiers, and running instructions
 - [CHANGELOG](CHANGELOG.md) -- Version history
 
 ## Contributing
