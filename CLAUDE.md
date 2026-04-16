@@ -43,6 +43,7 @@ agent-browser/                          # Project root
 │   ├── config.py                      # SkillConfig dataclass + load_config / detect_mode
 │   ├── deploy_config.py               # DeployConfig for Docker/K8s deployments
 │   ├── models.py                      # Data models (BrowserInstance, UserSession, AgentConfig, BrowserProfile, etc.)
+│   ├── detection.py                   # Server-side intervention detection (login, CAPTCHA, anti-bot URL/title patterns)
 │   │
 │   ├── browser/                       # Browser engine layer
 │   │   ├── __init__.py                # BrowserBackend + BrowserPageHandle ABCs
@@ -53,6 +54,7 @@ agent-browser/                          # Project root
 │   │   ├── stealth_launcher.py        # CloakBrowser launch with conditional imports
 │   │   ├── human_behavior.py          # Human behavior parameters
 │   │   ├── instance_pool.py           # Browser instance pool
+│   │   ├── k8s_node_manager.py        # Dynamic br pod lifecycle (warm pool, reconcile, release)
 │   │   └── auth_proxy.py              # Reverse proxy for browser pod CDP + noVNC
 │   │
 │   ├── stealth/                       # Anti-detection layer (Layers 6-7)

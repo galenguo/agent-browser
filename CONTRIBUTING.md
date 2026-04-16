@@ -94,7 +94,7 @@ agent_browser/           # Package root (all source code here)
 ├── cli/                # CLI interface
 └── utils/              # Shared utilities
 
-tests/                  # Test suite (868 tests)
+tests/                  # Test suite (1000+ tests)
 ├── conftest.py         # Shared fixtures
 ├── unit/               # Unit tests (~31 files)
 ├── stealth/            # Anti-detection layer tests

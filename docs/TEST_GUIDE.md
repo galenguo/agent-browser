@@ -11,6 +11,7 @@
 | 单元测试（核心） | `unit/test_config`, `unit/test_stealth`, `unit/test_daemon`, `unit/test_controller` | ~73 | ✅ 完成 |
 | 单元测试（Pipeline v2.3） | `unit/test_classifier`, `unit/test_fallback`, `unit/test_debugger`, `unit/test_telemetry`, `unit/test_template_errors` | ~78 | ✅ 完成 |
 | 单元测试（Explore） | `unit/test_explore_analysis`, `unit/test_explore_cascade`, `unit/test_explore_synthesizer` | ~30 | ✅ 完成 |
+| 单元测试（Intervention） | `unit/test_detection`, `unit/test_cli_session_cache`, `unit/test_k8s_node_manager` | ~55 | ✅ 完成 |
 | 集成测试 | `integration/` (8 files) | ~50 | ✅ 完成 |
 | 中间件测试 | `stealth/test_stealth_middleware`, `stealth/test_stealth_profiles` | 41 | ✅ 完成 |
 | 安全测试 | `unit/test_security_hardening`, `unit/test_auth_ownership` | ~20 | ✅ 完成 |
@@ -19,7 +20,7 @@
 | Skill 测试 | `skill/test_skill_facade`, `skill/test_deploy_wizard_complete` | ~50 | ✅ 完成 |
 | E2E 测试 | `e2e/` (9+ files) | ~40+ | ⚠️ 需 API 服务或浏览器 |
 
-**总计: ~966 测试用例（含 E2E 和真实浏览器测试）**
+**总计: ~1021 测试用例（含 E2E 和真实浏览器测试）**
 
 ---
 
@@ -640,4 +641,4 @@ tests/results/
 
 **文档版本**: v3.2
 **创建日期**: 2026-04-04
-**更新日期**: 2026-04-07 (同步 0.2.0 发布: Extension popup, SKILL.md 重写, 安全修复)
+**更新日期**: 2026-04-16 (新增 intervention detection + K8s lifecycle + CLI cache tests)

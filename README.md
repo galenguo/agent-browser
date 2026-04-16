@@ -247,6 +247,7 @@ curl http://localhost:8000/health
 | POST | `/click` | Click element by ref |
 | POST | `/fill` | Fill input field |
 | POST | `/evaluate` | Execute JavaScript |
+| GET | `/sessions/{id}/check-intervention` | Check if page requires human intervention |
 | POST | `/task` | Submit LLM/Agent task |
 
 ### Pipeline Mode
@@ -358,6 +359,7 @@ agent_browser/
 ├── main.py          # Facade API (create_session, snapshot, click, run_task, etc.)
 ├── client.py        # AgentBrowser OOP interface (session tracking, context manager)
 ├── config.py        # SkillConfig dataclass + mode detection
+├── detection.py     # Server-side intervention detection (login, CAPTCHA, anti-bot)
 ├── browser/         # Backend ABCs + implementations (local, remote, extension)
 ├── stealth/         # Anti-detection: middleware, enhancer, profiles, actions, patches
 ├── pipeline/        # YAML pipeline engine v2.3
@@ -429,7 +431,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - Development environment setup
 - Code style guidelines (ruff formatter/linter)
 - Pull request process
-- Test suite (868 tests across unit, integration, scenario, stealth, browser, skill, and e2e tests)
+- Test suite (1000+ tests across unit, integration, scenario, stealth, browser, skill, and e2e tests)
 
 ## License
 

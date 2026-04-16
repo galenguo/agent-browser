@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Intervention detection** (`detection.py`): Server-side URL/title pattern matching that detects login pages, CAPTCHAs, anti-bot challenges, and access-denied redirects. Returns `{"type", "reason", "patterns_matched"}` when detected, surfaced automatically in `open`, `snapshot`, and `go_back` responses.
+- **`check-intervention` API endpoint** (`app.py`): `GET /sessions/{id}/check-intervention` returns current page URL, title, intervention status, and VNC URL for manual human-in-the-loop workflows.
+- **`check` and `vnc` CLI commands** (`cli.py`): `agent-browser check --session <name>` checks current page for intervention, `agent-browser vnc --session <name>` retrieves cached VNC URL at any time.
+- **Mandatory intervention protocol in SKILL.md**: When `open`, `snapshot`, or `check` returns `intervention` field, automation must stop immediately, surface VNC URL, and wait for user confirmation.
+
+### Changed
+- **`cmd_open` response passthrough** (`cli.py`): Now uses API response instead of discarding it, surfacing actual URL, title, and intervention detection from the server.
+- **Session cache upgrade** (`cli.py`): Cache format changed from `{"name": "session_id"}` to `{"name": {"session_id": "...", "vnc_url": "..."}}` with automatic migration from legacy format. VNC URL is now cached on session creation and retrievable at any time.
+- **SnapshotResponse model** (`models.py`): Added `intervention: dict | None = None` field for intervention detection passthrough.
+
+### Fixed
+- **K8s warm pool replenishment** (`k8s_node_manager.py`): `_warm_pool_loop` now calls `_ensure_warm_pool()` after reclaiming timed-out pods. `allocate()` triggers replenishment in background.
+- **Orphan busy pod cleanup** (`k8s_node_manager.py`): `_reconcile_existing_pods` now detects and deletes busy pods left over from previous CP instances (session data from crashed CP).
+- **Pod always deleted on release** (`k8s_node_manager.py`): `release()` now always deletes pod + PVC instead of returning to idle pool, preventing session data leakage between users.
+- **Idle timeout reclaims all stale pods** (`k8s_node_manager.py`): Previously skipped first WARM_POOL_SIZE idle pods during timeout check. Now reclaims all pods exceeding BR_IDLE_TIMEOUT.
+- **Missing `redis` dependency** (`requirements.txt`): Added `redis` package required by state store on K8s deployments.
+
 ## [0.2.1] - 2026-04-15
 
 ### Added
