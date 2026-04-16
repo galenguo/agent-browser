@@ -368,6 +368,7 @@ class SnapshotResponse(BaseModel):
     elements: list[ElementInfo]
     raw_html_size: int | None = None
     snapshot_size: int | None = None
+    intervention: dict | None = None
 
 
 class AgentConfig(BaseModel):

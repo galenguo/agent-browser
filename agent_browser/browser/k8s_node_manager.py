@@ -2,6 +2,12 @@
 
 Creates and deletes br pods on demand, maintaining a warm pool of idle pods.
 CP pod uses this manager to allocate/release browser pods for sessions.
+
+Lifecycle:
+  startup → reconcile existing pods → fill warm pool to WARM_POOL_SIZE
+  allocate → grab idle pod (or create on-demand) → replenish warm pool
+  release → stop browser → delete pod + PVC → replenish warm pool
+  _warm_pool_loop (every 60s) → reclaim timed-out idle pods → replenish warm pool
 """
 
 from __future__ import annotations
@@ -71,15 +77,13 @@ class K8sBrowserNodeManager:
         logger.info("K8sBrowserNodeManager started")
 
     async def _reconcile_and_warm(self):
-        """Discover existing idle BR pods from k8s, then fill warm pool to minimum size."""
+        """Discover existing BR pods from k8s, clean orphans, then fill warm pool."""
         # Brief delay to allow DNS to propagate after pod startup
         await asyncio.sleep(5)
         await self._reconcile_existing_pods()
-        # Only fill to WARM_POOL_SIZE at startup; after that, rely on natural reuse + trim
-        async with self._lock:
-            idle_count = sum(1 for p in self._pods.values() if not p.busy)
-        if idle_count < WARM_POOL_SIZE:
-            await self._ensure_warm_pool()
+        await self._ensure_warm_pool()
+
+    # ── Public API ────────────────────────────────────────────────────
 
     async def allocate(self, session_id: str):
         """Find idle warm pod or create a new one, start browser, return K8sBrowserInstance."""
@@ -142,22 +146,29 @@ class K8sBrowserNodeManager:
             session_id=session_id,
         )
         logger.info(f"Allocated br pod {pod.pod_name} for session {session_id}")
+
+        # Replenish warm pool in background
+        asyncio.create_task(self._ensure_warm_pool())
         return instance
 
     async def release(self, session_id: str, pod_name: str):
-        """Stop browser and return pod to idle pool. Delete only if stop fails."""
+        """Stop browser and delete the br pod + PVC.
+
+        Pods are always deleted on release (not returned to idle pool) to prevent
+        session data leakage via persistent PVC profiles.
+        """
         async with self._lock:
-            pod = self._pods.get(pod_name)
+            pod = self._pods.pop(pod_name, None)
 
         if not pod:
             logger.warning(f"release: pod {pod_name} not found in registry")
+            # Still attempt deletion in case it exists in k8s
             await self._delete_br_pod(pod_name)
             return
 
-        # Stop browser
+        # Stop browser (best-effort)
         import aiohttp
 
-        stop_ok = False
         try:
             async with aiohttp.ClientSession() as http:
                 async with http.post(
@@ -165,28 +176,21 @@ class K8sBrowserNodeManager:
                     timeout=aiohttp.ClientTimeout(total=10),
                 ) as resp:
                     logger.info(f"browser/stop on {pod_name}: {resp.status}")
-                    stop_ok = resp.status == 200
         except Exception as e:
             logger.warning(f"browser/stop failed for {pod_name}: {e}")
 
-        if not stop_ok:
-            # Pod in bad state — delete it
-            async with self._lock:
-                self._pods.pop(pod_name, None)
-            await self._delete_br_pod(pod_name)
-            logger.info(f"Deleted unhealthy br pod {pod_name}")
-            return
+        await self._delete_br_pod(pod_name)
+        logger.info(f"Released and deleted br pod {pod_name}")
 
-        # Return pod to idle pool
+        # Replenish warm pool
+        asyncio.create_task(self._ensure_warm_pool())
+
+    # ── Internal helpers ─────────────────────────────────────────────
+
+    async def get_pod_info(self, pod_name: str) -> BrPodInfo | None:
+        """Look up a single pod by name (no K8s API call, local registry only)."""
         async with self._lock:
-            if pod_name in self._pods:
-                self._pods[pod_name].busy = False
-                self._pods[pod_name].session_id = None
-                self._pods[pod_name].last_idle_at = time.time()
-        logger.info(f"Returned br pod {pod_name} to idle pool")
-
-        # Trim excess idle pods in background
-        asyncio.create_task(self._trim_excess_idle())
+            return self._pods.get(pod_name)
 
     def _get_http_session(self):
         """Lazy-initialised shared aiohttp session (reused across health checks)."""
@@ -208,13 +212,6 @@ class K8sBrowserNodeManager:
             await self._http_session.close()
             self._http_session = None
         logger.info("K8sBrowserNodeManager shutdown complete")
-
-    # ── Internal helpers ─────────────────────────────────────────────
-
-    async def get_pod_info(self, pod_name: str) -> BrPodInfo | None:
-        """Look up a single pod by name (no K8s API call, local registry only)."""
-        async with self._lock:
-            return self._pods.get(pod_name)
 
     async def _get_pod_ip(self, pod_name: str) -> str:
         """Get pod IP address from k8s API."""
@@ -390,8 +387,10 @@ class K8sBrowserNodeManager:
             except Exception as e:
                 logger.warning(f"Failed to delete {kind} {name}: {e}")
 
+    # ── Reconciliation ───────────────────────────────────────────────
+
     async def _reconcile_existing_pods(self):
-        """Discover existing idle BR pods in k8s and register them in the warm pool."""
+        """Discover existing BR pods in k8s, clean orphan busy pods, register idle ones."""
         import aiohttp
 
         try:
@@ -402,16 +401,18 @@ class K8sBrowserNodeManager:
                     label_selector="app=agent-browser-br,managed-by=agent-browser-cp",
                 ),
             )
-            registered = 0
             cs = self._get_http_session()
+            to_delete: list[str] = []  # orphan busy pods to clean up
+
             for pod in pods.items:
                 pod_name = pod.metadata.name
                 phase = pod.status.phase if pod.status else None
                 if phase not in ("Running", "Pending"):
                     continue
+
                 pod_url = f"http://{pod_name}.agent-browser-br-headless.{BR_NAMESPACE}.svc.cluster.local:8080"
-                # Check if pod is actually idle (not serving a browser session)
-                # Retry with longer timeout to handle DNS propagation delays
+
+                # Check if pod is actually idle or busy
                 busy = False
                 health_ok = False
                 for attempt in range(3):
@@ -434,15 +435,38 @@ class K8sBrowserNodeManager:
                 if not health_ok:
                     continue  # Not reachable, skip
 
-                info = BrPodInfo(pod_name=pod_name, pod_url=pod_url, busy=busy)
+                if busy:
+                    # Orphan busy pod: browser session from previous cp instance
+                    # No session in pool_manager memory can release it — delete it
+                    logger.warning(
+                        f"Reconcile: found orphan busy pod {pod_name}, scheduling deletion"
+                    )
+                    to_delete.append(pod_name)
+                    continue
+
+                # Idle pod — register for warm pool
+                info = BrPodInfo(pod_name=pod_name, pod_url=pod_url)
                 async with self._lock:
                     self._pods[pod_name] = info
-                registered += 1
-                logger.info(f"Reconciled existing br pod {pod_name} (busy={busy})")
+                logger.info(f"Reconciled existing idle br pod {pod_name}")
 
-            logger.info(f"Reconciliation complete: registered {registered} existing br pods")
+            # Delete orphan busy pods (outside lock to avoid blocking)
+            for pod_name in to_delete:
+                try:
+                    await self._delete_br_pod(pod_name)
+                    logger.info(f"Reconcile: deleted orphan busy pod {pod_name}")
+                except Exception as e:
+                    logger.warning(f"Reconcile: failed to delete orphan pod {pod_name}: {e}")
+
+            idle_count = sum(1 for p in self._pods.values() if not p.busy)
+            logger.info(
+                f"Reconciliation complete: {idle_count} idle pods registered, "
+                f"{len(to_delete)} orphan busy pods deleted"
+            )
         except Exception as e:
             logger.error(f"Failed to reconcile existing br pods: {e}")
+
+    # ── Warm pool management ─────────────────────────────────────────
 
     async def _ensure_warm_pool(self):
         """Ensure warm pool has WARM_POOL_SIZE idle pods (create in parallel)."""
@@ -454,7 +478,7 @@ class K8sBrowserNodeManager:
             if needed <= 0:
                 return
 
-            logger.debug(f"Warm pool check: idle={idle_count}, needed={needed}")
+            logger.info(f"Warm pool: idle={idle_count}, creating {needed} pod(s)")
 
             async def _create_and_register():
                 pod = await self._create_br_pod()
@@ -470,28 +494,12 @@ class K8sBrowserNodeManager:
                 if isinstance(r, Exception):
                     logger.error(f"Failed to create warm br pod: {r}")
 
-    async def _trim_excess_idle(self):
-        """Delete idle pods beyond WARM_POOL_SIZE (oldest idle first)."""
-        to_delete: list[BrPodInfo] = []
-        async with self._lock:
-            idle_pods = [p for p in self._pods.values() if not p.busy]
-            if len(idle_pods) <= WARM_POOL_SIZE:
-                return
-            idle_pods.sort(key=lambda p: p.last_idle_at)
-            for p in idle_pods[WARM_POOL_SIZE:]:
-                self._pods.pop(p.pod_name, None)
-                to_delete.append(p)
-
-        for pod in to_delete:
-            logger.info(f"Trimming excess idle br pod {pod.pod_name}")
-            await self._delete_br_pod(pod.pod_name)
-
     async def _warm_pool_loop(self):
-        """Background task: idle-timeout cleanup + trim excess idle pods (runs every 60s)."""
+        """Background task: reclaim timed-out idle pods, then replenish (runs every 60s)."""
         while True:
             await asyncio.sleep(60)
             try:
-                # Delete idle pods that have exceeded idle timeout
+                # Delete ALL idle pods that exceeded idle timeout (not just excess)
                 to_reclaim: list[BrPodInfo] = []
                 async with self._lock:
                     idle_pods = [p for p in self._pods.values() if not p.busy]
@@ -505,7 +513,7 @@ class K8sBrowserNodeManager:
                     logger.info(f"Idle timeout: reclaiming br pod {pod.pod_name}")
                     await self._delete_br_pod(pod.pod_name)
 
-                # Trim any excess idle pods beyond WARM_POOL_SIZE
-                await self._trim_excess_idle()
+                # Replenish warm pool to WARM_POOL_SIZE
+                await self._ensure_warm_pool()
             except Exception as e:
                 logger.error(f"Warm pool loop error: {e}")

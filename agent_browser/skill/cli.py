@@ -67,17 +67,28 @@ def _err(msg: str) -> None:
 
 # ── Session cache ──────────────────────────────────────────────────────────────
 
+# Cache format: {"name": {"session_id": "...", "vnc_url": "..."}}
+# Legacy format: {"name": "session_id_str"} — auto-migrated on load.
 
-def _load_session_cache() -> dict[str, str]:
+
+def _load_session_cache() -> dict[str, dict]:
+    """Load session cache, migrating legacy str format to dict format."""
     try:
         if SESSION_CACHE.exists():
-            return json.loads(SESSION_CACHE.read_text(encoding="utf-8"))
+            raw = json.loads(SESSION_CACHE.read_text(encoding="utf-8"))
+            migrated: dict[str, dict] = {}
+            for key, value in raw.items():
+                if isinstance(value, str):
+                    migrated[key] = {"session_id": value, "vnc_url": ""}
+                elif isinstance(value, dict):
+                    migrated[key] = value
+            return migrated
     except Exception:
         pass
     return {}
 
 
-def _save_session_cache(cache: dict[str, str]) -> None:
+def _save_session_cache(cache: dict[str, dict]) -> None:
     SESSION_CACHE.parent.mkdir(parents=True, exist_ok=True)
     SESSION_CACHE.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
 
@@ -85,13 +96,27 @@ def _save_session_cache(cache: dict[str, str]) -> None:
 def _get_session_id(name: str | None) -> str | None:
     """Return cached session_id for the given name (or 'default')."""
     key = name or "default"
-    return _load_session_cache().get(key)
+    entry = _load_session_cache().get(key)
+    if isinstance(entry, dict):
+        return entry.get("session_id")
+    return None
 
 
-def _set_session_id(name: str | None, session_id: str) -> None:
+def _get_vnc_url(name: str | None) -> str | None:
+    """Return cached VNC URL for the given session name."""
+    key = name or "default"
+    entry = _load_session_cache().get(key)
+    if isinstance(entry, dict):
+        vnc = entry.get("vnc_url")
+        return vnc if vnc else None
+    return None
+
+
+def _set_session_id(name: str | None, session_id: str, vnc_url: str = "") -> None:
+    """Cache session_id and VNC URL for the given name."""
     key = name or "default"
     cache = _load_session_cache()
-    cache[key] = session_id
+    cache[key] = {"session_id": session_id, "vnc_url": vnc_url}
     _save_session_cache(cache)
 
 
@@ -238,8 +263,21 @@ def cmd_open(args: list[str]) -> None:
     url = args[0]
     session_name = _flag(args, "--session")
     sid = _require_session(session_name)
-    _rpc("POST", f"/sessions/{sid}/navigate", {"url": url})
-    _ok({"url": url})
+    result = _rpc("POST", f"/sessions/{sid}/navigate", {"url": url})
+
+    output: dict[str, Any] = {"url": result.get("url", url), "title": result.get("title", "")}
+
+    # Surface intervention detection from server
+    if result.get("intervention"):
+        output["intervention"] = result["intervention"]
+        if result.get("vnc_url"):
+            output["vnc_url"] = result["vnc_url"]
+        else:
+            vnc_url = _get_vnc_url(session_name)
+            if vnc_url:
+                output["vnc_url"] = vnc_url
+
+    _ok(output)
 
 
 def cmd_snapshot(args: list[str]) -> None:
@@ -252,6 +290,13 @@ def cmd_snapshot(args: list[str]) -> None:
     if iframe_selector:
         body["iframe_selector"] = iframe_selector
     result = _rpc("POST", f"/sessions/{sid}/snapshot", body)
+
+    # Surface intervention detection from server
+    if isinstance(result, dict) and result.get("intervention"):
+        vnc_url = _get_vnc_url(session_name)
+        if vnc_url and not result.get("vnc_url"):
+            result["vnc_url"] = vnc_url
+
     _ok(result)
 
 
@@ -575,13 +620,18 @@ def cmd_session(args: list[str]) -> None:
         sid = result.get("session_id", result.get("id", ""))
         if not sid:
             _err(f"No session_id returned: {result}")
-        _set_session_id(name, sid)
+
+        # Extract and cache VNC URL
+        vnc_url = ""
+        if "vnc_url" in result and result.get("vnc_url"):
+            vnc_url = result["vnc_url"]
+        elif "novnc_url" in result and result.get("novnc_url"):
+            vnc_url = result["novnc_url"]
+        _set_session_id(name, sid, vnc_url=vnc_url)
 
         output = {"name": name, "session_id": sid}
-        if "vnc_url" in result and result.get("vnc_url"):
-            output["vnc_url"] = result["vnc_url"]
-        elif "novnc_url" in result and result.get("novnc_url"):
-            output["vnc_url"] = result["novnc_url"]
+        if vnc_url:
+            output["vnc_url"] = vnc_url
 
         _ok(output)
 
@@ -699,6 +749,32 @@ def _require_session(name: str | None) -> str:
     return sid  # type: ignore[return-value]
 
 
+# ── Intervention commands ──────────────────────────────────────────────────────
+
+
+def cmd_check(args: list[str]) -> None:
+    """check [--session <name>] -- check if current page requires human intervention."""
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+    result = _rpc("GET", f"/sessions/{sid}/check-intervention")
+    _ok(result)
+
+
+def cmd_vnc(args: list[str]) -> None:
+    """vnc [--session <name>] -- print VNC URL for the session."""
+    session_name = _flag(args, "--session")
+    sid = _require_session(session_name)
+    vnc_url = _get_vnc_url(session_name)
+    if not vnc_url:
+        # Try fetching from API session status
+        try:
+            result = _rpc("GET", f"/sessions/{sid}")
+            vnc_url = result.get("vnc_url", "")
+        except Exception:
+            vnc_url = ""
+    _ok({"vnc_url": vnc_url or "VNC not available"})
+
+
 # ── Dispatch ───────────────────────────────────────────────────────────────────
 
 COMMANDS: dict[str, Any] = {
@@ -726,6 +802,8 @@ COMMANDS: dict[str, Any] = {
     "session": cmd_session,
     "daemon": cmd_daemon,
     "doctor": cmd_doctor,
+    "check": cmd_check,
+    "vnc": cmd_vnc,
 }
 
 
@@ -758,7 +836,9 @@ def main() -> None:
             "  dropdown options|select\n"
             "  session create|list|destroy\n"
             "  daemon status|stop\n"
-            "  doctor                    Run environment diagnostics\n\n"
+            "  doctor                    Run environment diagnostics\n"
+            "  check                     Check if page needs human intervention\n"
+            "  vnc                       Show VNC URL for manual access\n\n"
             "All commands accept --session <name> (default: 'default')\n"
             "All output is JSON: {\"success\": true, \"data\": {...}}"
         )

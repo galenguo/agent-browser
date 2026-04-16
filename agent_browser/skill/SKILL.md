@@ -74,15 +74,15 @@ agent-browser snapshot --session default -i
 ```bash
 agent-browser session create --name <name>
 # Returns: {"success": true, "data": {"name": "...", "session_id": "...", "vnc_url": "..."}}
-# vnc_url is present when available for manual login/verification
+# vnc_url is cached locally — retrieve anytime with: agent-browser vnc --session <name>
 agent-browser session list
 agent-browser session destroy <name>
 ```
 
-When login or CAPTCHA is required:
-1. Read `vnc_url` from session creation output
-2. Provide it to user: "Please complete login at: <vnc_url>"
-3. Wait for user confirmation before continuing automation
+When login or CAPTCHA is required, the `open` and `snapshot` commands automatically detect it and return an `intervention` field. Follow the HUMAN INTERVENTION protocol below when it appears. You can also manually retrieve the VNC URL at any time:
+```bash
+agent-browser vnc --session <name>
+```
 
 ### Navigation
 
@@ -113,7 +113,21 @@ agent-browser title --session <name>   # Check for "安全限制", "Access Denie
 agent-browser url --session <name>     # Check for unexpected redirects to /login, /captcha, /verify
 ```
 
-If an anti-bot or login page is detected: stop immediately, report to user with VNC URL, wait for confirmation.
+The `open` command automatically detects login, CAPTCHA, and anti-bot pages and returns an `intervention` field when detected. When `intervention` appears in the output, you MUST follow the HUMAN INTERVENTION protocol below.
+
+To manually check the current page state at any time:
+
+```bash
+agent-browser check --session <name>
+# Returns: {"url": "...", "title": "...", "intervention": {...}|null, "vnc_url": "..."}
+```
+
+To get the VNC URL at any time:
+
+```bash
+agent-browser vnc --session <name>
+# Returns: {"vnc_url": "https://..."}
+```
 
 ### Observation
 
@@ -229,20 +243,44 @@ All commands return JSON:
 {"success": false, "error": "..."}
 ```
 
+## HUMAN INTERVENTION (MANDATORY)
+
+> **This protocol is MANDATORY. You MUST NOT skip or ignore it.**
+
+When `open`, `snapshot`, or `check` returns an `intervention` field in the output, you MUST:
+
+1. **STOP** all automation immediately — do NOT attempt any further actions
+2. **Print** the VNC URL from the output to the user
+3. **Tell the user**: "Human intervention required: `{intervention.reason}`. Please complete at: `{vnc_url}`"
+4. **WAIT** for user confirmation before continuing automation
+5. **NEVER retry** the same action without user guidance
+
+Example output that triggers this protocol:
+```json
+{"success": true, "data": {
+  "url": "https://example.com/login",
+  "title": "请登录",
+  "intervention": {"type": "login", "reason": "Login page detected -- user authentication required"},
+  "vnc_url": "https://agent-browser-vnc.example.com/vnc/abc123/vnc.html?autoconnect=1"
+}}
+```
+
+If no VNC URL is in the output, retrieve it:
+```bash
+agent-browser vnc --session <name>
+```
+
+You do NOT need to manually check title/url patterns — the `intervention` field is generated automatically by the server. However, if you suspect the automatic detection missed something, you can manually check:
+```bash
+agent-browser check --session <name>
+```
+
 ## Error Recovery
 
 - Session not found: run `agent-browser session create --name <name>`
 - Element ref not found: call `snapshot` again and re-locate the element by text
-- **Login/captcha required**: 
-  - Stop automation immediately
-  - Check the session creation output for `vnc_url` field
-  - Provide the VNC URL to the user: "Please complete login manually at: <vnc_url>"
-  - Wait for user confirmation before continuing
-  - If no VNC URL available, ask user to check browser window directly
-- **Anti-bot / security page detected** (title contains "安全限制", "Access Denied", "Verify"; URL redirected to `/login`, `/captcha`, `/verify`):
-  - Stop automation immediately
-  - Report to user with current URL and VNC URL
-  - Do NOT retry the same URL — wait for user guidance
+- **Login/captcha required**: Follow the HUMAN INTERVENTION protocol above — stop, surface VNC URL, wait for confirmation
+- **Anti-bot / security page detected**: Follow the HUMAN INTERVENTION protocol — do NOT retry the same URL without user guidance
 - **Empty data from `eval`**: page not fully loaded — use `wait "body"` before extracting, or switch to `extract`
 - API unreachable: check `agent_browser/skill/config.yaml` service.url and network access
 
@@ -251,7 +289,7 @@ All commands return JSON:
 1. **Always `wait` after `open`** — never operate on a page before confirming it loaded
 2. **Throttle batch operations** — add `sleep 2` between consecutive page navigations
 3. **Prefer `extract` over `eval`** for data extraction — `eval` bypasses stealth delays
-4. **Verify page state after navigation** — check title/url for anti-bot or login redirects
+4. **Verify page state after navigation** — `open` auto-detects intervention; follow HUMAN INTERVENTION protocol when `intervention` field appears
 5. **Pause after interactions** — `sleep 1` after `click`/`fill`/`press` before next action
 6. **Reuse named sessions** — avoid creating new sessions repeatedly
 7. **Avoid screenshots** unless explicitly requested by user

@@ -495,6 +495,30 @@ async def get_title(session_id: str, api_key: str = Depends(require_api_key)):
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
 
+@app.get("/sessions/{session_id}/check-intervention")
+async def check_intervention(session_id: str, api_key: str = Depends(require_api_key)):
+    """Check if the current page requires human intervention."""
+    from agent_browser.detection import detect_intervention
+
+    pool = get_pool()
+    _get_owned_session(pool, session_id, api_key)
+    try:
+        url = await pool.get_url(session_id)
+        title = await pool.get_title(session_id)
+        intervention = detect_intervention(url, title)
+
+        vnc_url = None
+        session = pool.sessions.get(session_id)
+        if session and session.vnc_token:
+            vnc_base = os.environ.get("VNC_BASE_URL", "")
+            if vnc_base:
+                vnc_url = f"{vnc_base}/vnc/{session.vnc_token}/vnc.html?autoconnect=1&resize=scale"
+
+        return {"url": url, "title": title, "intervention": intervention, "vnc_url": vnc_url}
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+
 # ── Interaction ──────────────────────────────────────────────────────
 
 

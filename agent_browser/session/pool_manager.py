@@ -22,6 +22,7 @@ from browser_use import Agent, BrowserProfile, BrowserSession
 from playwright.async_api import Page, async_playwright
 
 from agent_browser.browser.instance_pool import BrowserInstancePool
+from agent_browser.detection import detect_intervention
 from agent_browser.models import (
     ClickRequest,
     DockerBrowserInstance,
@@ -1088,7 +1089,18 @@ class SessionPoolManager:
         if session:
             session.mark_activity()
 
-        return {"status": "ok", "url": page.url, "title": await page.title()}
+        result: dict = {"status": "ok", "url": page.url, "title": await page.title()}
+
+        # Intervention detection
+        intervention = detect_intervention(page.url, result["title"], request.url)
+        if intervention:
+            result["intervention"] = intervention
+            if session and session.vnc_token:
+                vnc_base = os.environ.get("VNC_BASE_URL", "")
+                if vnc_base:
+                    result["vnc_url"] = f"{vnc_base}/vnc/{session.vnc_token}/vnc.html?autoconnect=1&resize=scale"
+
+        return result
 
     async def snapshot(self, session_id: str, interactive_only: bool = True,
                        iframe_selector: str | None = None) -> SnapshotResponse:
@@ -1226,8 +1238,12 @@ class SessionPoolManager:
         if session:
             session.mark_activity()
 
+        # Intervention detection on snapshot
+        intervention = detect_intervention(result["url"], result["title"])
+
         return SnapshotResponse(
-            url=result["url"], title=result["title"], elements=[ElementInfo(**el) for el in result["elements"]]
+            url=result["url"], title=result["title"], elements=[ElementInfo(**el) for el in result["elements"]],
+            intervention=intervention,
         )
 
     async def click(self, session_id: str, request: ClickRequest) -> dict:
@@ -1352,7 +1368,17 @@ class SessionPoolManager:
         if session:
             session.mark_activity()
 
-        return {"status": "ok", "url": page.url}
+        result: dict = {"status": "ok", "url": page.url, "title": await page.title()}
+
+        intervention = detect_intervention(page.url, result["title"])
+        if intervention:
+            result["intervention"] = intervention
+            if session and session.vnc_token:
+                vnc_base = os.environ.get("VNC_BASE_URL", "")
+                if vnc_base:
+                    result["vnc_url"] = f"{vnc_base}/vnc/{session.vnc_token}/vnc.html?autoconnect=1&resize=scale"
+
+        return result
 
     async def mouse_move(self, session_id: str, x: float, y: float) -> dict:
         """Move mouse."""
