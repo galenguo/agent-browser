@@ -28,10 +28,8 @@ x11vnc \
     -nopw \
     -xkb \
     -noxrecord \
-    -noxfixes \
-    -noxdamage \
     -wait 5 \
-    -noncache \
+    -threads \
     2>/data/logs/x11vnc.log &
 sleep 1
 echo "[browser-node] x11vnc started"
@@ -49,7 +47,7 @@ echo "[browser-node] noVNC started"
 
 # ── 4. Browser Node API ───────────────────────────────────────
 echo "[browser-node] Starting Browser Node API on :8080..."
-cd /app/src
+cd /app
 exec python -m uvicorn agent_browser.browser.node_api:app \
     --host 0.0.0.0 \
     --port 8080 \

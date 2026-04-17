@@ -78,7 +78,6 @@ def _build_launch_args(cdp_port: int | None = None, proxy: str | None = None, ex
         "--remote-allow-origins=*",
         # -- Environment adaptation --
         "--no-sandbox",
-        "--disable-dev-shm-usage",
         "--window-size=1920,1080",
         "--window-position=0,0",
         "--start-maximized",
