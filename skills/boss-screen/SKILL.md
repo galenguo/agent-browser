@@ -140,10 +140,12 @@ echo ""
 
 ### Step 3: 流式筛选主循环
 
-**架构说明**：每次循环处理一个候选人卡片（cursor 递增），初筛通过后执行两次 eval：
+**架构说明**：每次循环处理一个候选人卡片（cursor 递增），初筛通过后执行三个步骤：
 - Eval 1：点击名字打开详情
 - sleep 2（等待详情面板渲染）
-- Eval 2：提取详情 + AI 精筛 + 收藏 + 关闭
+- Eval 2a：提取详情文本（不执行收藏）
+- Claude 决策点：根据详情评估是否收藏
+- Eval 2b：根据 Claude 决策执行收藏或跳过
 
 找到目标数量即停止，无需预先扫描全部候选人。
 
@@ -154,7 +156,6 @@ CURSOR=0
 SCROLL_COUNT=0
 MAX_SCROLL=5
 COLLECTED_LIST=""
-COLLECTED_DETAILS=""
 NEW_IDS=""
 
 echo "开始流式筛选..."
@@ -302,7 +303,7 @@ while [ "$COLLECTED" -lt "$target" ]; do
     fi
   fi
 
-  # ── Eval 2: 提取详情 + AI 精筛 + 收藏 + 关闭 ─────────────────────
+  # ── Eval 2a: 提取详情文本（不执行收藏）────────────────────
   DETAIL=$(stealth-browser eval "
   (() => {
     const iframe = document.querySelector('iframe');
@@ -312,101 +313,21 @@ while [ "$COLLECTED" -lt "$target" ]; do
     if (!popup) return JSON.stringify({status:'no_popup'});
 
     const detailText = popup.textContent.replace(/\s+/g,' ');
-    const aiPattern = /AI|大模型|LLM|机器学习|深度学习|NLP|CV|AIGC|RAG|向量数据库|Transformer|GPT|BERT|模型训练|模型部署|Prompt|微调|LangChain|Spring AI|智能体|Agent/i;
-    const hasAI = aiPattern.test(detailText);
     
     // 提取关键段落供 LLM 分析
     const extractSection = (title) => {
       const regex = new RegExp(title + '[：:]?([^]*?)(?=工作经历|项目经验|教育经历|个人优势|期望职位|$)', 'i');
       const match = detailText.match(regex);
-      return match ? match[1].trim().substring(0, 300) : '';
+      return match ? match[1].trim().substring(0, 400) : '';
     };
     
-    const sections = {
+    return JSON.stringify({
+      status: 'ok',
+      full_text: detailText.substring(0, 800),
       work_exp: extractSection('工作经历'),
       project_exp: extractSection('项目经验'),
       education: extractSection('教育经历'),
       advantage: extractSection('个人优势')
-    };
-
-    let collected = false;
-    let collectBtnFound = false;
-    if (hasAI) {
-      const likeBtn = doc.querySelector('.like-icon-and-text');
-      if (likeBtn) {
-        collectBtnFound = true;
-        
-        // Check if already favorited before clicking
-        const iconEl = likeBtn.querySelector('.like-icon');
-        const btnText = likeBtn.querySelector('.btn-text');
-        const alreadyFavorited = (iconEl && iconEl.className.includes('like-icon-active')) ||
-                                 (btnText && btnText.textContent.trim() === '已收藏');
-        
-        if (alreadyFavorited) {
-          // Already favorited, skip click
-          const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
-          if (closeBtn) closeBtn.click();
-          return JSON.stringify({status:'ok', has_ai:hasAI, collected:true, btn_found:true, already_favorited:true});
-        }
-        
-        likeBtn.click();
-        
-        // 使用 Promise 等待状态更新
-        return new Promise(resolve => {
-          setTimeout(() => {
-            // 检查子元素状态变化（实际变化在 .like-icon 上）
-            const iconEl = likeBtn.querySelector('.like-icon');
-            const btnText = likeBtn.querySelector('.btn-text');
-            const collected = (iconEl && iconEl.className.includes('like-icon-active')) || 
-                            (btnText && btnText.textContent.trim() === '已收藏');
-            
-            // 关闭详情面板
-            const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
-            if (closeBtn) closeBtn.click();
-            
-            resolve(JSON.stringify({status:'ok', has_ai:hasAI, collected:collected, btn_found:true}));
-          }, 1000);
-        });
-      } else {
-        const favBtn = Array.from(doc.querySelectorAll('button,[class*=\"btn\"],[class*=\"like\"]'))
-          .find(e => e.textContent.trim().includes('收藏'));
-        if (favBtn) {
-          collectBtnFound = true;
-          
-          // Check if already favorited before clicking
-          if (favBtn.textContent.trim() === '已收藏') {
-            // Already favorited, skip click
-            const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
-            if (closeBtn) closeBtn.click();
-            return JSON.stringify({status:'ok', has_ai:hasAI, collected:true, btn_found:true, already_favorited:true});
-          }
-          
-          favBtn.click();
-          
-          return new Promise(resolve => {
-            setTimeout(() => {
-              // 关闭详情面板
-              const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
-              if (closeBtn) closeBtn.click();
-              
-              resolve(JSON.stringify({status:'ok', has_ai:hasAI, collected:true, btn_found:true}));
-            }, 1000);
-          });
-        }
-      }
-    }
-
-    // 关闭详情面板
-    const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
-    if (closeBtn) closeBtn.click();
-
-    return JSON.stringify({
-      status:'ok', 
-      has_ai:hasAI, 
-      collected:collected, 
-      btn_found:collectBtnFound,
-      sections: sections,
-      detail_summary: detailText.substring(0, 500)
     });
   })()
   " --session boss)
@@ -415,50 +336,159 @@ while [ "$COLLECTED" -lt "$target" ]; do
   if [ $? -ne 0 ] || [ -z "$DETAIL_DATA" ] || [ "$DETAIL_DATA" = "{}" ]; then
     echo "  ✗ 详情数据解析失败，原始内容:"
     echo "$DETAIL" | head -c 200
+    # 关闭面板
+    stealth-browser eval "
+    (() => {
+      const iframe = document.querySelector('iframe');
+      const doc = iframe.contentDocument;
+      const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
+      if (closeBtn) closeBtn.click();
+      return 'closed';
+    })()
+    " --session boss > /dev/null
     continue
   fi
   
   DETAIL_STATUS=$(echo "$DETAIL_DATA" | jq -r '.status // "error"')
-  HAS_AI=$(echo "$DETAIL_DATA" | jq -r '.has_ai // false')
-  WAS_COLLECTED=$(echo "$DETAIL_DATA" | jq -r '.collected // false')
-  BTN_FOUND=$(echo "$DETAIL_DATA" | jq -r '.btn_found // false')
 
   if [ "$DETAIL_STATUS" = "no_popup" ]; then
     echo "  ✗ 详情面板未出现，跳过"
     continue
   fi
 
-  # 提取详情段落
-  WORK_EXP=$(echo "$DETAIL_DATA" | jq -r '.sections.work_exp // ""')
-  PROJECT_EXP=$(echo "$DETAIL_DATA" | jq -r '.sections.project_exp // ""')
-  DETAIL_SUMMARY=$(echo "$DETAIL_DATA" | jq -r '.detail_summary // ""')
+  # 提取详情字段
+  FULL_TEXT=$(echo "$DETAIL_DATA" | jq -r '.full_text // ""')
+  WORK_EXP=$(echo "$DETAIL_DATA" | jq -r '.work_exp // ""')
+  PROJECT_EXP=$(echo "$DETAIL_DATA" | jq -r '.project_exp // ""')
+  EDUCATION=$(echo "$DETAIL_DATA" | jq -r '.education // ""')
+  ADVANTAGE=$(echo "$DETAIL_DATA" | jq -r '.advantage // ""')
 
-  if [ "$HAS_AI" = "true" ]; then
-    REFINED_COUNT=$((REFINED_COUNT + 1))
+  # ── Claude 决策点: 评估候选人匹配度 ────────────────────────
+  echo ""
+  echo "=========================================="
+  echo "候选人: $CAND_NAME"
+  echo "年限: $CAND_YEARS 年 | 学校: $CAND_SCHOOL"
+  echo "初筛关键词: $CAND_AI"
+  echo ""
+  echo "【工作经历】"
+  echo "$WORK_EXP"
+  echo ""
+  echo "【项目经验】"
+  echo "$PROJECT_EXP"
+  echo ""
+  echo "【教育经历】"
+  echo "$EDUCATION"
+  echo ""
+  echo "【个人优势】"
+  echo "$ADVANTAGE"
+  echo ""
+  echo "筛选条件:"
+  echo "- 年限要求: $min_years ~ $max_years 年"
+  echo "- 关键词: $keywords"
+  echo "- 岗位要求: AI 相关项目研发经验"
+  echo "=========================================="
+  echo ""
+
+  # ★★★ Claude 决策点 ★★★
+  # 
+  # Claude: 请根据以上候选人详情，评估其与岗位的匹配度
+  #
+  # 评估维度:
+  # 1. 工作经历中是否有实质性的 AI 项目经验（权重 40%）
+  # 2. 项目经验的技术深度和业务价值（权重 30%）
+  # 3. 技术栈与岗位要求的匹配度（权重 20%）
+  # 4. 教育背景和个人优势（权重 10%）
+  #
+  # 决策规则:
+  # - 如果综合评估匹配度 >= 70 分: 在下一个 bash 代码块前执行 SHOULD_COLLECT="yes"
+  # - 如果综合评估匹配度 < 70 分: 在下一个 bash 代码块前执行 SHOULD_COLLECT="no"
+  #
+  # 请在执行下一个 bash 代码块之前，临时执行一个命令来设置 SHOULD_COLLECT 变量
+  # 例如: SHOULD_COLLECT="yes"  # 理由: 有 3 年 LLM 应用开发经验，参与过 RAG 项目
+
+  # ── Eval 2b: 根据 Claude 决策执行收藏或跳过 ──────────────
+  # 默认值: 如果 Claude 未设置 SHOULD_COLLECT，默认为 no
+  : ${SHOULD_COLLECT:="no"}
+
+  if [ "$SHOULD_COLLECT" = "yes" ]; then
+    echo "  ✓ Claude 评估: 符合要求，执行收藏"
+    
+    # 收藏逻辑（包含已收藏检查）
+    COLLECT_RESULT=$(stealth-browser eval "
+    (() => {
+      const iframe = document.querySelector('iframe');
+      const doc = iframe.contentDocument;
+      const likeBtn = doc.querySelector('.like-icon-and-text');
+      
+      if (!likeBtn) {
+        const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
+        if (closeBtn) closeBtn.click();
+        return JSON.stringify({status:'error', msg:'收藏按钮未找到'});
+      }
+      
+      // 检查是否已收藏
+      const iconEl = likeBtn.querySelector('.like-icon');
+      const btnText = likeBtn.querySelector('.btn-text');
+      const alreadyFavorited = (iconEl && iconEl.className.includes('like-icon-active')) ||
+                               (btnText && btnText.textContent.trim() === '已收藏');
+      
+      if (alreadyFavorited) {
+        const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
+        if (closeBtn) closeBtn.click();
+        return JSON.stringify({status:'ok', collected:true, already_favorited:true});
+      }
+      
+      likeBtn.click();
+      
+      return new Promise(resolve => {
+        setTimeout(() => {
+          const iconEl = likeBtn.querySelector('.like-icon');
+          const btnText = likeBtn.querySelector('.btn-text');
+          const collected = (iconEl && iconEl.className.includes('like-icon-active')) || 
+                          (btnText && btnText.textContent.trim() === '已收藏');
+          
+          const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
+          if (closeBtn) closeBtn.click();
+          
+          resolve(JSON.stringify({status:'ok', collected:collected}));
+        }, 1000);
+      });
+    })()
+    " --session boss)
+    
+    COLLECT_STATUS=$(echo "$COLLECT_RESULT" | jq -r '.data.result.status // "error"')
+    WAS_COLLECTED=$(echo "$COLLECT_RESULT" | jq -r '.data.result.collected // false')
+    
     if [ "$WAS_COLLECTED" = "true" ]; then
       COLLECTED=$((COLLECTED + 1))
+      REFINED_COUNT=$((REFINED_COUNT + 1))
       echo "  ★ 已收藏 [$COLLECTED/$target]"
-      # 输出详细信息供 LLM 后续分析
-      echo "    工作经历: ${WORK_EXP:0:150}"
-      echo "    项目经验: ${PROJECT_EXP:0:150}"
-      COLLECTED_LIST="${COLLECTED_LIST}${COLLECTED}. ${CAND_NAME} | ${CAND_YEARS}年 | ${CAND_SCHOOL} | ${CAND_AI}\n"
-      COLLECTED_DETAILS="${COLLECTED_DETAILS}--- 候选人 ${COLLECTED}: ${CAND_NAME} ---\n年限: ${CAND_YEARS}年 | 学校: ${CAND_SCHOOL} | 关键词: ${CAND_AI}\n工作经历: ${WORK_EXP:0:200}\n项目经验: ${PROJECT_EXP:0:200}\n详情摘要: ${DETAIL_SUMMARY:0:300}\n\n"
+      COLLECTED_LIST="${COLLECTED_LIST}${COLLECTED}. ${CAND_NAME} | ${CAND_YEARS}年 | ${CAND_SCHOOL}\n"
+      
       # 追加到已处理 ID
       if [ -z "$NEW_IDS" ]; then
         NEW_IDS="$CAND_ID"
       else
         NEW_IDS="${NEW_IDS},${CAND_ID}"
       fi
-    else
-      if [ "$BTN_FOUND" = "true" ]; then
-        echo "  ✓ 精筛通过但收藏状态未确认（可能已收藏）"
-      else
-        echo "  ✓ 精筛通过但收藏按钮未找到"
-      fi
     fi
   else
-    echo "  ✗ 精筛不通过"
+    echo "  ✗ Claude 评估: 不符合要求，跳过收藏"
+    
+    # 关闭详情面板
+    stealth-browser eval "
+    (() => {
+      const iframe = document.querySelector('iframe');
+      const doc = iframe.contentDocument;
+      const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
+      if (closeBtn) closeBtn.click();
+      return 'closed';
+    })()
+    " --session boss > /dev/null
   fi
+
+  # 重置决策变量，准备下一个候选人
+  unset SHOULD_COLLECT
 
   sleep 1
 done
@@ -501,29 +531,6 @@ if [ -n "$NEW_IDS" ]; then
       "$job_id" "$IDS_ARRAY" "$REFINED_COUNT" "$COLLECTED" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$CACHE_FILE"
   fi
   echo "缓存已更新: $CACHE_FILE"
-fi
-```
-
-### Step 5: LLM 语义分析
-
-筛选完成后，输出候选人详情供 Claude 进行语义分析和评分。
-
-```bash
-if [ -n "$COLLECTED_DETAILS" ] && [ "$COLLECTED" -gt 0 ]; then
-  echo ""
-  echo "========== LLM 候选人分析 =========="
-  echo ""
-  printf '%b' "$COLLECTED_DETAILS"
-  echo "====================================="
-  echo ""
-  echo "请根据以上候选人详情，对每位候选人进行评估:"
-  echo "- 匹配度评分 (0-100)"
-  echo "- 核心优势"
-  echo "- 潜在风险"
-  echo "- 推荐优先级 (高/中/低)"
-  echo ""
-  echo "筛选条件: 年限 $min_years~$max_years 年, 关键词: $keywords"
-  echo "岗位要求: AI 相关项目研发经验"
 fi
 ```
 
