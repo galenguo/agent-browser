@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM registry-cn-gimc-local.gimccloud.com/docker.io/library/python:3.11-slim
 
 # 使用阿里云 Debian 镜像源（国内网络加速）
 RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
@@ -55,9 +55,13 @@ RUN pip install --upgrade pip setuptools wheel && \
     fastapi \
     uvicorn[standard]
 
-# 只下载 CloakBrowser 二进制（不下载 patchright 的 Chromium，CloakBrowser 自带）
-# 这样节省约 1GB 空间
-RUN python -c "import cloakbrowser; cloakbrowser.ensure_binary()" || true
+# 预下载 CloakBrowser 二进制（必须成功，否则运行时会超时）
+# 重试 3 次，每次超时 300s
+RUN for i in 1 2 3; do \
+        python -c "import cloakbrowser; cloakbrowser.ensure_binary()" && break || \
+        (echo "CloakBrowser download attempt $i failed, retrying..." && sleep 10); \
+    done && \
+    python -c "import cloakbrowser; print('CloakBrowser binary:', cloakbrowser.ensure_binary())"
 
 # 清理编译依赖（节省约 200MB）
 RUN apt-get purge -y gcc python3-dev && \
