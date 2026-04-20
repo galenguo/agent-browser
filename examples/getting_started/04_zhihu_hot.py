@@ -1,4 +1,4 @@
-"""Agent Browser 示例：知乎热榜提取
+"""Stealth Browser 示例：知乎热榜提取
 
 运行前确保：
   1. CloakBrowser 已启动（CDP 端口 19222）
@@ -6,8 +6,8 @@
 """
 import asyncio
 import json
-from agent_browseradapters.runner import run_adapter
-from agent_browsermain import create_session
+from stealth_browser.adapters.runner import run_adapter
+from stealth_browser.main import create_session
 
 
 async def main():

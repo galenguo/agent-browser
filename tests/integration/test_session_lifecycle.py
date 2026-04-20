@@ -26,8 +26,8 @@ def facade_with_mock(mock_backend, skill_config_no_stealth):
 
     Returns (main_module, config) tuple for test convenience.
     """
-    from agent_browser import main as skill_main
-    from agent_browser.config import SkillConfig
+    from stealth_browser import main as skill_main
+    from stealth_browser.config import SkillConfig
 
     async def _mock_select_backend(config: SkillConfig):
         return mock_backend
@@ -233,7 +233,7 @@ class TestRealBrowserCycle:
         Uses httpbin.org/html which returns a simple HTML page.
         No LLM keys or external services needed.
         """
-        from agent_browser import main as skill_main
+        from stealth_browser import main as skill_main
 
         skill_main.configure(
             cdp_url=real_cdp_url,

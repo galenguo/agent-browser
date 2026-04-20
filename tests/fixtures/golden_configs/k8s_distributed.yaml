@@ -21,7 +21,7 @@ stealth:
   enabled: true
   mode: full
 k8s:
-  namespace: "agent-browser-prod"
+  namespace: "stealth-browser-prod"
   context: "prod-cluster"
   registry: "ghcr.io/myorg"
   storage_class: "ssd-fast"

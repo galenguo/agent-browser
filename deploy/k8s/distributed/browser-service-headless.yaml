@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: agent-browser-br-headless
-  namespace: agent-browser
+  name: stealth-browser-br-headless
+  namespace: stealth-browser
   labels:
-    app: agent-browser-br
+    app: stealth-browser-br
 spec:
   clusterIP: None
   selector:
-    app: agent-browser-br
+    app: stealth-browser-br
   ports:
   - name: browser-api
     port: 8080

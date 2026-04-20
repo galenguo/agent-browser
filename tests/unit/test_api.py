@@ -16,7 +16,7 @@ import pytest
 
 
 def _api_available():
-    """Check if the agent-browser API server is reachable and healthy."""
+    """Check if the stealth-browser API server is reachable and healthy."""
     try:
         import httpx
 

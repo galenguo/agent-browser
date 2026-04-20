@@ -49,11 +49,11 @@ create_builder() {
 build_aio() {
     print_info "构建 All-in-One 镜像..."
     print_info "平台: $PLATFORMS"
-    print_info "镜像: ${REGISTRY_URL}/agent-browser:${TAG}"
+    print_info "镜像: ${REGISTRY_URL}/stealth-browser:${TAG}"
 
     docker buildx build \
         --platform $PLATFORMS \
-        -t ${REGISTRY_URL}/agent-browser:${TAG} \
+        -t ${REGISTRY_URL}/stealth-browser:${TAG} \
         -f docker/Dockerfile \
         --push \
         .
@@ -65,11 +65,11 @@ build_aio() {
 build_api() {
     print_info "构建 API 镜像..."
     print_info "平台: $PLATFORMS"
-    print_info "镜像: ${REGISTRY_URL}/agent-browser-api:${TAG}"
+    print_info "镜像: ${REGISTRY_URL}/stealth-browser-api:${TAG}"
 
     docker buildx build \
         --platform $PLATFORMS \
-        -t ${REGISTRY_URL}/agent-browser-api:${TAG} \
+        -t ${REGISTRY_URL}/stealth-browser-api:${TAG} \
         -f docker/Dockerfile.api \
         --push \
         .
@@ -81,11 +81,11 @@ build_api() {
 build_browser() {
     print_info "构建 Browser 镜像..."
     print_info "平台: $BROWSER_PLATFORM (仅 linux/amd64)"
-    print_info "镜像: ${REGISTRY_URL}/agent-browser-browser:${TAG}"
+    print_info "镜像: ${REGISTRY_URL}/stealth-browser-browser:${TAG}"
 
     docker buildx build \
         --platform $BROWSER_PLATFORM \
-        -t ${REGISTRY_URL}/agent-browser-browser:${TAG} \
+        -t ${REGISTRY_URL}/stealth-browser-browser:${TAG} \
         -f docker/Dockerfile.browser \
         --push \
         .
@@ -97,7 +97,7 @@ build_browser() {
 verify_images() {
     print_info "验证镜像..."
 
-    for image in "agent-browser" "agent-browser-api" "agent-browser-browser"; do
+    for image in "stealth-browser" "stealth-browser-api" "stealth-browser-browser"; do
         print_info "检查 ${REGISTRY_URL}/${image}:${TAG}"
         if docker manifest inspect ${REGISTRY_URL}/${image}:${TAG} &> /dev/null; then
             print_success "${image} 镜像验证成功"
@@ -110,7 +110,7 @@ verify_images() {
 # 主函数
 main() {
     echo ""
-    print_info "Agent Browser 多架构镜像构建"
+    print_info "Stealth Browser 多架构镜像构建"
     echo ""
 
     # 检查环境
@@ -132,9 +132,9 @@ main() {
     print_success "所有镜像构建完成！"
     echo ""
     print_info "镜像列表:"
-    echo "  - ${REGISTRY_URL}/agent-browser:${TAG}"
-    echo "  - ${REGISTRY_URL}/agent-browser-api:${TAG}"
-    echo "  - ${REGISTRY_URL}/agent-browser-browser:${TAG}"
+    echo "  - ${REGISTRY_URL}/stealth-browser:${TAG}"
+    echo "  - ${REGISTRY_URL}/stealth-browser-api:${TAG}"
+    echo "  - ${REGISTRY_URL}/stealth-browser-browser:${TAG}"
     echo ""
 }
 

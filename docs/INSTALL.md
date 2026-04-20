@@ -1,6 +1,6 @@
-# Agent Browser 安装指南
+# Stealth Browser 安装指南
 
-本文档提供 Agent Browser 在不同平台、不同部署模式下的详细安装指南。
+本文档提供 Stealth Browser 在不同平台、不同部署模式下的详细安装指南。
 
 ## 目录
 
@@ -48,8 +48,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-org/agent-browser.git
-cd agent-browser
+git clone https://github.com/your-org/stealth-browser.git
+cd stealth-browser
 
 # 运行安装脚本
 ./bin/install.sh
@@ -102,7 +102,7 @@ nano .env
 mkdir -p /data/profiles /data/logs
 
 # 启动 API
-python3 -m uvicorn agent_browser.api:app --reload --port 8000
+python3 -m uvicorn stealth_browser.api:app --reload --port 8000
 ```
 
 #### 4. 验证
@@ -144,7 +144,7 @@ sudo mkdir -p /data/profiles /data/logs
 sudo chown -R $USER:$USER /data
 
 # 启动 API
-python3 -m uvicorn agent_browser.api:app --reload --port 8000
+python3 -m uvicorn stealth_browser.api:app --reload --port 8000
 ```
 
 ### Linux (CentOS/RHEL)
@@ -187,7 +187,7 @@ docker-compose --version
 ./deploy/docker/build-multiarch.sh --registry localhost:5000
 
 # 或手动构建
-docker build -f deploy/docker/Dockerfile -t agent-browser:latest .
+docker build -f deploy/docker/Dockerfile -t stealth-browser:latest .
 ```
 
 #### 2. 配置环境
@@ -333,13 +333,13 @@ kubectl apply -f deploy/k8s/browser-service.yaml
 
 ```bash
 # 检查 Pod 状态
-kubectl get pods -n agent-browser
+kubectl get pods -n stealth-browser
 
 # 检查 Service
-kubectl get svc -n agent-browser
+kubectl get svc -n stealth-browser
 
 # 获取访问地址
-kubectl get svc agent-browser-aio -n agent-browser
+kubectl get svc stealth-browser-aio -n stealth-browser
 
 # 测试健康检查
 curl http://<node-ip>:<node-port>/health
@@ -361,7 +361,7 @@ curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
 ```bash
 # 复制 values 文件
-cp deploy/helm/agent-browser/values.yaml my-values.yaml
+cp deploy/helm/stealth-browser/values.yaml my-values.yaml
 
 # 编辑配置
 nano my-values.yaml
@@ -371,21 +371,21 @@ nano my-values.yaml
 
 ```bash
 # All-in-One 模式
-helm install agent-browser ./deploy/helm/agent-browser \
-  -f deploy/helm/agent-browser/values-aio.yaml \
+helm install stealth-browser ./deploy/helm/stealth-browser \
+  -f deploy/helm/stealth-browser/values-aio.yaml \
   --set secrets.anthropicApiKey=your-key \
   --set secrets.openaiApiKey=your-key \
   --set image.registry=registry.example.com \
-  --namespace agent-browser \
+  --namespace stealth-browser \
   --create-namespace
 
 # 分布式模式
-helm install agent-browser ./deploy/helm/agent-browser \
-  -f deploy/helm/agent-browser/values-distributed.yaml \
+helm install stealth-browser ./deploy/helm/stealth-browser \
+  -f deploy/helm/stealth-browser/values-distributed.yaml \
   --set secrets.anthropicApiKey=your-key \
   --set secrets.openaiApiKey=your-key \
   --set image.registry=registry.example.com \
-  --namespace agent-browser \
+  --namespace stealth-browser \
   --create-namespace
 ```
 
@@ -393,27 +393,27 @@ helm install agent-browser ./deploy/helm/agent-browser \
 
 ```bash
 # 检查 Release
-helm list -n agent-browser
+helm list -n stealth-browser
 
 # 检查 Pod
-kubectl get pods -n agent-browser
+kubectl get pods -n stealth-browser
 
 # 检查 Service
-kubectl get svc -n agent-browser
+kubectl get svc -n stealth-browser
 ```
 
 #### 5. 升级
 
 ```bash
-helm upgrade agent-browser ./deploy/helm/agent-browser \
+helm upgrade stealth-browser ./deploy/helm/stealth-browser \
   -f my-values.yaml \
-  --namespace agent-browser
+  --namespace stealth-browser
 ```
 
 #### 6. 卸载
 
 ```bash
-helm uninstall agent-browser --namespace agent-browser
+helm uninstall stealth-browser --namespace stealth-browser
 ```
 
 ---
@@ -432,7 +432,7 @@ helm uninstall agent-browser --namespace agent-browser
 docker builder prune -a
 
 # 重新构建
-docker build --no-cache -f deploy/docker/Dockerfile -t agent-browser:latest .
+docker build --no-cache -f deploy/docker/Dockerfile -t stealth-browser:latest .
 ```
 
 #### 2. Kubernetes Pod 无法启动
@@ -442,17 +442,17 @@ docker build --no-cache -f deploy/docker/Dockerfile -t agent-browser:latest .
 **解决：**
 ```bash
 # 检查镜像是否存在
-docker manifest inspect registry.example.com/agent-browser:latest
+docker manifest inspect registry.example.com/stealth-browser:latest
 
 # 检查 imagePullSecrets
-kubectl get secret -n agent-browser
+kubectl get secret -n stealth-browser
 
 # 创建 imagePullSecret
 kubectl create secret docker-registry registry-secret \
   --docker-server=registry.example.com \
   --docker-username=your-username \
   --docker-password=your-password \
-  -n agent-browser
+  -n stealth-browser
 ```
 
 #### 3. 健康检查失败
@@ -462,13 +462,13 @@ kubectl create secret docker-registry registry-secret \
 **解决：**
 ```bash
 # 检查日志
-kubectl logs -n agent-browser <pod-name>
+kubectl logs -n stealth-browser <pod-name>
 
 # 检查环境变量
-kubectl exec -n agent-browser <pod-name> -- env
+kubectl exec -n stealth-browser <pod-name> -- env
 
 # 检查 Secret
-kubectl get secret agent-browser-secret -n agent-browser -o yaml
+kubectl get secret stealth-browser-secret -n stealth-browser -o yaml
 ```
 
 #### 4. 浏览器无法启动
@@ -478,7 +478,7 @@ kubectl get secret agent-browser-secret -n agent-browser -o yaml
 **解决：**
 ```bash
 # 检查共享内存
-kubectl exec -n agent-browser <pod-name> -- df -h /dev/shm
+kubectl exec -n stealth-browser <pod-name> -- df -h /dev/shm
 
 # 增加共享内存
 # 在 Deployment 中添加：
@@ -493,15 +493,15 @@ kubectl exec -n agent-browser <pod-name> -- df -h /dev/shm
 
 **Docker：**
 ```bash
-docker logs agent-browser
-docker logs -f agent-browser  # 实时查看
+docker logs stealth-browser
+docker logs -f stealth-browser  # 实时查看
 ```
 
 **Kubernetes：**
 ```bash
-kubectl logs -n agent-browser <pod-name>
-kubectl logs -n agent-browser <pod-name> -f  # 实时查看
-kubectl logs -n agent-browser <pod-name> --previous  # 查看上一个容器的日志
+kubectl logs -n stealth-browser <pod-name>
+kubectl logs -n stealth-browser <pod-name> -f  # 实时查看
+kubectl logs -n stealth-browser <pod-name> --previous  # 查看上一个容器的日志
 ```
 
 ---
@@ -516,7 +516,7 @@ kubectl logs -n agent-browser <pod-name> --previous  # 查看上一个容器的�
 
 ```yaml
 services:
-  agent-browser:
+  stealth-browser:
     deploy:
       resources:
         limits:

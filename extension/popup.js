@@ -1,5 +1,5 @@
 /**
- * Agent Browser Bridge -- Popup Controller
+ * Stealth Browser Bridge -- Popup Controller
  *
  * Queries background service worker for connection status, tab info,
  * and session stats. Renders a live status panel with auto-refresh.

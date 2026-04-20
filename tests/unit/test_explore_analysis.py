@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-from agent_browser.explore.analysis import (
+from stealth_browser.explore.analysis import (
     DiscoveredStore,
     InferredCapability,
     classify_param,

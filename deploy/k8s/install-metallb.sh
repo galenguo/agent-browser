@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== Agent Browser: Install MetalLB ==="
+echo "=== Stealth Browser: Install MetalLB ==="
 
 # Step 1: Apply MetalLB manifest (Namespace + CRDs + Controller)
 echo "Applying MetalLB manifests..."
@@ -17,7 +17,7 @@ cat <<'EOF' | kubectl apply -f -
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
-  name: agent-browser-pool
+  name: stealth-browser-pool
   namespace: metallb-system
 spec:
   addresses:
@@ -26,11 +26,11 @@ spec:
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
-  name: agent-browser-advert
+  name: stealth-browser-advert
   namespace: metallb-system
 spec:
   ipAddressPools:
-  - agent-browser-pool
+  - stealth-browser-pool
 EOF
 
 echo ""

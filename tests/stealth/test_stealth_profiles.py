@@ -5,7 +5,7 @@ from unittest import mock
 
 import pytest
 
-from agent_browser.stealth.profiles import (
+from stealth_browser.stealth.profiles import (
     BALANCED_PROFILE,
     BUILTIN_PROFILES,
     FULL_PROFILE,
@@ -81,26 +81,26 @@ class TestResolveStealthProfile:
 class TestProfileFromEnv:
     def test_default_is_minimal(self):
         with mock.patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("AGENT_BROWSER_STEALTH_PROFILE", None)
+            os.environ.pop("STEALTH_BROWSER_STEALTH_PROFILE", None)
             profile = profile_from_env()
         assert profile is MINIMAL_PROFILE
 
     def test_env_full(self):
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_STEALTH_PROFILE": "full"}):
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_STEALTH_PROFILE": "full"}):
             assert profile_from_env() is FULL_PROFILE
 
     def test_env_off(self):
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_STEALTH_PROFILE": "off"}):
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_STEALTH_PROFILE": "off"}):
             assert profile_from_env() is OFF_PROFILE
 
     def test_env_unknown_falls_back_to_full(self):
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_STEALTH_PROFILE": "bogus"}):
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_STEALTH_PROFILE": "bogus"}):
             profile = profile_from_env()
         assert profile is FULL_PROFILE
 
     def test_env_unknown_logs_warning(self, caplog):
         import logging
-        with caplog.at_level(logging.WARNING, logger="agent_browser.stealth.profiles"):
-            with mock.patch.dict(os.environ, {"AGENT_BROWSER_STEALTH_PROFILE": "bogus"}):
+        with caplog.at_level(logging.WARNING, logger="stealth_browser.stealth.profiles"):
+            with mock.patch.dict(os.environ, {"STEALTH_BROWSER_STEALTH_PROFILE": "bogus"}):
                 profile_from_env()
         assert "bogus" in caplog.text

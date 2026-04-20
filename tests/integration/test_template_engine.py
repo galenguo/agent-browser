@@ -13,7 +13,7 @@ These are integration-level tests for template.py — proving the engine works
 correctly in the context it's used (pipeline variable substitution).
 """
 
-from agent_browser.pipeline.template import (
+from stealth_browser.pipeline.template import (
     PIPE_FILTERS,
     TemplateContext,
     apply_filter,

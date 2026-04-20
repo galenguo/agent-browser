@@ -9,12 +9,12 @@ cd "$(dirname "$0")/.."
 
 docker build \
   -f docker/Dockerfile.browser \
-  -t agent-browser-browser:latest \
+  -t stealth-browser-browser:latest \
   ../..
 
 echo "✅ Browser container image built successfully"
 echo ""
-echo "Image: agent-browser-browser:latest"
+echo "Image: stealth-browser-browser:latest"
 echo ""
 echo "Test the image:"
-echo "  docker run --rm -p 19222:19222 agent-browser-browser:latest"
+echo "  docker run --rm -p 19222:19222 stealth-browser-browser:latest"

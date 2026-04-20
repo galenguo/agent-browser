@@ -1,6 +1,6 @@
 # 部署脚本说明
 
-本目录包含 Agent Browser 的所有部署脚本。
+本目录包含 Stealth Browser 的所有部署脚本。
 
 ## 脚本列表
 
@@ -30,7 +30,7 @@
 
 | 脚本 | 描述 | 用途 |
 |------|------|------|
-| `test_openclaw_e2e.sh` | OpenClaw × agent-browser E2E 测试 | 通过 OpenClaw agent CLI 调用 skill，验证 4 个核心场景 |
+| `test_openclaw_e2e.sh` | OpenClaw × stealth-browser E2E 测试 | 通过 OpenClaw agent CLI 调用 skill，验证 4 个核心场景 |
 
 #### test_openclaw_e2e.sh 使用说明
 
@@ -38,7 +38,7 @@
 - FastAPI 服务运行中（`localhost:8000`）
 - OpenClaw gateway 运行中（`ws://localhost:18789`）
 - `openclaw` 命令在 PATH 中
-- agent-browser skill 已安装到 `~/.openclaw/skills/agent-browser/`
+- stealth-browser skill 已安装到 `~/.openclaw/skills/stealth-browser/`
 
 **运行：**
 ```bash
@@ -172,10 +172,10 @@ docker builder prune -a
 kubectl cluster-info
 
 # 查看 Pod 日志
-kubectl logs -n agent-browser <pod-name>
+kubectl logs -n stealth-browser <pod-name>
 
 # 查看事件
-kubectl get events -n agent-browser --sort-by='.lastTimestamp'
+kubectl get events -n stealth-browser --sort-by='.lastTimestamp'
 ```
 
 ## 详细文档

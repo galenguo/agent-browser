@@ -13,15 +13,15 @@ echo ""
 cd "$(dirname "$0")/../docker"
 
 # 检查浏览器镜像是否存在
-if ! docker images | grep -q "agent-browser-browser"; then
+if ! docker images | grep -q "stealth-browser-browser"; then
     echo "⚠️  Browser image not found. Building..."
     ../scripts/build-browser-image.sh
 fi
 
 # 创建 Docker 网络（如果不存在）
-if ! docker network ls | grep -q "agent-browser-network"; then
+if ! docker network ls | grep -q "stealth-browser-network"; then
     echo "📡 Creating Docker network..."
-    docker network create agent-browser-network
+    docker network create stealth-browser-network
 fi
 
 # 启动 API 服务器
@@ -37,7 +37,7 @@ echo ""
 echo "Browser containers will be created automatically when sessions are created."
 echo ""
 echo "View logs:"
-echo "  docker logs -f agent-browser-api"
+echo "  docker logs -f stealth-browser-api"
 echo ""
 echo "Stop:"
 echo "  docker-compose --profile distributed down"

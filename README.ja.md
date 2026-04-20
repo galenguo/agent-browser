@@ -1,13 +1,13 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
-[![PyPI version](https://img.shields.io/pypi/v/agent-browser.svg)](https://pypi.org/project/agent-browser/)
-[![CI](https://github.com/galen/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/galen/agent-browser/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/stealth-browser.svg)](https://pypi.org/project/stealth-browser/)
+[![CI](https://github.com/galen/stealth-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/galen/stealth-browser/actions/workflows/ci.yml)
 
-# Agent Browser
+# Stealth Browser
 
 > [browser-use](https://github.com/browser-use/browser-use) に基づく検知回避ブラウザ自動化フレームワーク。
 
-Agent Browser は **browser-use** に産業級の検知回避機能、YAML パイプラインエンジン v2.3、サイト探索、アダプタ合成機能を追加します。検知システムでブロックされる **browser-use 上級ユーザー** のために設計されています。
+Stealth Browser は **browser-use** に産業級の検知回避機能、YAML パイプラインエンジン v2.3、サイト探索、アダプタ合成機能を追加します。検知システムでブロックされる **browser-use 上級ユーザー** のために設計されています。
 
 ## 主な機能
 
@@ -19,12 +19,12 @@ Agent Browser は **browser-use** に産業級の検知回避機能、YAML パ�
 ## クイックスタート
 
 ```bash
-pip install agent-browser
+pip install stealth-browser
 ```
 
 ```python
 import asyncio
-from agent_browser import create_session, open_page, snapshot, click, fill
+from stealth_browser import create_session, open_page, snapshot, click, fill
 
 async def main():
     session_id = await create_session()
@@ -81,21 +81,21 @@ asyncio.run(main())
 
 ```bash
 # ベーシック（ステルス層 6-7 のみ、標準 Playwright で動作）
-pip install agent-browser
+pip install stealth-browser
 
 # フル検知回避（全 7 層、CloakBrowser 要）
-pip install agent-browser[cloak]
+pip install stealth-browser[cloak]
 
 # サーバーモード含む（FastAPI + LLM 統合）
-pip install agent-browser[full]
+pip install stealth-browser[full]
 ```
 
 <details>
 <summary>ソースからインストール</summary>
 
 ```bash
-git clone https://github.com/galen/agent-browser.git
-cd agent-browser
+git clone https://github.com/galen/stealth-browser.git
+cd stealth-browser
 pip install -e ".[full]"
 playwright install chromium
 ```
@@ -108,7 +108,7 @@ playwright install chromium
 
 ```python
 import asyncio
-from agent_browser import create_session, open_page, snapshot, click, fill, evaluate
+from stealth_browser import create_session, open_page, snapshot, click, fill, evaluate
 
 async def main():
     session_id = await create_session()
@@ -126,10 +126,10 @@ asyncio.run(main())
 
 ```python
 import asyncio
-from agent_browser import AgentBrowser
+from stealth_browser import StealthBrowser
 
 async def main():
-    async with AgentBrowser() as ab:
+    async with StealthBrowser() as ab:
         await ab.create_session()
         await ab.open_page("https://example.com")
         snap = await ab.snapshot()
@@ -143,8 +143,8 @@ asyncio.run(main())
 ### サーバーモード（FastAPI）
 
 ```bash
-pip install agent-browser[full]
-uvicorn agent_browser.api:app --port 8000
+pip install stealth-browser[full]
+uvicorn stealth_browser.api:app --port 8000
 curl http://localhost:8000/health
 ```
 
@@ -166,7 +166,7 @@ curl http://localhost:8000/health
 ### パイプラインモード
 
 ```python
-from agent_browser.pipeline import PipelineExecutor
+from stealth_browser.pipeline import PipelineExecutor
 
 executor = PipelineExecutor(stealth_enabled=True)
 result = await executor.run("adapters/my-site.yaml")
@@ -175,8 +175,8 @@ result = await executor.run("adapters/my-site.yaml")
 ### 探索モード
 
 ```python
-from agent_browser.explore import Explorer, Synthesizer
-from agent_browser import create_session, open_page
+from stealth_browser.explore import Explorer, Synthesizer
+from stealth_browser import create_session, open_page
 
 async def main():
     session_id = await create_session()
@@ -195,7 +195,7 @@ asyncio.run(main())
 ### CLI
 
 ```bash
-agent-browser --help
+stealth-browser --help
 ```
 
 ## 公開 API リファレンス
@@ -223,10 +223,10 @@ agent-browser --help
 ## アーキテクチャ
 
 ```
-agent_browser/
+stealth_browser/
 ├── __init__.py      # 公開 API エクスポート + __version__
 ├── main.py          # ファサード API（create_session, snapshot, click, run_task 等）
-├── client.py        # AgentBrowser OOP インターフェース（セッショントラッキング、コンテキストマネージャ）
+├── client.py        # StealthBrowser OOP インターフェース（セッショントラッキング、コンテキストマネージャ）
 ├── config.py        # SkillConfig データクラス + モード検出
 ├── browser/         # バックエンド ABC + 実装（local, remote, extension）
 ├── stealth/         # 検知回避：middleware, enhancer, actions, patches
@@ -251,7 +251,7 @@ agent_browser/
 
 ## browser-use との比較
 
-| 機能 | browser-use | Agent Browser |
+| 機能 | browser-use | Stealth Browser |
 |------|------------|-------------|
 | AI Agent 自動化 | 対応 | 対応（browser-use ラッパー） |
 | 検知回避 | なし | 7 層防御スタック |

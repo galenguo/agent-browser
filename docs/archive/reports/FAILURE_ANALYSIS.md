@@ -1,4 +1,4 @@
-# Agent Browser 失败原因分析报告
+# Stealth Browser 失败原因分析报告
 
 **分析时间：** 2026-03-31 19:15  
 **问题：** 测试操作失败，无法完成场景测试
@@ -103,7 +103,7 @@ python -m src.cli.commands navigate goto --session test --url xxx
 **需要的实现：**
 ```python
 # 1. 启动浏览器作为独立进程
-# 2. 保存会话信息到文件（~/.agent-browser/sessions.json）
+# 2. 保存会话信息到文件（~/.stealth-browser/sessions.json）
 # 3. Python 进程退出，浏览器继续运行
 # 4. 后续命令从文件读取会话信息连接
 ```
@@ -184,7 +184,7 @@ ps aux | grep -E "chromium|CloakBrowser"
 
 ### 测试 3: 检查 Profile 目录
 ```bash
-ls -la /tmp/agent_browser_profiles/test-scenario1-full
+ls -la /tmp/stealth_browser_profiles/test-scenario1-full
 ```
 **结果：** 目录存在，包含 Default 等子目录  
 **结论：** Profile 创建成功，但浏览器已退出
@@ -235,7 +235,7 @@ process = subprocess.Popen(
 )
 
 # 保存 PID
-with open(f"/tmp/agent_browser_{session_id}.pid", "w") as f:
+with open(f"/tmp/stealth_browser_{session_id}.pid", "w") as f:
     f.write(str(process.pid))
 ```
 

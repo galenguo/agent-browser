@@ -4,12 +4,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from agent_browser.pipeline.classifier import ErrorCategory
-from agent_browser.pipeline.errors import (
+from stealth_browser.pipeline.classifier import ErrorCategory
+from stealth_browser.pipeline.errors import (
     PipelineStepError,
     StepTimeoutError,
 )
-from agent_browser.pipeline.fallback import (
+from stealth_browser.pipeline.fallback import (
     _FALLBACK_HANDLER_NAMES,
     attempt_fallback,
 )
@@ -43,7 +43,7 @@ class TestFallbackSelectorDrift:
         )
 
         mock_handler = AsyncMock(return_value=True)
-        with patch("agent_browser.pipeline.fallback._get_fallback_handler", return_value=mock_handler):
+        with patch("stealth_browser.pipeline.fallback._get_fallback_handler", return_value=mock_handler):
             recovered = await attempt_fallback("s1", pe, {"data": []})
             assert recovered is True
 
@@ -57,7 +57,7 @@ class TestFallbackSelectorDrift:
         )
 
         with patch(
-            "agent_browser.pipeline.fallback._retry_with_fresh_selector", new_callable=AsyncMock(return_value=False)
+            "stealth_browser.pipeline.fallback._retry_with_fresh_selector", new_callable=AsyncMock(return_value=False)
         ):
             recovered = await attempt_fallback("s1", pe, {"data": []})
             assert recovered is False
@@ -83,7 +83,7 @@ class TestFallbackTimeout:
         )
 
         mock_handler = AsyncMock(return_value=True)
-        with patch("agent_browser.pipeline.fallback._get_fallback_handler", return_value=mock_handler):
+        with patch("stealth_browser.pipeline.fallback._get_fallback_handler", return_value=mock_handler):
             recovered = await attempt_fallback("s1", te, {"data": None})
             assert recovered is True
 
@@ -93,7 +93,7 @@ class TestFallbackTimeout:
         te = StepTimeoutError(message="timed out", step_index=1)
 
         with patch(
-            "agent_browser.pipeline.fallback._retry_with_longer_timeout", new_callable=AsyncMock(return_value=False)
+            "stealth_browser.pipeline.fallback._retry_with_longer_timeout", new_callable=AsyncMock(return_value=False)
         ):
             recovered = await attempt_fallback("s1", te, {})
             assert recovered is False
@@ -122,7 +122,7 @@ class TestFallbackMaxRetries:
         pe = PipelineStepError(message="fail", step_index=0)
 
         mock_handler = AsyncMock(return_value=False)
-        with patch("agent_browser.pipeline.fallback._get_fallback_handler", return_value=mock_handler):
+        with patch("stealth_browser.pipeline.fallback._get_fallback_handler", return_value=mock_handler):
             result = await attempt_fallback("s1", pe, {}, max_retries=3)
             assert result is False
             assert mock_handler.call_count == 3  # 尝试了 3 次

@@ -1,12 +1,12 @@
 """Classifier 测试 — 错误分类逻辑"""
 
-from agent_browser.pipeline.classifier import (
+from stealth_browser.pipeline.classifier import (
     ErrorCategory,
     _extract_status_code,
     category_description,
     classify,
 )
-from agent_browser.pipeline.errors import (
+from stealth_browser.pipeline.errors import (
     PipelineStepError,
     SelectorNotFoundError,
     StepTimeoutError,

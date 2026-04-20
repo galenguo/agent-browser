@@ -3,8 +3,8 @@
 import os
 from unittest import mock
 
-from agent_browser.config import from_deploy_config, load_config
-from agent_browser.deploy_config import DeployConfig, load_deploy_config
+from stealth_browser.config import from_deploy_config, load_config
+from stealth_browser.deploy_config import DeployConfig, load_deploy_config
 
 
 class TestFromDeployConfig:
@@ -60,43 +60,43 @@ class TestPrecedenceChain:
 
     def test_explicit_params_override_yaml(self, tmp_path):
         """Explicit kwargs should win over YAML."""
-        skill_dir = tmp_path / ".agent-browser"
+        skill_dir = tmp_path / ".stealth-browser"
         skill_dir.mkdir(exist_ok=True)
         cfg_file = skill_dir / "skill.yaml"
         cfg_file.write_text("""\
 calling_mode: api
 cdp_url: "http://localhost:9222"
 """)
-        with mock.patch("agent_browser.config.Path.home", return_value=tmp_path):
+        with mock.patch("stealth_browser.config.Path.home", return_value=tmp_path):
             cfg = load_config(calling_mode="cli", cdp_url="http://127.0.0.1:19222")
             assert cfg.calling_mode == "cli"
             assert cfg.cdp_url == "http://127.0.0.1:19222"
 
     def test_env_vars_override_yaml(self, tmp_path):
         """Environment variables should override YAML."""
-        cfg_file = tmp_path / ".agent-browser" / "skill.yaml"
+        cfg_file = tmp_path / ".stealth-browser" / "skill.yaml"
         cfg_file.parent.mkdir(exist_ok=True)
         cfg_file.write_text("""\
 calling_mode: cli
 """)
 
         with (
-            mock.patch.dict(os.environ, {"AGENT_BROWSER_CALLING_MODE": "api"}),
-            mock.patch("agent_browser.config.Path.home", return_value=cfg_file.parent.parent),
+            mock.patch.dict(os.environ, {"STEALTH_BROWSER_CALLING_MODE": "api"}),
+            mock.patch("stealth_browser.config.Path.home", return_value=cfg_file.parent.parent),
         ):
             cfg = load_config()
             assert cfg.calling_mode == "api"
 
     def test_yaml_overrides_defaults(self, tmp_path):
         """YAML config should override hardcoded defaults."""
-        cfg_file = tmp_path / ".agent-browser" / "skill.yaml"
+        cfg_file = tmp_path / ".stealth-browser" / "skill.yaml"
         cfg_file.parent.mkdir(exist_ok=True)
         cfg_file.write_text("""\
 calling_mode: api
 browser_mode: remote
 intelligence: agent
 """)
-        with mock.patch("agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
+        with mock.patch("stealth_browser.config.Path.home", return_value=cfg_file.parent.parent):
             cfg = load_config()
             assert cfg.calling_mode == "api"
             assert cfg.intelligence == "agent"
@@ -107,7 +107,7 @@ class TestExtendedYAMLSections:
 
     def test_full_extended_yaml_loads_without_error(self, tmp_path):
         """A skill.yaml with various keys should not break existing load_config()."""
-        cfg_file = tmp_path / ".agent-browser" / "skill.yaml"
+        cfg_file = tmp_path / ".stealth-browser" / "skill.yaml"
         cfg_file.parent.mkdir(exist_ok=True)
         cfg_file.write_text("""\
 calling_mode: cli
@@ -126,7 +126,7 @@ stealth:
   enabled: true
   mode: full
 """)
-        with mock.patch("agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
+        with mock.patch("stealth_browser.config.Path.home", return_value=cfg_file.parent.parent):
             # Should not raise
             cfg = load_config()
             assert cfg.calling_mode == "cli"
@@ -145,7 +145,7 @@ k8s:
   namespace: production
   replicas: 3
 """)
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", cfg_file):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", cfg_file):
             dep = load_deploy_config()
             assert dep.mode == "docker-aio"
             assert dep.docker_registry == "ghcr.io/myorg"
@@ -157,7 +157,7 @@ k8s:
         """If new sections are missing, use DeployConfig defaults."""
         cfg_file = tmp_path / "config.yaml"
         cfg_file.write_text("deployment:\n  mode: local\n")
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", cfg_file):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", cfg_file):
             dep = load_deploy_config()
             assert dep.docker_registry is None  # default
             assert dep.k8s_replicas == 1  # default
@@ -169,13 +169,13 @@ class TestBackwardCompatibility:
 
     def test_old_format_still_works(self, tmp_path):
         """skill.yaml with flat keys loads fine."""
-        cfg_file = tmp_path / ".agent-browser" / "skill.yaml"
+        cfg_file = tmp_path / ".stealth-browser" / "skill.yaml"
         cfg_file.parent.mkdir(exist_ok=True)
         cfg_file.write_text("""\
 calling_mode: cli
 browser_mode: local
 intelligence: llm
 """)
-        with mock.patch("agent_browser.config.Path.home", return_value=cfg_file.parent.parent):
+        with mock.patch("stealth_browser.config.Path.home", return_value=cfg_file.parent.parent):
             cfg = load_config()
             assert cfg.calling_mode == "cli"

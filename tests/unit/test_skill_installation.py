@@ -26,28 +26,28 @@ import pytest
 class TestPackageMetadata:
     def test_package_name(self):
         """pyproject.toml declares a valid package name."""
-        meta = importlib.metadata.metadata("agent-browser")
-        assert meta["Name"] == "agent-browser"
+        meta = importlib.metadata.metadata("stealth-browser")
+        assert meta["Name"] == "stealth-browser"
 
     def test_version_defined(self):
         """Version string exists and is non-empty."""
-        import agent_browser
+        import stealth_browser
 
-        assert hasattr(agent_browser, "__version__")
-        assert isinstance(agent_browser.__version__, str)
-        assert len(agent_browser.__version__) > 0
+        assert hasattr(stealth_browser, "__version__")
+        assert isinstance(stealth_browser.__version__, str)
+        assert len(stealth_browser.__version__) > 0
 
     def test_version_matches_pyproject(self):
         """__version__ is consistent with pyproject.toml [project] version."""
-        import agent_browser
+        import stealth_browser
 
-        meta = importlib.metadata.metadata("agent-browser")
+        meta = importlib.metadata.metadata("stealth-browser")
         # __init__ may append -dev suffix; both should share the same base version
-        assert meta["Version"] in agent_browser.__version__ or agent_browser.__version__.startswith(meta["Version"])
+        assert meta["Version"] in stealth_browser.__version__ or stealth_browser.__version__.startswith(meta["Version"])
 
     def test_dependencies_declared(self):
         """Core dependencies listed in package metadata."""
-        meta = importlib.metadata.metadata("agent-browser")
+        meta = importlib.metadata.metadata("stealth-browser")
         requires = meta.get_all("Requires-Dist") or []
         dep_names = {r.split()[0].split(";")[0].strip().lower() for r in requires}
         assert any("browser-use" in d for d in dep_names)
@@ -60,11 +60,11 @@ class TestPackageMetadata:
         eps = importlib.metadata.entry_points()
         scripts = eps.select(group="console_scripts")
         names = {ep.name for ep in scripts}
-        assert "agent-browser" in names
+        assert "stealth-browser" in names
 
     def test_python_version_constraint(self):
         """Requires Python >= 3.11."""
-        meta = importlib.metadata.metadata("agent-browser")
+        meta = importlib.metadata.metadata("stealth-browser")
         requires = meta.get_all("Requires-Python") or []
         assert len(requires) > 0
         assert ">=" in requires[0] or "3.11" in requires[0]
@@ -78,24 +78,24 @@ class TestPackageMetadata:
 class TestPublicImports:
     def test___all___exists(self):
         """__all__ is defined and non-empty."""
-        import agent_browser
+        import stealth_browser
 
-        assert hasattr(agent_browser, "__all__")
-        assert isinstance(agent_browser.__all__, list)
-        assert len(agent_browser.__all__) > 0
+        assert hasattr(stealth_browser, "__all__")
+        assert isinstance(stealth_browser.__all__, list)
+        assert len(stealth_browser.__all__) > 0
 
     def test_all_symbols_importable(self):
         """Every symbol in __all__ can be imported from the top level."""
-        import agent_browser
+        import stealth_browser
 
-        for name in agent_browser.__all__:
-            assert hasattr(agent_browser, name), f"{name} in __all__ but not on module"
-            obj = getattr(agent_browser, name)
+        for name in stealth_browser.__all__:
+            assert hasattr(stealth_browser, name), f"{name} in __all__ but not on module"
+            obj = getattr(stealth_browser, name)
             assert obj is not None, f"{name} is None"
 
     def test_facade_functions_callable(self):
         """Core facade functions are callable."""
-        from agent_browser import (
+        from stealth_browser import (
             click,
             configure,
             create_session,
@@ -133,32 +133,32 @@ class TestPublicImports:
 
     def test_exception_classes_importable(self):
         """FirstSessionError imports correctly."""
-        from agent_browser import FirstSessionError
+        from stealth_browser import FirstSessionError
 
         assert issubclass(FirstSessionError, Exception)
 
     def test_config_types_importable(self):
         """SkillConfig, load_config, detect_mode import correctly."""
-        from agent_browser import SkillConfig
+        from stealth_browser import SkillConfig
 
         assert hasattr(SkillConfig, "__dataclass_fields__")
 
     def test_oop_interface_importable(self):
-        """AgentBrowser OOP class imports correctly."""
-        from agent_browser import AgentBrowser
+        """StealthBrowser OOP class imports correctly."""
+        from stealth_browser import StealthBrowser
 
-        assert callable(getattr(AgentBrowser, "create_session", None))
+        assert callable(getattr(StealthBrowser, "create_session", None))
 
     def test_adapter_functions_importable(self):
         """list_adapters, run_adapter import correctly."""
-        from agent_browser import list_adapters, run_adapter
+        from stealth_browser import list_adapters, run_adapter
 
         assert callable(list_adapters)
         assert callable(run_adapter)
 
     def test_explore_functions_importable(self):
         """explore, synthesize, cascade import correctly."""
-        from agent_browser import cascade, explore, synthesize
+        from stealth_browser import cascade, explore, synthesize
 
         assert callable(explore)
         assert callable(synthesize)
@@ -166,7 +166,7 @@ class TestPublicImports:
 
     def test_llm_factory_importable(self):
         """LLMFactory imports correctly."""
-        from agent_browser import LLMFactory
+        from stealth_browser import LLMFactory
 
         assert LLMFactory is not None
 
@@ -176,32 +176,32 @@ class TestPublicImports:
 # ════════════════════════════════════════════════════════════════════
 
 _SUBMODULES = [
-    ("agent_browser.main", ["create_session", "configure", "reset", "setup"]),
-    ("agent_browser.config", ["SkillConfig", "detect_mode", "load_config"]),
-    ("agent_browser.deploy_config", ["DeployConfig", "validate_config", "generate_config"]),
-    ("agent_browser.stealth.middleware", ["StealthMiddleware", "CircuitState"]),
-    ("agent_browser.stealth.enhancer", ["StealthEnhancer"]),
-    ("agent_browser.browser.local", ["LocalCDPBackend"]),
-    ("agent_browser.browser.remote", ["RemoteAPIBackend"]),
-    ("agent_browser.browser.daemon", ["BrowserDaemon"]),
-    ("agent_browser.pipeline.executor", ["execute_pipeline", "STEPS"]),
-    ("agent_browser.pipeline.steps", ["STEPS"]),
-    ("agent_browser.pipeline.template", ["render_template"]),
-    ("agent_browser.pipeline.errors", ["PipelineError", "StepTimeoutError"]),
-    ("agent_browser.pipeline.classifier", ["ErrorCategory", "classify"]),
-    ("agent_browser.pipeline.fallback", ["attempt_fallback"]),
-    ("agent_browser.pipeline.debugger", ["DebugSession"]),
-    ("agent_browser.pipeline.telemetry", ["Telemetry"]),
-    ("agent_browser.explore.explorer", ["explore"]),
-    ("agent_browser.explore.analysis", ["has_search", "has_pagination"]),
-    ("agent_browser.explore.cascade", ["cascade"]),
-    ("agent_browser.explore.synthesizer", ["synthesize", "build_adapter"]),
-    ("agent_browser.adapters.loader", ["get_adapter", "list_adapters"]),
-    ("agent_browser.adapters.runner", ["run_adapter"]),
-    ("agent_browser.adapters.validator", ["validate_adapter"]),
-    ("agent_browser.intelligence.agent_runner", ["AgentRunner"]),  # may raise OSError on CloakBrowser init
-    ("agent_browser.llm.factory", ["LLMFactory"]),
-    ("agent_browser.client", ["AgentBrowser"]),
+    ("stealth_browser.main", ["create_session", "configure", "reset", "setup"]),
+    ("stealth_browser.config", ["SkillConfig", "detect_mode", "load_config"]),
+    ("stealth_browser.deploy_config", ["DeployConfig", "validate_config", "generate_config"]),
+    ("stealth_browser.stealth.middleware", ["StealthMiddleware", "CircuitState"]),
+    ("stealth_browser.stealth.enhancer", ["StealthEnhancer"]),
+    ("stealth_browser.browser.local", ["LocalCDPBackend"]),
+    ("stealth_browser.browser.remote", ["RemoteAPIBackend"]),
+    ("stealth_browser.browser.daemon", ["BrowserDaemon"]),
+    ("stealth_browser.pipeline.executor", ["execute_pipeline", "STEPS"]),
+    ("stealth_browser.pipeline.steps", ["STEPS"]),
+    ("stealth_browser.pipeline.template", ["render_template"]),
+    ("stealth_browser.pipeline.errors", ["PipelineError", "StepTimeoutError"]),
+    ("stealth_browser.pipeline.classifier", ["ErrorCategory", "classify"]),
+    ("stealth_browser.pipeline.fallback", ["attempt_fallback"]),
+    ("stealth_browser.pipeline.debugger", ["DebugSession"]),
+    ("stealth_browser.pipeline.telemetry", ["Telemetry"]),
+    ("stealth_browser.explore.explorer", ["explore"]),
+    ("stealth_browser.explore.analysis", ["has_search", "has_pagination"]),
+    ("stealth_browser.explore.cascade", ["cascade"]),
+    ("stealth_browser.explore.synthesizer", ["synthesize", "build_adapter"]),
+    ("stealth_browser.adapters.loader", ["get_adapter", "list_adapters"]),
+    ("stealth_browser.adapters.runner", ["run_adapter"]),
+    ("stealth_browser.adapters.validator", ["validate_adapter"]),
+    ("stealth_browser.intelligence.agent_runner", ["AgentRunner"]),  # may raise OSError on CloakBrowser init
+    ("stealth_browser.llm.factory", ["LLMFactory"]),
+    ("stealth_browser.client", ["StealthBrowser"]),
 ]
 
 
@@ -265,7 +265,7 @@ class TestCodeQuality:
     def test_no_sys_path_hacks_in_source(self):
         """No sys.path.insert/appends in library source (ok in tests)."""
         violations = []
-        src_root = os.path.join(self._SOURCE_ROOT, "agent_browser")
+        src_root = os.path.join(self._SOURCE_ROOT, "stealth_browser")
         if not os.path.isdir(src_root):
             return  # nothing to check
         for root, _dirs, files in os.walk(src_root):

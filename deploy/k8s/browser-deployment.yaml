@@ -1,29 +1,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agent-browser-browser
-  namespace: agent-browser
+  name: stealth-browser-browser
+  namespace: stealth-browser
   labels:
-    app: agent-browser
+    app: stealth-browser
     component: browser
     mode: distributed
 spec:
   replicas: 3  # Adjust based on expected concurrent sessions
   selector:
     matchLabels:
-      app: agent-browser
+      app: stealth-browser
       component: browser
       mode: distributed
   template:
     metadata:
       labels:
-        app: agent-browser
+        app: stealth-browser
         component: browser
         mode: distributed
     spec:
       containers:
       - name: browser
-        image: agent-browser-browser:latest
+        image: stealth-browser-browser:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80          # Auth proxy (external access)
@@ -66,4 +66,4 @@ spec:
           sizeLimit: 512Mi
       - name: profiles
         persistentVolumeClaim:
-          claimName: agent-browser-profiles
+          claimName: stealth-browser-profiles

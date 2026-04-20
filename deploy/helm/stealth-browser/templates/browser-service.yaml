@@ -1,0 +1,27 @@
+{{- if eq .Values.deploymentMode "distributed" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stealth-browser.fullname" . }}-browser
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "stealth-browser.labels" . | nindent 4 }}
+    component: browser
+    mode: distributed
+spec:
+  clusterIP: None  # Headless service
+  selector:
+    {{- include "stealth-browser.selectorLabels" . | nindent 4 }}
+    component: browser
+    mode: distributed
+  ports:
+  - name: cdp
+    port: {{ .Values.service.browser.cdpPort }}
+    targetPort: 19222
+  - name: novnc
+    port: {{ .Values.service.browser.novncPort }}
+    targetPort: 6080
+  - name: vnc
+    port: {{ .Values.service.browser.vncPort }}
+    targetPort: 5900
+{{- end }}

@@ -14,7 +14,7 @@
 - 小红书搜索 "中环小韭" 博主最近5条帖子
 - Boss直聘 HR 招聘登录页二维码
 
-数据流 (参考 Agent-Browser 架构方案V4):
+数据流 (参考 Stealth-Browser 架构方案V4):
 - CLI + local: Agent → main.py → LocalCDPBackend → BrowserDaemon → CDP → CloakBrowser
 - API + local: Agent → main.py → RemoteAPIBackend → HTTP → FastAPI → LocalCDPBackend → CDP
 - API + remote: Agent → HTTP → FastAPI → Gateway /allocate → Docker CDP
@@ -546,8 +546,8 @@ def print_summary(all_results: list):
 async def main():
     """运行所有集成测试"""
     print("\n" + "=" * 70)
-    print("Agent-Browser 集成测试")
-    print("测试通过 Claude Code 安装 skills/agent-browser skill 进行")
+    print("Stealth-Browser 集成测试")
+    print("测试通过 Claude Code 安装 skills/stealth-browser skill 进行")
     print("=" * 70)
 
     # 定义测试批次

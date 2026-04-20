@@ -1,15 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== Agent Browser: Teardown ==="
+echo "=== Stealth Browser: Teardown ==="
 cd "$(dirname "$0")"
 
 # Delete kind cluster (removes all resources)
-if kind get clusters 2>/dev/null | grep -q "agent-browser"; then
-  echo "Deleting kind cluster 'agent-browser'..."
-  kind delete cluster --name agent-browser
+if kind get clusters 2>/dev/null | grep -q "stealth-browser"; then
+  echo "Deleting kind cluster 'stealth-browser'..."
+  kind delete cluster --name stealth-browser
 else
-  echo "Kind cluster 'agent-browser' not found, nothing to teardown"
+  echo "Kind cluster 'stealth-browser' not found, nothing to teardown"
 fi
 
 # Clean up data directories (optional, uncomment if needed)

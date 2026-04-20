@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest a new feature or enhancement for agent-browser
+about: Suggest a new feature or enhancement for stealth-browser
 title: "[Feature] "
 labels: enhancement
 assignees: ''

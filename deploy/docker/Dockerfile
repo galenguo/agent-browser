@@ -59,8 +59,8 @@ RUN apt-get purge -y gcc python3-dev && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache/pip
 
-# 复制应用代码（保留 agent_browser 包名，因为内部 import 依赖它）
-COPY agent_browser/ /app/src/agent_browser/
+# 复制应用代码（保留 stealth_browser 包名，因为内部 import 依赖它）
+COPY stealth_browser/ /app/stealth_browser/
 
 # 数据目录
 RUN mkdir -p /data/sessions /data/profiles /data/logs
@@ -70,7 +70,7 @@ ENV DISPLAY=:99 \
     CDP_PORT=19222 \
     HEADLESS=false \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/src \
+    PYTHONPATH=/app \
     REBROWSER_PATCHES_RUNTIME_FIX_MODE=addBinding \
     TZ=Asia/Shanghai \
     LANG=zh_CN.UTF-8 \

@@ -1,5 +1,5 @@
 # API Keys 配置
-# 每个 key 可以访问 agent-browser API 服务
+# 每个 key 可以访问 stealth-browser API 服务
 # 每个 key 只能访问它自己创建的 session（session 归属隔离）
 #
 # 注意：

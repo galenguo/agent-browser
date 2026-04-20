@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from agent_browser.pipeline.debugger import DebugSession, StepRecord, _summarize, debug_pipeline
+from stealth_browser.pipeline.debugger import DebugSession, StepRecord, _summarize, debug_pipeline
 
 
 class TestSummarize:
@@ -100,7 +100,7 @@ class TestDebugSessionRun:
         assert len(result["history"]) == 2
 
     @pytest.mark.asyncio
-    @patch("agent_browser.pipeline.steps.STEPS", new_callable=dict)
+    @patch("stealth_browser.pipeline.steps.STEPS", new_callable=dict)
     async def test_unknown_step_skipped(self, mock_steps):
         """未知步骤应跳过并记录错误，不崩溃"""
         steps = [
@@ -136,7 +136,7 @@ class TestDebugPipelineFunction:
     @pytest.mark.asyncio
     async def test_debug_pipeline_returns_data_on_completion(self):
         """debug_pipeline 在完成时返回数据（与 execute_pipeline 兼容）"""
-        with patch("agent_browser.pipeline.debugger.DebugSession") as MockDS:
+        with patch("stealth_browser.pipeline.debugger.DebugSession") as MockDS:
             mock_instance = MagicMock()
             mock_instance.run_to_breakpoint = AsyncMock(
                 return_value={
@@ -155,7 +155,7 @@ class TestDebugPipelineFunction:
     @pytest.mark.asyncio
     async def test_debug_pipeline_returns_state_on_breakpoint(self):
         """debug_pipeline 在断点时返回状态字典"""
-        with patch("agent_browser.pipeline.debugger.DebugSession") as MockDS:
+        with patch("stealth_browser.pipeline.debugger.DebugSession") as MockDS:
             mock_instance = MagicMock()
             mock_instance.run_to_breakpoint = AsyncMock(
                 return_value={

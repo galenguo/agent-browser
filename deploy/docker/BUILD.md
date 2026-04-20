@@ -6,7 +6,7 @@
 
 ```bash
 # 从项目根目录运行
-cd agent-browser
+cd stealth-browser
 
 # 构建 CloakBrowser All-in-One
 bash docker/build-local.sh aio
@@ -29,9 +29,9 @@ bash docker/build-multiarch.sh
 
 | 镜像名称 | 大小 | 用途 |
 |---------|------|------|
-| `agent-browser-aio` | 3.6GB | CloakBrowser All-in-One (API + 浏览器 + VNC) |
-| `agent-browser-api` | 773MB | 分布式 API 服务 |
-| `agent-browser-browser` | 3.01GB | 分布式浏览器容器 (CloakBrowser) |
+| `stealth-browser-aio` | 3.6GB | CloakBrowser All-in-One (API + 浏览器 + VNC) |
+| `stealth-browser-api` | 773MB | 分布式 API 服务 |
+| `stealth-browser-browser` | 3.01GB | 分布式浏览器容器 (CloakBrowser) |
 
 ## 架构支持
 
@@ -84,7 +84,7 @@ VERSION=v1.0.0 bash docker/build-local.sh all
 DOCKER_REGISTRY=your-registry.com bash docker/build-multiarch.sh
 
 # 推送镜像
-docker push your-registry.com/agent-browser-aio:latest
+docker push your-registry.com/stealth-browser-aio:latest
 ```
 
 ## 构建优化
@@ -100,10 +100,10 @@ docker push your-registry.com/agent-browser-aio:latest
 
 ```bash
 # 查看构建的镜像
-docker images | grep agent-browser
+docker images | grep stealth-browser
 
 # 测试 All-in-One 镜像
-docker run --rm -p 8000:8000 agent-browser-aio:latest
+docker run --rm -p 8000:8000 stealth-browser-aio:latest
 
 # 访问 API
 curl http://localhost:8000/health

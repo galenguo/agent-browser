@@ -267,7 +267,7 @@ await page.fill(selector, text, timeout=10000)   # 单次 CDP 调用，立即填
 `CLISessionManager`（文件持久化）已实现但未接入。导致 CLI 跨进程调用时 session 丢失。
 
 修复路径：
-- `commands.py` 的 `session create` 创建 `BrowserSession` 后，将 `cdp_url`/`session_id` 写入 `CLISessionManager`（`~/.agent-browser/sessions.json`）
+- `commands.py` 的 `session create` 创建 `BrowserSession` 后，将 `cdp_url`/`session_id` 写入 `CLISessionManager`（`~/.stealth-browser/sessions.json`）
 - 后续命令（navigate/interact/extract）先从 `CLISessionManager` 读取 `cdp_url`，再创建 `BrowserSession` 连接
 - `session destroy` 从 `CLISessionManager` 删除记录并关闭浏览器
 
@@ -585,7 +585,7 @@ async def random_mouse_move(self, page):
 | 特性 | CLI 模式 | API 模式 |
 |------|---------|---------|
 | 跨进程复用 | ✅ CLISessionManager 文件持久化 | ❌ 单进程内存态 |
-| CDP URL 持久化 | ✅ `~/.agent-browser/sessions.json` | ❌ 每任务新 BrowserSession |
+| CDP URL 持久化 | ✅ `~/.stealth-browser/sessions.json` | ❌ 每任务新 BrowserSession |
 | 浏览器重启频率 | 极低（手动 destroy） | 中等（任务结束可能重启） |
 
 **代码证据：**
@@ -744,7 +744,7 @@ class ProxyPool:
 | 特性 | CLI 模式 | API 模式 |
 |------|---------|---------|
 | 进程模型 | 多进程（每条命令一个子进程） | 单进程多线程 |
-| 会话持久化 | ✅ 文件持久化（`~/.agent-browser/sessions.json`） | ✅ 内存态（单进程内） |
+| 会话持久化 | ✅ 文件持久化（`~/.stealth-browser/sessions.json`） | ✅ 内存态（单进程内） |
 | 状态一致性 | ⚠️ 跨进程需要文件同步 | ✅ 内存共享，无同步问题 |
 | 并发安全 | ⚠️ 文件锁保护 | ✅ asyncio 天然线程安全 |
 
@@ -753,7 +753,7 @@ class ProxyPool:
 # CLI 模式（src/cli/session_manager.py）
 class CLISessionManager:
     def __init__(self):
-        self.sessions_file = Path.home() / ".agent-browser" / "sessions.json"
+        self.sessions_file = Path.home() / ".stealth-browser" / "sessions.json"
         # 文件持久化，跨进程共享
 
 # API 模式（src/api.py）

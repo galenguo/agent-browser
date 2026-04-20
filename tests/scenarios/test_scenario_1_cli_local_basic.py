@@ -103,7 +103,7 @@ class TestScenario1CLILocalBasic:
         assert result1["status"] == "success"
 
         # 第二个进程：使用已有会话（模拟跨进程）
-        # CLI 命令会从 ~/.agent-browser/sessions.json 读取 cdp_url
+        # CLI 命令会从 ~/.stealth-browser/sessions.json 读取 cdp_url
         result2 = self.cli.navigate_goto(self.session_name, "https://example.com")
         assert result2["status"] == "success"
 

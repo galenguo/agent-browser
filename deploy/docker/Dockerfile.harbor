@@ -51,7 +51,7 @@ RUN apt-get purge -y gcc python3-dev && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache/pip
 
-COPY agent_browser/ /app/agent_browser/
+COPY stealth_browser/ /app/stealth_browser/
 COPY deploy/docker/entrypoint.sh /entrypoint.sh
 COPY deploy/docker/entrypoint-browser.sh /entrypoint-browser.sh
 RUN chmod +x /entrypoint.sh /entrypoint-browser.sh

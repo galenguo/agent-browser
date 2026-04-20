@@ -1,13 +1,13 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: agent-browser-gateway
-  namespace: agent-browser
+  name: stealth-browser-gateway
+  namespace: stealth-browser
 spec:
   gatewayClassName: traefik
   listeners:
     - name: web                          # Must match Traefik entrypoint name
-      hostname: "*.agent-browser.local"
+      hostname: "*.stealth-browser.local"
       port: 8000                         # MUST be 8000 to match Traefik web entrypoint
       protocol: HTTP
       allowedRoutes:

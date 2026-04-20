@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Intervention detection** (`detection.py`): Server-side URL/title pattern matching that detects login pages, CAPTCHAs, anti-bot challenges, and access-denied redirects. Returns `{"type", "reason", "patterns_matched"}` when detected, surfaced automatically in `open`, `snapshot`, and `go_back` responses.
 - **`check-intervention` API endpoint** (`app.py`): `GET /sessions/{id}/check-intervention` returns current page URL, title, intervention status, and VNC URL for manual human-in-the-loop workflows.
-- **`check` and `vnc` CLI commands** (`cli.py`): `agent-browser check --session <name>` checks current page for intervention, `agent-browser vnc --session <name>` retrieves cached VNC URL at any time.
+- **`check` and `vnc` CLI commands** (`cli.py`): `stealth-browser check --session <name>` checks current page for intervention, `stealth-browser vnc --session <name>` retrieves cached VNC URL at any time.
 - **Mandatory intervention protocol in SKILL.md**: When `open`, `snapshot`, or `check` returns `intervention` field, automation must stop immediately, surface VNC URL, and wait for user confirmation.
 
 ### Changed
@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.1] - 2026-04-15
 
 ### Added
-- **StealthProfile system** (`stealth/profiles.py`): Named delay presets for different deployment scenarios. Four built-in profiles: `full` (max anti-detection, historical behavior), `balanced` (K8s-optimized, ~60-70% less delay overhead), `minimal` (near-zero delays for trusted/internal targets), `off` (all delays disabled). Configurable via `AGENT_BROWSER_STEALTH_PROFILE` env var or `stealth_profile` field in `SkillConfig`.
+- **StealthProfile system** (`stealth/profiles.py`): Named delay presets for different deployment scenarios. Four built-in profiles: `full` (max anti-detection, historical behavior), `balanced` (K8s-optimized, ~60-70% less delay overhead), `minimal` (near-zero delays for trusted/internal targets), `off` (all delays disabled). Configurable via `STEALTH_BROWSER_STEALTH_PROFILE` env var or `stealth_profile` field in `SkillConfig`.
 - **Profile-aware `StealthEnhancer`** (`stealth/enhancer.py`): Accepts `StealthProfile` in `__init__`. When a profile is provided, all delay/behavior parameters (delay_map, post_delay_range, mouse_move_steps, typing_delay_range, typo_probability, long_pause_probability) are loaded from the profile. Legacy path (no profile) remains 100% backward-compatible.
 - **Profile resolution in `StealthMiddleware`** (`stealth/middleware.py`): Resolves stealth profile from `config.stealth_profile` or falls back to `profile_from_env()` on initialization.
 
@@ -51,34 +51,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pytest stdin capture** (`test_anti_detection.py`): Guarded `input()` call with `os.getenv("PYTEST_CURRENT_TEST")` check so the anti-detection test runs cleanly under pytest without conflicting with stdout/stdin capture.
 
 ### Added (previous unreleased)
-- **Skill config file separation**: client-side config now lives in `~/.agent-browser/skill.yaml` (flat YAML keys, no namespace) separate from server-side `~/.agent-browser/config.yaml`. `load_config()` reads `skill.yaml`; `load_deploy_config()` continues to read `config.yaml`.
-- **`remote_type` field** (`SkillConfig`): `"aio"` or `"distributed"` -- only meaningful when `browser_mode="remote"`. Controls whether a single VNC endpoint or per-session endpoints are used. Env var: `AGENT_BROWSER_REMOTE_TYPE`.
-- **`vnc_url` field** (`SkillConfig`): noVNC endpoint for AIO remote deployments. Empty for distributed (per-session URLs). Env var: `AGENT_BROWSER_VNC_URL`.
-- **`generate_skill_config()`** (`deploy_config.py`): generates `~/.agent-browser/skill.yaml` from a `DeployConfig`. Maps all 5 deployment modes (local, docker-aio, docker-distributed, k8s-aio, k8s-distributed) to correct `SkillConfig` fields. Used by server admins to produce a shareable client config.
-- **`session.py` script** (`agent_browser/skill/scripts/session.py`): unified session lifecycle entry point for the Claude Code skill. `check_config()` returns a structured guidance dict when `skill.yaml` is absent -- no blocking `input()`. Exposes `create()`, `open_page()`, `snapshot()`, `click()`, `fill()`, `scroll()`, `run_task()`, `delete()` as thin async wrappers.
-- **`setup.py` script** (`agent_browser/skill/scripts/setup.py`): writes `~/.agent-browser/skill.yaml` from user-provided mode + params. Supports modes `local`, `remote-aio`, `remote-distributed`. Callable as CLI (`python -m agent_browser.skill.scripts.setup --mode ...`) or programmatically.
+- **Skill config file separation**: client-side config now lives in `~/.stealth-browser/skill.yaml` (flat YAML keys, no namespace) separate from server-side `~/.stealth-browser/config.yaml`. `load_config()` reads `skill.yaml`; `load_deploy_config()` continues to read `config.yaml`.
+- **`remote_type` field** (`SkillConfig`): `"aio"` or `"distributed"` -- only meaningful when `browser_mode="remote"`. Controls whether a single VNC endpoint or per-session endpoints are used. Env var: `STEALTH_BROWSER_REMOTE_TYPE`.
+- **`vnc_url` field** (`SkillConfig`): noVNC endpoint for AIO remote deployments. Empty for distributed (per-session URLs). Env var: `STEALTH_BROWSER_VNC_URL`.
+- **`generate_skill_config()`** (`deploy_config.py`): generates `~/.stealth-browser/skill.yaml` from a `DeployConfig`. Maps all 5 deployment modes (local, docker-aio, docker-distributed, k8s-aio, k8s-distributed) to correct `SkillConfig` fields. Used by server admins to produce a shareable client config.
+- **`session.py` script** (`stealth_browser/skill/scripts/session.py`): unified session lifecycle entry point for the Claude Code skill. `check_config()` returns a structured guidance dict when `skill.yaml` is absent -- no blocking `input()`. Exposes `create()`, `open_page()`, `snapshot()`, `click()`, `fill()`, `scroll()`, `run_task()`, `delete()` as thin async wrappers.
+- **`setup.py` script** (`stealth_browser/skill/scripts/setup.py`): writes `~/.stealth-browser/skill.yaml` from user-provided mode + params. Supports modes `local`, `remote-aio`, `remote-distributed`. Callable as CLI (`python -m stealth_browser.skill.scripts.setup --mode ...`) or programmatically.
 - **Remote mode doctor checks** (`doctor.py`): Check 5 (CDP) now skips with `status=skip` when `browser_mode=remote`. New Check 5b verifies remote API health at `config.api_url/health`. New Check 5c checks VNC URL reachability when `vnc_url` is set.
 
 ### Changed
 - **`from_deploy_config()`** (`config.py`): full mode mapping table covering all 5 modes. `local` mode now correctly sets `api_url` from `DeployConfig.api_port` (previously left at default, causing `test_api_port_creates_api_url` to fail).
 - **`SKILL.md` Quick Start**: updated to show `setup.py` commands for all 3 modes (`local`, `remote-aio`, `remote-distributed`). Session operations table now points to `session.py` script.
 - **`_apply_yaml_overrides()`** (`config.py`): reads `remote_type` and `vnc_url` from flat YAML keys in `skill.yaml`.
-- **`_apply_env_overrides()`** (`config.py`): applies `AGENT_BROWSER_REMOTE_TYPE` and `AGENT_BROWSER_VNC_URL`.
+- **`_apply_env_overrides()`** (`config.py`): applies `STEALTH_BROWSER_REMOTE_TYPE` and `STEALTH_BROWSER_VNC_URL`.
 
 ## [0.2.0] - 2026-04-07
 
 ### Added
 - **Chrome Extension popup UI** (`extension/popup.html` + `popup.js`): Dark theme status panel (280x380px) showing connection state, current tab info, session stats, and troubleshoot section with copy-paste fix commands
 - **Extension getStatus protocol**: background.js `chrome.runtime.onMessage` handler for popup status queries with auto-refresh every 2s
-- **SKILL.md rewrite** (`agent_browser/skill/SKILL.md`, ~435 lines): Conforms to Claude Code skill spec with bilingual triggers (Chinese + English), ARGUMENTS/Execution Environment blockquotes, doctor.py Quick Start checklist, Extension Mode docs, conversational error recovery with IF/THEN decision tree, and progressive disclosure via references/
-- **Reference docs** (`agent_browser/skill/references/`): adapter-guide.md for site adapters/explore pipeline; react-workflow.md, error-recovery.md, api-reference.md ported from canonical
-- **Environment diagnostic** (`agent_browser/skill/scripts/doctor.py`): 7-check diagnosis (Python version, package, Playwright, CloakBrowser, CDP endpoint, LLM API key, websockets) with auto-fix capability and structured DoctorReport output
-- **install-skill CLI command** (`agent-browser install-skill`): Copies SKILL.md + references + scripts to `~/.claude/skills/agent-browser/` for Claude Code discovery; supports `--path` and `--force` flags
+- **SKILL.md rewrite** (`stealth_browser/skill/SKILL.md`, ~435 lines): Conforms to Claude Code skill spec with bilingual triggers (Chinese + English), ARGUMENTS/Execution Environment blockquotes, doctor.py Quick Start checklist, Extension Mode docs, conversational error recovery with IF/THEN decision tree, and progressive disclosure via references/
+- **Reference docs** (`stealth_browser/skill/references/`): adapter-guide.md for site adapters/explore pipeline; react-workflow.md, error-recovery.md, api-reference.md ported from canonical
+- **Environment diagnostic** (`stealth_browser/skill/scripts/doctor.py`): 7-check diagnosis (Python version, package, Playwright, CloakBrowser, CDP endpoint, LLM API key, websockets) with auto-fix capability and structured DoctorReport output
+- **install-skill CLI command** (`stealth-browser install-skill`): Copies SKILL.md + references + scripts to `~/.claude/skills/stealth-browser/` for Claude Code discovery; supports `--path` and `--force` flags
 - **91 tests** across 12 test classes in `tests/skill/test_skill_extension.py`: SKILL.md conformance (21), Extension popup (8), manifest (9), background.js (13), snapshot.js (8), doctor script (6), install-skill (5), config extension field (2), pyproject package data (6), reference docs (6), backend snapshot (2)
 
 ### Changed
 - **ExtensionBackend.snapshot()**: New method on ExtensionBackend that routes snapshot commands through the page handle or bridge (previously missing, would crash with AttributeError)
-- **SkillConfig.extension_enabled**: New field (default True) with env var (`AGENT_BROWSER_EXTENSION_ENABLED`) and YAML override support
+- **SkillConfig.extension_enabled**: New field (default True) with env var (`STEALTH_BROWSER_EXTENSION_ENABLED`) and YAML override support
 - **Extension tools list**: Added `select_option` to LLM-mode tool list for Extension backend
 - **manifest.json**: Added `default_popup: "popup.html"` so toolbar icon opens the status panel
 - **DoctorReport.ready semantics**: Now requires both zero failures AND zero warnings (previously returned True with 7 warnings)
@@ -104,14 +104,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`evaluate()` public API**: Execute JavaScript in page context via `await evaluate(session_id, "expression")`. Available on both functional API (`agent_browser.main`) and OOP interface (`AgentBrowser.evaluate()`)
-- **`AgentBrowser.evaluate()`**: OOP wrapper for JS evaluation with automatic session resolution
+- **`evaluate()` public API**: Execute JavaScript in page context via `await evaluate(session_id, "expression")`. Available on both functional API (`stealth_browser.main`) and OOP interface (`StealthBrowser.evaluate()`)
+- **`StealthBrowser.evaluate()`**: OOP wrapper for JS evaluation with automatic session resolution
 - **E2E capability verification suite** (89 tests across 3 files):
   - `test_skill_installation.py` (42 tests): package metadata, import integrity, submodule load validation, code quality guards
   - `test_skill_facade.py` (44 tests): facade routing through middleware stack, ReAct cycle (snapshot→click→fill), run_task(llm/agent), mode selection, error recovery
   - `test_docker_smoke.py` (3 tests): Docker script sanity + graceful skip when daemon unavailable
 - **Deploy wizard validation suite** (148 tests): config YAML roundtrip, generate_config, validate_config, migration, shell script parsing
-- **FastAPI REST API server** (`agent_browser.api`): 25 endpoints mapped to SessionPoolManager business logic
+- **FastAPI REST API server** (`stealth_browser.api`): 25 endpoints mapped to SessionPoolManager business logic
   - Session CRUD: `GET /sessions`, `POST /sessions/create`, `GET/DELETE /sessions/{id}`
   - Navigation: `POST /sessions/{id}/navigate`, `/back`, `GET /url`, `/title`
   - Interaction: `POST /snapshot`, `/click`, `/fill`, `/scroll`, `/evaluate`, `/wait`, `/mouse/move`, `/keyboard/press`
@@ -140,18 +140,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
-- Package structure completely changed: old `skills.agent_browser` and `src` modules no longer exist
-- All import paths changed from `from skills.agent_browser.X` / `from src.X` to `from agent_browser.X`
+- Package structure completely changed: old `skills.stealth_browser` and `src` modules no longer exist
+- All import paths changed from `from skills.stealth_browser.X` / `from src.X` to `from stealth_browser.X`
 - `BrowserController` now requires `(browser_session, session_id)` args (was previously no-arg)
-- Old CLI entry points removed; new entry point: `agent-browser` (Typer app)
+- Old CLI entry points removed; new entry point: `stealth-browser` (Typer app)
 - `docs/` directory is now gitignored (local only)
 - Chinese comments/docs removed from codebase; all code is English-only
 
 ### Added
 
-- **Standalone pip-installable package**: `pip install agent-browser` or `pip install agent-browser[cloak]` for full anti-detection
-- **AgentBrowser OOP facade class**: `from agent_browser import AgentBrowser` with session tracking and async context manager support
-- **LLMFactory module**: Unified LLM creation for OpenAI, Anthropic, GLM providers at `agent_browser.llm.factory`
+- **Standalone pip-installable package**: `pip install stealth-browser` or `pip install stealth-browser[cloak]` for full anti-detection
+- **StealthBrowser OOP facade class**: `from stealth_browser import StealthBrowser` with session tracking and async context manager support
+- **LLMFactory module**: Unified LLM creation for OpenAI, Anthropic, GLM providers at `stealth_browser.llm.factory`
 - **CI/CD workflows**: ci.yml (3-version matrix), lint.yml (fast ruff), security.yml (pip-audit + bandit)
 - **GitHub templates**: Bug report, feature request, PR template with checklists
 - **Adapter contribution guide**: `adapters/README.md` with YAML schema, step types, examples
@@ -179,7 +179,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Critical silent import bug: `from core.stealth_enhancer import StealthEnhancer` would silently fail, disabling ALL anti-detection. Now correctly imports from `agent_browser.stealth.enhancer`
+- Critical silent import bug: `from core.stealth_enhancer import StealthEnhancer` would silently fail, disabling ALL anti-detection. Now correctly imports from `stealth_browser.stealth.enhancer`
 - Adapter directory path resolution (`parents[3]` -> `parents[2]`)
 - Unicode arrow characters in synthesizer.py causing SyntaxError
 - Unclosed f-string in synthesizer.py build_adapter function

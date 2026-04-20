@@ -2,7 +2,7 @@
 
 ## Context
 
-当前 `skills/agent-browser/` 仅支持 local CDP 直连（硬编码 `127.0.0.1:19222`），没有模式切换、没有配置系统、没有 daemon 持久化。而 `src/` 下的 ConfigManager、Gateway、StealthEnhancer 等基础设施与 skill 包完全断开。本次优化目标：让 skill 通过配置化支持 **CLI/API 调用模式 × local/remote 浏览器模式 × LLM/Agent 智能模式**，并引入 opencli 风格的微 daemon 持久化。
+当前 `skills/stealth-browser/` 仅支持 local CDP 直连（硬编码 `127.0.0.1:19222`），没有模式切换、没有配置系统、没有 daemon 持久化。而 `src/` 下的 ConfigManager、Gateway、StealthEnhancer 等基础设施与 skill 包完全断开。本次优化目标：让 skill 通过配置化支持 **CLI/API 调用模式 × local/remote 浏览器模式 × LLM/Agent 智能模式**，并引入 opencli 风格的微 daemon 持久化。
 
 ---
 
@@ -298,7 +298,7 @@ async def run_task(sid, task, llm_config, max_steps) -> Dict: ...
 **关键**：`stealth_actions.py` 通过 `tools.registry.exclude_action()` + 重新注册来覆盖 browser-use Agent 的默认 navigate/click/input 操作，注入 StealthEnhancer 的延迟和鼠标模拟。**两种模式的隐匿得分一致（87.4-87.6/100）**。
 
 **实现路径**：
-- `skills/agent-browser/stealth.py`：从 `src/core/stealth_enhancer.py` 移植（纯 Python，零重依赖）
+- `skills/stealth-browser/stealth.py`：从 `src/core/stealth_enhancer.py` 移植（纯 Python，零重依赖）
 - LLM 模式：StealthEnhancer 集成到 pipeline steps 和 `PlaywrightPageHandle`
 - Agent 模式：`register_stealth_actions(tools, stealth)` 覆盖 browser-use Agent 的默认操作
 
@@ -460,7 +460,7 @@ elif config.intelligence == "agent" and config.calling_mode == "cli":
 
 ## 新增文件（8 个）
 
-### 1. `skills/agent-browser/config.py` — 配置管理器
+### 1. `skills/stealth-browser/config.py` — 配置管理器
 
 从 `src/config/manager.py` 适配，无重依赖：
 
@@ -477,20 +477,20 @@ class SkillConfig:
 
     daemon_enabled: bool     # 是否启用 daemon 持久化
     daemon_idle_timeout: int # 秒，默认 1800
-    daemon_state_path: str   # "~/.agent-browser/daemon-state.json"
+    daemon_state_path: str   # "~/.stealth-browser/daemon-state.json"
 
     headless: bool
     default_timeout: int     # ms
 ```
 
-**配置解析优先级**：显式参数 → 环境变量 → `~/.agent-browser/config.yaml` → 自动探测 → 硬编码默认
+**配置解析优先级**：显式参数 → 环境变量 → `~/.stealth-browser/config.yaml` → 自动探测 → 硬编码默认
 
 **自动探测逻辑**：
 1. `http://localhost:8000/health` 可达 → API mode
 2. `http://127.0.0.1:19222/json/version` 可达 → CLI mode
 3. 默认 → CLI + local
 
-### 2. `skills/agent-browser/backends/__init__.py` — 后端抽象
+### 2. `skills/stealth-browser/backends/__init__.py` — 后端抽象
 
 ```python
 class BrowserBackend(ABC):
@@ -518,14 +518,14 @@ class BrowserPageHandle(ABC):
     async def close()
 ```
 
-### 3. `skills/agent-browser/backends/local.py` — 本地 CDP 后端
+### 3. `skills/stealth-browser/backends/local.py` — 本地 CDP 后端
 
 - `LocalCDPBackend`：包装当前 `BrowserController`，使用 `BrowserDaemon` 管理持久连接
 - `PlaywrightPageHandle`：薄 wrapper，委托 Playwright `Page`，集成 `StealthEnhancer`
 - **95% 复用现有 `controller.py` 代码**
 - Agent 模式：创建 `BrowserSession(cdp_url=..., is_local=True)` + `Agent(task, llm, browser_session)`，注入 `stealth_actions`
 
-### 4. `skills/agent-browser/backends/remote.py` — HTTP 传输适配器（薄包装）
+### 4. `skills/stealth-browser/backends/remote.py` — HTTP 传输适配器（薄包装）
 
 **RemoteAPIBackend 不实现任何浏览器逻辑，它是 LocalCDPBackend 的 HTTP 代理。**
 
@@ -555,7 +555,7 @@ get_task_result(sid,tid) → GET    /sessions/{id}/tasks/{tid}
 
 **关键**：所有浏览器逻辑（StealthEnhancer、browser-use、adapters）在服务端的 LocalCDPBackend 中执行。RemoteAPIBackend 只处理 HTTP 序列化、认证、session 映射。
 
-### 5. `skills/agent-browser/daemon.py` — 微 Daemon
+### 5. `skills/stealth-browser/daemon.py` — 微 Daemon
 
 ```python
 class BrowserDaemon:
@@ -572,11 +572,11 @@ class BrowserDaemon:
     - 首次浏览器命令时懒连接
     - 双条件空闲断开（无活跃 session 且超时）
     - 下次命令自动重连
-    - 状态持久化到 ~/.agent-browser/daemon-state.json
+    - 状态持久化到 ~/.stealth-browser/daemon-state.json
     """
 ```
 
-### 6. `skills/agent-browser/stealth.py` — StealthEnhancer
+### 6. `skills/stealth-browser/stealth.py` — StealthEnhancer
 
 从 `src/core/stealth_enhancer.py` 移植核心逻辑（纯 Python，零重依赖）：
 - `pre_action(action_type)` / `post_action()` — 按操作类型的随机延迟
@@ -586,7 +586,7 @@ class BrowserDaemon:
 - `inject_timing_noise(page)` — Date.now() / performance.now() 偏移
 - `warmup_browsing(page)` — 访问 3 个站点建立正常基线
 
-### 7. `skills/agent-browser/intelligence/__init__.py` — 智能模式路由
+### 7. `skills/stealth-browser/intelligence/__init__.py` — 智能模式路由
 
 ```python
 async def run_task(
@@ -603,7 +603,7 @@ async def run_task(
     """
 ```
 
-### 8. `skills/agent-browser/intelligence/agent_runner.py` — Agent 模式执行器
+### 8. `skills/stealth-browser/intelligence/agent_runner.py` — Agent 模式执行器
 
 从 `src/agent/runner.py` 和 `src/core/stealth_actions.py` 适配：
 - 创建 `BrowserSession` + `Agent`
@@ -615,25 +615,25 @@ async def run_task(
 
 ## 修改文件（7 个）
 
-### 1. `skills/agent-browser/main.py`
+### 1. `skills/stealth-browser/main.py`
 模式感知 facade，`_ensure_backend(config)` 路由到后端。保持向后兼容。新增 `run_task()`。
 
-### 2. `skills/agent-browser/session_manager.py`
+### 2. `skills/stealth-browser/session_manager.py`
 从 `BrowserController` 改为 `BrowserBackend`。
 
-### 3. `skills/agent-browser/controller.py`
+### 3. `skills/stealth-browser/controller.py`
 变为 `LocalCDPBackend` 内部实现（不删除，被包装）。
 
-### 4. `skills/agent-browser/pipeline/steps.py`
+### 4. `skills/stealth-browser/pipeline/steps.py`
 `_get_page()` 改为从 backend 获取 `BrowserPageHandle`。
 
-### 5. `skills/agent-browser/explore/explorer.py`
+### 5. `skills/stealth-browser/explore/explorer.py`
 `session.page` → `backend.get_page(session_id)`。
 
-### 6. `skills/agent-browser/__init__.py`
+### 6. `skills/stealth-browser/__init__.py`
 新增导出：`run_task`, `detect_mode`, `SkillConfig`, `configure`。
 
-### 7. `skills/agent-browser/SKILL.md`
+### 7. `skills/stealth-browser/SKILL.md`
 重写：三种模式配置、ReAct/Agent prompt routing、适配器优先策略。
 
 ---
@@ -679,26 +679,26 @@ async def run_task(
 
 | 用途 | 文件路径 |
 |------|---------|
-| 现有 controller（→ LocalCDPBackend） | `skills/agent-browser/controller.py` |
-| 现有 facade（→ 模式路由） | `skills/agent-browser/main.py` |
+| 现有 controller（→ LocalCDPBackend） | `skills/stealth-browser/controller.py` |
+| 现有 facade（→ 模式路由） | `skills/stealth-browser/main.py` |
 | 配置参考 | `src/config/manager.py` |
 | 隐匿增强参考 | `src/core/stealth_enhancer.py` |
 | stealth_actions 参考 | `src/core/stealth_actions.py` |
 | browser-use Agent 集成参考 | `src/agent/runner.py` |
-| Pipeline steps（→ 适配 BrowserPageHandle） | `skills/agent-browser/pipeline/steps.py` |
+| Pipeline steps（→ 适配 BrowserPageHandle） | `skills/stealth-browser/pipeline/steps.py` |
 | Daemon 参考 | `references/opencli/src/daemon.ts` |
 | IdleManager 参考 | `references/opencli/src/idle-manager.ts` |
 | IPage 抽象参考 | `references/opencli/src/browser/base-page.ts` |
 | YAML 适配器模式参考 | `references/opencli/src/clis/` (200+ 适配器) |
 | explore 自动生成参考 | `references/opencli/src/explore.ts` |
-| V3 架构文档 | `docs/Agent-Browser 架构方案V3.md` |
+| V3 架构文档 | `docs/Stealth-Browser 架构方案V3.md` |
 
 ---
 
 ## 验证方案
 
 1. **向后兼容**：现有 `create_session()` → `open_page()` → `snapshot()` → `click()` → `delete_session()` 无参数调用正常
-2. **模式切换**：设置 `AGENT_BROWSER_MODE=api` 后自动路由到 RemoteAPIBackend
+2. **模式切换**：设置 `STEALTH_BROWSER_MODE=api` 后自动路由到 RemoteAPIBackend
 3. **Daemon 持久化**：连续创建/删除 session 不触发 CDP 重连；空闲超时后自动断开
 4. **Agent 模式**：`run_task(sid, "访问 example.com 提取标题")` 返回正确结果；stealth_actions 覆盖生效
 5. **适配器兼容**：`run_adapter("baidu", "search", query="test")` 在 CLI 和 API 模式下均可执行（零 token）

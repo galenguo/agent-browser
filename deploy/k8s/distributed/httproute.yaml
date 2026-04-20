@@ -1,13 +1,13 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: agent-browser-api-route
-  namespace: agent-browser
+  name: stealth-browser-api-route
+  namespace: stealth-browser
   labels:
-    app: agent-browser-cp
+    app: stealth-browser-cp
 spec:
   hostnames:
-  - agent-browser-api.vpc-dale.gimcyun.com
+  - stealth-browser-api.vpc-dale.gimcyun.com
   parentRefs:
   - group: gateway.networking.k8s.io
     kind: Gateway
@@ -17,7 +17,7 @@ spec:
   - backendRefs:
     - group: ""
       kind: Service
-      name: agent-browser-cp
+      name: stealth-browser-cp
       port: 8000
       weight: 100
     matches:
@@ -28,13 +28,13 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: agent-browser-vnc-route
-  namespace: agent-browser
+  name: stealth-browser-vnc-route
+  namespace: stealth-browser
   labels:
-    app: agent-browser-cp
+    app: stealth-browser-cp
 spec:
   hostnames:
-  - agent-browser-vnc.vpc-dale.gimcyun.com
+  - stealth-browser-vnc.vpc-dale.gimcyun.com
   parentRefs:
   - group: gateway.networking.k8s.io
     kind: Gateway
@@ -44,7 +44,7 @@ spec:
   - backendRefs:
     - group: ""
       kind: Service
-      name: agent-browser-cp
+      name: stealth-browser-cp
       port: 8000
       weight: 100
     matches:

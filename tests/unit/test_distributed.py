@@ -16,7 +16,7 @@ import pytest
 
 
 def _distributed_env_ready():
-    """Check if Docker and agent-browser API server are available."""
+    """Check if Docker and stealth-browser API server are available."""
     try:
         import subprocess
 
@@ -58,8 +58,8 @@ def run_command(cmd: str) -> str:
 def test_browser_image_exists():
     """测试浏览器镜像是否存在"""
     print("\n1. 检查浏览器镜像...")
-    output = run_command("docker images | grep agent-browser-browser")
-    if "agent-browser-browser" in output:
+    output = run_command("docker images | grep stealth-browser-browser")
+    if "stealth-browser-browser" in output:
         print("✅ 浏览器镜像已存在")
         return True
     print("❌ 浏览器镜像不存在，请先运行: ./scripts/build-browser-image.sh")
@@ -69,8 +69,8 @@ def test_browser_image_exists():
 def test_api_server_running():
     """测试 API 服务器是否运行"""
     print("\n2. 检查 API 服务器...")
-    output = run_command("docker ps | grep agent-browser-api")
-    if "agent-browser-api" in output:
+    output = run_command("docker ps | grep stealth-browser-api")
+    if "stealth-browser-api" in output:
         print("✅ API 服务器正在运行")
         return True
     print("❌ API 服务器未运行，请先运行: ./scripts/start-distributed.sh")

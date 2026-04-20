@@ -1,11 +1,11 @@
-"""Agent Browser Agent 模式：AI 自主操作
+"""Stealth Browser Agent 模式：AI 自主操作
 
 运行前确保：
   1. CloakBrowser 已启动（CDP 端口 19222）
   2. LLM API Key 已配置（OPENAI_API_KEY 或 ANTHROPIC_API_KEY）
 """
 import asyncio
-from agent_browsermain import create_session, run_task
+from stealth_browser.main import create_session, run_task
 
 
 async def main():

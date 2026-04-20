@@ -14,7 +14,7 @@
 
 **修复文件：**
 - `src/controller.py`
-- `skills/agent-browser/controller.py`
+- `skills/stealth-browser/controller.py`
 
 ### 问题 2：页面加载超时 ✅
 **原因：**
@@ -28,7 +28,7 @@
 
 **修复文件：**
 - `src/controller.py` - `open_page()` 方法
-- `skills/agent-browser/controller.py` - `open()` 方法
+- `skills/stealth-browser/controller.py` - `open()` 方法
 
 ## 测试结果
 
@@ -86,7 +86,7 @@ async def click(self, session_id: str, ref: str):
             await page.wait_for_load_state("networkidle", timeout=5000)
 ```
 
-### skills/agent-browser/controller.py
+### skills/stealth-browser/controller.py
 - 同步应用相同的修复
 - 使用 `ElementHandle` 列表存储
 - 改进错误处理
@@ -115,7 +115,7 @@ async def click(self, session_id: str, ref: str):
 
 1. **启动远程浏览器测试 Mode 2**
    ```bash
-   docker run -p 19222:19222 agent-browser-chromium
+   docker run -p 19222:19222 stealth-browser-chromium
    pytest tests/test_mode2_remote_cdp.py
    ```
 

@@ -1,32 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agent-browser-api
-  namespace: agent-browser
+  name: stealth-browser-api
+  namespace: stealth-browser
   labels:
-    app: agent-browser
+    app: stealth-browser
     component: api
     mode: distributed
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: agent-browser
+      app: stealth-browser
       component: api
       mode: distributed
   template:
     metadata:
       labels:
-        app: agent-browser
+        app: stealth-browser
         component: api
         mode: distributed
     spec:
       # Service account for K8s API access (pod listing)
-      serviceAccountName: agent-browser-api
+      serviceAccountName: stealth-browser-api
 
       containers:
       - name: api
-        image: agent-browser-api:latest
+        image: stealth-browser-api:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
@@ -43,12 +43,12 @@ spec:
         - name: API_KEYS
           valueFrom:
             secretKeyRef:
-              name: agent-browser-secret
+              name: stealth-browser-secret
               key: API_KEYS
         - name: API_KEY
           valueFrom:
             secretKeyRef:
-              name: agent-browser-secret
+              name: stealth-browser-secret
               key: API_KEY
 
         # ── Session limits (read by get_pool()) ──
@@ -57,48 +57,48 @@ spec:
         - name: IDLE_TIMEOUT_SECONDS
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: IDLE_TIMEOUT_SECONDS
 
         # ── Storage ──
         - name: PROFILE_STORAGE
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: PROFILE_STORAGE
         - name: LOG_LEVEL
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: LOG_LEVEL
 
         # ── Browser recycling ──
         - name: BROWSER_IDLE_RESTART_MINUTES
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: BROWSER_IDLE_RESTART_MINUTES
 
         # ── LLM Keys ──
         - name: ANTHROPIC_API_KEY
           valueFrom:
             secretKeyRef:
-              name: agent-browser-secret
+              name: stealth-browser-secret
               key: ANTHROPIC_API_KEY
         - name: ANTHROPIC_BASE_URL
           valueFrom:
             secretKeyRef:
-              name: agent-browser-secret
+              name: stealth-browser-secret
               key: ANTHROPIC_BASE_URL
         - name: OPENAI_API_KEY
           valueFrom:
             secretKeyRef:
-              name: agent-browser-secret
+              name: stealth-browser-secret
               key: OPENAI_API_KEY
         - name: OPENAI_BASE_URL
           valueFrom:
             secretKeyRef:
-              name: agent-browser-secret
+              name: stealth-browser-secret
               key: OPENAI_BASE_URL
 
         volumeMounts:
@@ -132,7 +132,7 @@ spec:
       volumes:
       - name: profiles
         persistentVolumeClaim:
-          claimName: agent-browser-profiles
+          claimName: stealth-browser-profiles
       - name: logs
         persistentVolumeClaim:
-          claimName: agent-browser-logs
+          claimName: stealth-browser-logs

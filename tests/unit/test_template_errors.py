@@ -1,6 +1,6 @@
 """Template 边界情况测试 — 错误输入和异常路径"""
 
-from agent_browser.pipeline.template import (
+from stealth_browser.pipeline.template import (
     TemplateContext,
     apply_filter,
     render_template,

@@ -31,8 +31,8 @@ error()   { echo -e "${RED}[ERROR] $*${NC}"; exit 1; }
 MODE="aio"
 REGISTRY_URL="${REGISTRY_URL:-localhost:5000}"
 # Distributed mode: full image reference (overrides REGISTRY_URL for distributed)
-IMAGE="${IMAGE:-registry-cn-gimc-local.gimccloud.com/library/agent-browser:latest}"
-NAMESPACE="agent-browser"
+IMAGE="${IMAGE:-registry-cn-gimc-local.gimccloud.com/library/stealth-browser:latest}"
+NAMESPACE="stealth-browser"
 CLEANUP=false
 
 # ── Prereq checks ─────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ deploy_aio() {
     kubectl apply -f "$SCRIPT_DIR/aio-service.yaml"
 
     info "Waiting for pod to be ready..."
-    kubectl rollout status deployment/agent-browser-aio \
+    kubectl rollout status deployment/stealth-browser-aio \
         -n "$NAMESPACE" --timeout=180s
 
     echo ""
@@ -80,16 +80,16 @@ deploy_aio() {
 
 cleanup_aio() {
     warn "Deleting All-in-One deployment..."
-    kubectl delete deployment agent-browser-aio -n "$NAMESPACE" --ignore-not-found=true
+    kubectl delete deployment stealth-browser-aio -n "$NAMESPACE" --ignore-not-found=true
     kubectl delete -f "$SCRIPT_DIR/aio-service.yaml" --ignore-not-found=true
     success "All-in-One resources removed"
 }
 
 _show_aio_status() {
-    kubectl get pods -n "$NAMESPACE" -l "app=agent-browser,mode=all-in-one" 2>/dev/null || true
+    kubectl get pods -n "$NAMESPACE" -l "app=stealth-browser,mode=all-in-one" 2>/dev/null || true
     echo ""
     local url
-    url=$(_get_service_url "agent-browser-aio" 8000)
+    url=$(_get_service_url "stealth-browser-aio" 8000)
     if [[ -n "$url" ]]; then
         info "API    : $url"
         info "Health : $url/health"
@@ -99,12 +99,12 @@ _show_aio_status() {
 # ── Distributed mode ──────────────────────────────────────────────────
 #
 # Architecture:
-#   - 1 CP pod (agent-browser-cp-0): runs FastAPI, manages BR pod lifecycle via k8s API
-#   - N BR pods (agent-browser-br-{uuid8}): each runs Xvfb + CloakBrowser + noVNC + node_api
+#   - 1 CP pod (stealth-browser-cp-0): runs FastAPI, manages BR pod lifecycle via k8s API
+#   - N BR pods (stealth-browser-br-{uuid8}): each runs Xvfb + CloakBrowser + noVNC + node_api
 #   - Warm pool: CP maintains 3 idle BR pods at all times
 #   - On session create: CP picks idle BR pod → calls /browser/start → returns cdp_url (pod IP)
 #   - On session delete: CP calls /browser/stop → deletes BR pod + PVC
-#   - BR pod DNS: {pod_name}.agent-browser-br-headless.{namespace}.svc.cluster.local
+#   - BR pod DNS: {pod_name}.stealth-browser-br-headless.{namespace}.svc.cluster.local
 #     (requires hostname + subdomain set in pod spec — handled by K8sBrowserNodeManager)
 #   - CDP access: via pod IP (Chrome rejects non-IP Host headers on CDP port)
 #   - VNC routing: token → session → pod_name → headless DNS :6080 (proxied by CP FastAPI)
@@ -129,8 +129,8 @@ cleanup_distributed() {
 
 _require_secret() {
     local secret_file="$SCRIPT_DIR/secret.yaml"
-    if kubectl get secret agent-browser-secret -n "$NAMESPACE" &>/dev/null; then
-        success "Secret 'agent-browser-secret' exists"
+    if kubectl get secret stealth-browser-secret -n "$NAMESPACE" &>/dev/null; then
+        success "Secret 'stealth-browser-secret' exists"
         return
     fi
     if [[ ! -f "$secret_file" ]]; then

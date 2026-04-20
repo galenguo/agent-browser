@@ -13,4 +13,4 @@ ports:
 service:
   type: LoadBalancer
   annotations:
-    metallb.universe.tf/address-pool: agent-browser-pool
+    metallb.universe.tf/address-pool: stealth-browser-pool

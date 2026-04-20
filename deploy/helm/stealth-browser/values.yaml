@@ -1,0 +1,126 @@
+# 默认配置
+
+# 部署模式: all-in-one 或 distributed
+deploymentMode: all-in-one
+
+# 镜像配置
+image:
+  registry: localhost:5000
+  repository: stealth-browser
+  tag: latest
+  pullPolicy: IfNotPresent
+  # pullSecrets:
+  #   - name: registry-secret
+
+# All-in-One 模式配置
+aio:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+# 分布式模式配置
+distributed:
+  api:
+    replicaCount: 2
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+  browser:
+    replicaCount: 3
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "2000m"
+
+# 服务配置
+service:
+  type: NodePort
+  aio:
+    apiPort: 8000
+    apiNodePort: 30800
+    novncPort: 6080
+    novncNodePort: 30680
+    vncPort: 5900
+    vncNodePort: 30590
+  api:
+    port: 8000
+    nodePort: 30801
+  browser:
+    cdpPort: 19222
+    novncPort: 6080
+    vncPort: 5900
+
+# 持久化存储
+persistence:
+  enabled: true
+  profiles:
+    size: 10Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+  logs:
+    size: 5Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+
+# 应用配置
+config:
+  maxSessions: 10
+  idleTimeoutSeconds: 1800
+  cdpPort: 19222
+  cdpBindAddress: "0.0.0.0"
+  profileStorage: "/data/profiles"
+  logLevel: "INFO"
+  headless: false
+  # Stealth profile: "off" (fast) | "balanced" | "minimal" | "full" (max anti-detection)
+  stealthProfile: "minimal"
+
+# Secret 配置（通过 values 文件或 --set 传入）
+secrets:
+  anthropicApiKey: ""
+  openaiApiKey: ""
+  openaiBaseUrl: "https://api.openai.com/v1"
+
+# 健康检查
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# 共享内存
+shm:
+  enabled: true
+  size: 512Mi
+
+# Node 选择器
+nodeSelector: {}
+
+# 容忍度
+tolerations: []
+
+# 亲和性
+affinity: {}

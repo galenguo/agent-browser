@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: agent-browser-cp-headless
-  namespace: agent-browser
+  name: stealth-browser-cp-headless
+  namespace: stealth-browser
   labels:
-    app: agent-browser-cp
+    app: stealth-browser-cp
 spec:
   clusterIP: None
   selector:
-    app: agent-browser-cp
+    app: stealth-browser-cp
   ports:
   - name: novnc
     port: 6080

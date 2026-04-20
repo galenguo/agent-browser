@@ -9,7 +9,7 @@ from unittest import mock
 
 import pytest
 
-from agent_browser.browser.k8s_node_manager import (
+from stealth_browser.browser.k8s_node_manager import (
     BR_IDLE_TIMEOUT,
     WARM_POOL_SIZE,
     BrPodInfo,
@@ -31,8 +31,8 @@ def _make_pod(name: str, busy: bool = False) -> BrPodInfo:
 
 def _make_manager():
     """Create a K8sBrowserNodeManager with mocked k8s client (no cluster needed)."""
-    with mock.patch("agent_browser.browser.k8s_node_manager.K8sBrowserNodeManager.__init__", lambda self: None):
-        from agent_browser.browser.k8s_node_manager import K8sBrowserNodeManager
+    with mock.patch("stealth_browser.browser.k8s_node_manager.K8sBrowserNodeManager.__init__", lambda self: None):
+        from stealth_browser.browser.k8s_node_manager import K8sBrowserNodeManager
         mgr = K8sBrowserNodeManager.__new__(K8sBrowserNodeManager)
         mgr._core = mock.MagicMock()
         mgr._pods = {}

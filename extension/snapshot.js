@@ -1,5 +1,5 @@
 /**
- * Agent Browser Bridge — Snapshot Module
+ * Stealth Browser Bridge — Snapshot Module
  *
  * Extracts DOM elements with @eN references.
  * Output format matches LocalCDPBackend exactly for seamless ReAct loop compatibility.
@@ -8,7 +8,7 @@
  * Can also be tested standalone in browser console.
  */
 
-var AgentBrowserSnapshot = (function() {
+var StealthBrowserSnapshot = (function() {
   'use strict';
 
   // ── Interactive element selectors ──────────────────────
@@ -222,8 +222,8 @@ var AgentBrowserSnapshot = (function() {
 
 // Auto-export for different environments
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = AgentBrowserSnapshot;
+  module.exports = StealthBrowserSnapshot;
 }
 if (typeof self !== 'undefined') {
-  self.AgentBrowserSnapshot = AgentBrowserSnapshot;
+  self.StealthBrowserSnapshot = StealthBrowserSnapshot;
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Agent Browser 一键安装脚本
+# Stealth Browser 一键安装脚本
 # 支持 macOS 和 Linux 系统
 
 set -e
@@ -77,7 +77,7 @@ check_dependencies() {
 show_menu() {
     echo ""
     echo "========================================="
-    echo "  Agent Browser 一键安装"
+    echo "  Stealth Browser 一键安装"
     echo "========================================="
     echo ""
     echo "请选择部署模式："
@@ -118,7 +118,7 @@ setup_environment() {
 # 主函数
 main() {
     echo ""
-    print_info "Agent Browser 一键安装脚本"
+    print_info "Stealth Browser 一键安装脚本"
     echo ""
 
     # 检测系统
@@ -200,7 +200,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --mode <mode>          部署模式: local, docker-aio, docker-distributed"
             echo "  --os <os>              操作系统: macos, linux"
             echo "  --non-interactive      非交互模式：从 config.yaml 读取配置，跳过菜单"
-            echo "  --config <path>        指定 config.yaml 路径 (默认: ~/.agent-browser/config.yaml)"
+            echo "  --config <path>        指定 config.yaml 路径 (默认: ~/.stealth-browser/config.yaml)"
             echo "  --help                 显示帮助信息"
             exit 0
             ;;
@@ -213,7 +213,7 @@ done
 
 # 非交互模式：从 config.yaml 读取部署模式
 if [[ "$NON_INTERACTIVE" == "true" ]]; then
-    CFG_FILE="${CONFIG_PATH:-$HOME/.agent-browser/config.yaml}"
+    CFG_FILE="${CONFIG_PATH:-$HOME/.stealth-browser/config.yaml}"
     if [[ -f "$CFG_FILE" ]]; then
         # 用 grep+awk 提取 deployment.mode（兼容无 yq 的环境）
         READ_MODE=$(grep -E '^\s*mode:' "$CFG_FILE" | head -1 | awk -F': '{print $2}' | tr -d ' "')

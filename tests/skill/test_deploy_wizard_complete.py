@@ -16,17 +16,17 @@ from unittest import mock
 
 import pytest
 
-from agent_browser.config import SkillConfig, from_deploy_config, load_config
+from stealth_browser.config import SkillConfig, from_deploy_config, load_config
 
-# agent_browser is now a proper installable package -- no sys.path hacks needed
-from agent_browser.deploy_config import (
+# stealth_browser is now a proper installable package -- no sys.path hacks needed
+from stealth_browser.deploy_config import (
     ConfigIssue,
     DeployConfig,
     generate_config,
     load_deploy_config,
     validate_config,
 )
-from agent_browser.main import (
+from stealth_browser.main import (
     DepStatus,
     FirstSessionError,
     RecoveryReport,
@@ -42,7 +42,7 @@ from agent_browser.main import (
 class TestYamlPathConsistency:
     """Verify generate_config() writes what config.py can read back.
 
-    IMPORTANT: load_config() resolves to Path.home()/.agent-browser/config.yaml.
+    IMPORTANT: load_config() resolves to Path.home()/.stealth-browser/config.yaml.
     load_deploy_config() uses CONFIG_PATH (defaults to same path).
     Tests must write to the same path that readers will use.
     """
@@ -50,7 +50,7 @@ class TestYamlPathConsistency:
     @staticmethod
     def _target_path(tmp_path) -> Path:
         """Return the path where both generate_config and load_config expect the file."""
-        return tmp_path / ".agent-browser" / "config.yaml"
+        return tmp_path / ".stealth-browser" / "config.yaml"
 
     def test_stealth_mode_roundtrip_through_config_py(self, tmp_path):
         """stealth.mode written by generate_config() is readable by load_config()."""
@@ -59,7 +59,7 @@ class TestYamlPathConsistency:
         generate_config(cfg, path=target)
 
         # Read via config.py's path (what the actual runtime uses)
-        with mock.patch("agent_browser.config.Path.home", return_value=tmp_path):
+        with mock.patch("stealth_browser.config.Path.home", return_value=tmp_path):
             loaded = load_config()
 
         assert loaded.stealth_mode == "vanilla", f"Expected stealth_mode=vanilla but got {loaded.stealth_mode}"
@@ -71,7 +71,7 @@ class TestYamlPathConsistency:
         target = self._target_path(tmp_path)
         generate_config(cfg, path=target)
 
-        with mock.patch("agent_browser.config.Path.home", return_value=tmp_path):
+        with mock.patch("stealth_browser.config.Path.home", return_value=tmp_path):
             loaded = load_config()
 
         assert loaded.cdp_url == "http://localhost:9222"
@@ -82,7 +82,7 @@ class TestYamlPathConsistency:
         target = self._target_path(tmp_path)
         generate_config(cfg, path=target)
 
-        with mock.patch("agent_browser.config.Path.home", return_value=tmp_path):
+        with mock.patch("stealth_browser.config.Path.home", return_value=tmp_path):
             loaded = load_config()
 
         assert "9000" in loaded.api_url
@@ -93,7 +93,7 @@ class TestYamlPathConsistency:
         target = self._target_path(tmp_path)
         generate_config(cfg, path=target)
 
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", target):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", target):
             dep = load_deploy_config()
         assert dep.mode == "docker-aio"
 
@@ -133,11 +133,11 @@ another_unknown: yes
         target = self._target_path(tmp_path)
         generate_config(cfg, path=target)
 
-        with mock.patch("agent_browser.config.Path.home", return_value=tmp_path):
+        with mock.patch("stealth_browser.config.Path.home", return_value=tmp_path):
             load_config()
 
         # Verify key fields survived roundtrip through BOTH systems
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", target):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", target):
             dep = load_deploy_config()
         assert dep.mode == "docker-aio"
         assert dep.browser_type == "playwright"
@@ -174,7 +174,7 @@ another_unknown: yes
         # Switch back to local
         generate_config(DeployConfig(mode="local"), path=target)
 
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", target):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", target):
             dep = load_deploy_config()
         assert dep.mode == "local"
         # Docker section should NOT have been written for local mode (or if written, shouldn't break)
@@ -341,7 +341,7 @@ class TestLoadDeployConfigEdgeCases:
         bad_file = tmp_path / "list_config.yaml"
         bad_file.write_text("- item1\n- item2\n")
 
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", bad_file):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", bad_file):
             cfg = load_deploy_config()
             assert isinstance(cfg, DeployConfig)
             assert cfg.mode == "local"  # defaults
@@ -351,7 +351,7 @@ class TestLoadDeployConfigEdgeCases:
         bad_file = tmp_path / "corrupt.yaml"
         bad_file.write_bytes(b"\x00\x01\x02\xff\xfe")
 
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", bad_file):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", bad_file):
             cfg = load_deploy_config()
             assert isinstance(cfg, DeployConfig)
 
@@ -360,7 +360,7 @@ class TestLoadDeployConfigEdgeCases:
         bad_file = tmp_path / "string_browser.yaml"
         bad_file.write_text("browser: cloakbrowser\n")
 
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", bad_file):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", bad_file):
             cfg = load_deploy_config()
             assert isinstance(cfg, DeployConfig)
             assert cfg.browser_type == "cloakbrowser"  # default, string ignored
@@ -370,14 +370,14 @@ class TestLoadDeployConfigEdgeCases:
         # Absent: should use default []
         absent_file = tmp_path / "no_proxy.yaml"
         absent_file.write_text("mode: local\n")
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", absent_file):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", absent_file):
             cfg1 = load_deploy_config()
             assert cfg1.proxy_list == []
 
         # Explicit None: should also be [] (default)
         none_file = tmp_path / "none_proxy.yaml"
         none_file.write_text("mode: local\nproxy:\n  list: null\n")
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", none_file):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", none_file):
             cfg2 = load_deploy_config()
             # px.get("list", cfg.proxy_list) returns explicit None (not default [])
             assert cfg2.proxy_list is None
@@ -412,18 +412,18 @@ class TestEnsureMiddlewareRecovery:
         )
 
         with (
-            mock.patch("agent_browser.stealth.middleware.StealthMiddleware", return_value=mock_instance),
-            mock.patch("agent_browser.main._select_backend") as mock_sb,
-            mock.patch("agent_browser.main.detect_missing_deps", return_value=non_ready_report),
+            mock.patch("stealth_browser.stealth.middleware.StealthMiddleware", return_value=mock_instance),
+            mock.patch("stealth_browser.main._select_backend") as mock_sb,
+            mock.patch("stealth_browser.main.detect_missing_deps", return_value=non_ready_report),
         ):
             mock_sb.return_value = mock.MagicMock()
 
             with pytest.raises(FirstSessionError) as exc_info:
-                from agent_browser.main import SkillConfig, _ensure_middleware
+                from stealth_browser.main import SkillConfig, _ensure_middleware
 
                 config = SkillConfig()
                 # Reset global state
-                import agent_browser.main as main_mod
+                import stealth_browser.main as main_mod
 
                 main_mod._config = config
                 main_mod._middleware = None
@@ -444,11 +444,11 @@ class TestSetupFunctionEdgeCases:
     @pytest.mark.asyncio
     async def test_ready_false_when_errors_exist(self, tmp_path):
         """Issues present -> ready=False."""
-        with mock.patch("agent_browser.deploy_config.validate_config") as mock_vc:
+        with mock.patch("stealth_browser.deploy_config.validate_config") as mock_vc:
             mock_vc.return_value = [
                 ConfigIssue(severity="error", section="test", message="broken"),
             ]
-            with mock.patch("agent_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
+            with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
                 result = await setup()
 
         assert result["ready"] is False
@@ -456,11 +456,11 @@ class TestSetupFunctionEdgeCases:
     @pytest.mark.asyncio
     async def test_ready_true_when_clean(self, tmp_path):
         """No issues + report ready -> ready=True."""
-        with mock.patch("agent_browser.deploy_config.validate_config") as mock_vc:
+        with mock.patch("stealth_browser.deploy_config.validate_config") as mock_vc:
             mock_vc.return_value = []
-            with mock.patch("agent_browser.main.detect_missing_deps") as mock_dm:
+            with mock.patch("stealth_browser.main.detect_missing_deps") as mock_dm:
                 mock_dm.return_value = RecoveryReport()  # ready=True by default
-                with mock.patch("agent_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
+                with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
                     result = await setup()
 
         assert result["ready"] is True
@@ -468,7 +468,7 @@ class TestSetupFunctionEdgeCases:
     @pytest.mark.asyncio
     async def test_kwargs_override_loaded_config(self, tmp_path):
         """Explicit kwargs win over file-based config."""
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
             r1 = await setup(mode="local")
             r2 = await setup(mode="docker-aio")
 
@@ -478,9 +478,9 @@ class TestSetupFunctionEdgeCases:
     @pytest.mark.asyncio
     async def test_auto_fill_os_arch(self, tmp_path):
         """Empty os/arch fields filled from detect_environment."""
-        with mock.patch("agent_browser.deploy_config.detect_environment") as mock_de:
+        with mock.patch("stealth_browser.deploy_config.detect_environment") as mock_de:
             mock_de.return_value = {"os": "freebsd", "arch": "riscv64"}
-            with mock.patch("agent_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
+            with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
                 result = await setup()
 
         env = result["environment"]
@@ -498,7 +498,7 @@ class TestSetupFunctionEdgeCases:
         old_format.write_text("""
 legacy_top_level_key: preserved
 """)
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", old_format):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", old_format):
             result = await setup()
 
         assert result["ready"] in (True, False)  # shouldn't crash
@@ -532,7 +532,7 @@ class TestValidateConfigFullPaths:
 
     def test_docker_mode_no_binary(self):
         """Docker mode without docker binary = error."""
-        with mock.patch("agent_browser.deploy_config._command_exists") as mock_ce:
+        with mock.patch("stealth_browser.deploy_config._command_exists") as mock_ce:
             mock_ce.return_value = False
             issues = validate_config(DeployConfig(mode="docker-aio"), env_check=True)
 
@@ -541,7 +541,7 @@ class TestValidateConfigFullPaths:
 
     def test_k8s_mode_no_kubectl(self):
         """K8s mode without kubectl = error."""
-        with mock.patch("agent_browser.deploy_config._command_exists") as mock_ce:
+        with mock.patch("stealth_browser.deploy_config._command_exists") as mock_ce:
             mock_ce.return_value = False
             issues = validate_config(DeployConfig(mode="k8s-aio"), env_check=True)
 
@@ -784,7 +784,7 @@ class TestGoldenMasters:
             cdp_url="http://gateway.cdp:19222",
             headless=True,
             max_sessions=20,
-            k8s_namespace="agent-browser-prod",
+            k8s_namespace="stealth-browser-prod",
             k8s_context="prod-cluster",
             k8s_replicas=3,
         )
@@ -797,7 +797,7 @@ class TestGoldenMasters:
             data = yaml.safe_load(f)
 
         assert "k8s" in data
-        assert data["k8s"]["namespace"] == "agent-browser-prod"
+        assert data["k8s"]["namespace"] == "stealth-browser-prod"
         assert data["k8s"]["replicas"] == 3
         assert data["deployment"]["mode"] == "k8s-distributed"
 
@@ -817,7 +817,7 @@ class TestGoldenMasters:
         assert "browser" in data
         assert "skill" in data
         # Must be valid enough for load_deploy_config to read back
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", target):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", target):
             loaded = load_deploy_config()
         assert loaded.mode == "local"
 
@@ -831,7 +831,7 @@ class TestGoldenMasters:
         shutil.copy(fixture, target)
 
         # Should not crash when reading old format
-        with mock.patch("agent_browser.config.Path.home", return_value=tmp_path):
+        with mock.patch("stealth_browser.config.Path.home", return_value=tmp_path):
             loaded = load_config()
 
         assert loaded.calling_mode == "cli"

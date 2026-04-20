@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: agent-browser-config
-  namespace: agent-browser
+  name: stealth-browser-config
+  namespace: stealth-browser
 data:
   # Deployment mode
   DEPLOYMENT_MODE: "distributed"
@@ -24,7 +24,7 @@ data:
   HEADLESS: "false"
 
   # Public access (for noVNC URL generation)
-  BROWSER_PUBLIC_HOST: "agent-browser.local"
+  BROWSER_PUBLIC_HOST: "stealth-browser.local"
   BROWSER_PORT_OFFSET: "0"
 
   # Browser recycling (mixed mode)
@@ -32,7 +32,7 @@ data:
   BROWSER_IDLE_RESTART_MINUTES: "30"
 
   # Stealth profile: "off" (default, fast) | "balanced" | "minimal" | "full" (max anti-detection)
-  AGENT_BROWSER_STEALTH_PROFILE: "minimal"
+  STEALTH_BROWSER_STEALTH_PROFILE: "minimal"
 
   # BR pod resource tuning
   BR_SHM_SIZE: "512Mi"

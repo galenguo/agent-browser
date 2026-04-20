@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "[browser-node] Starting Agent Browser - Browser Node"
+echo "[browser-node] Starting Stealth Browser - Browser Node"
 echo "[browser-node] Pod: ${POD_NAME:-unknown}"
 
 mkdir -p /data/logs /data/profiles
@@ -48,7 +48,7 @@ echo "[browser-node] noVNC started"
 # ── 4. Browser Node API ───────────────────────────────────────
 echo "[browser-node] Starting Browser Node API on :8080..."
 cd /app
-exec python -m uvicorn agent_browser.browser.node_api:app \
+exec python -m uvicorn stealth_browser.browser.node_api:app \
     --host 0.0.0.0 \
     --port 8080 \
     --workers 1 \

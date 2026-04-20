@@ -1,4 +1,4 @@
-# Agent-Browser 架构方案V2
+# Stealth-Browser 架构方案V2
 
 ## 一、架构概览
 
@@ -118,7 +118,7 @@ browser-use 框架提供两层能力：
 **命令分组：**
 
 ```bash
-agent-browser
+stealth-browser
 ├── session          # 会话管理
 │   ├── create       # 创建会话
 │   ├── list         # 列出会话
@@ -156,7 +156,7 @@ agent-browser
 **示例命令映射：**
 
 ```python
-# CLI: agent-browser navigate goto --url https://example.com --session sess_123
+# CLI: stealth-browser navigate goto --url https://example.com --session sess_123
 # 实现：
 async def goto(session_id: str, url: str):
     browser_session = get_session(session_id)
@@ -164,7 +164,7 @@ async def goto(session_id: str, url: str):
     await page.goto(url)
     return {"status": "success", "url": page.url}
 
-# CLI: agent-browser interact click --selector "#button" --session sess_123
+# CLI: stealth-browser interact click --selector "#button" --session sess_123
 # 实现：
 async def click(session_id: str, selector: str):
     browser_session = get_session(session_id)
@@ -173,7 +173,7 @@ async def click(session_id: str, selector: str):
     await element.click()
     return {"status": "success", "selector": selector}
 
-# CLI: agent-browser extract text --selector ".content" --session sess_123
+# CLI: stealth-browser extract text --selector ".content" --session sess_123
 # 实现：
 async def extract_text(session_id: str, selector: str):
     browser_session = get_session(session_id)
@@ -191,26 +191,26 @@ async def extract_text(session_id: str, selector: str):
 **模式 A：有状态会话（推荐）**
 ```bash
 # 创建会话
-agent-browser session create --name my-session --browser local
+stealth-browser session create --name my-session --browser local
 # 输出：{"session_id": "sess_abc123", "cdp_url": "http://localhost:19222"}
 
 # 使用会话执行操作
-agent-browser navigate goto --session sess_abc123 --url https://example.com
-agent-browser interact click --session sess_abc123 --selector "#login"
+stealth-browser navigate goto --session sess_abc123 --url https://example.com
+stealth-browser interact click --session sess_abc123 --selector "#login"
 
 # 销毁会话
-agent-browser session destroy --session sess_abc123
+stealth-browser session destroy --session sess_abc123
 ```
 
 **模式 B：无状态命令（简化）**
 ```bash
 # 每次命令自动创建临时会话
-agent-browser navigate goto --url https://example.com --browser remote --cdp-url http://remote:19222
+stealth-browser navigate goto --url https://example.com --browser remote --cdp-url http://remote:19222
 # 命令结束后自动清理
 ```
 
 **会话存储：**
-- 本地模式：JSON 文件 `~/.agent-browser/sessions.json`
+- 本地模式：JSON 文件 `~/.stealth-browser/sessions.json`
 - 远程模式：内存存储（CLI 进程生命周期）
 
 ### 3.4 输出格式设计
@@ -387,7 +387,7 @@ session_mgr = UnifiedSessionManager(mode="cli")
 
 @click.group()
 def cli():
-    """Agent Browser CLI"""
+    """Stealth Browser CLI"""
     pass
 
 # ===== 会话管理 =====
@@ -598,7 +598,7 @@ async def create_session_with_gateway(user_id: str):
 export BROWSER_GATEWAY_URL=http://gateway:8001
 export BROWSER_GATEWAY_KEY=key_abc123
 
-agent-browser session create --name my-session --browser remote --use-gateway
+stealth-browser session create --name my-session --browser remote --use-gateway
 # CLI 内部调用 Gateway API 获取 CDP URL
 ```
 
@@ -856,7 +856,7 @@ class CDPConnectionPool:
 ## 八、目录结构（重构后）
 
 ```
-agent-browser/
+stealth-browser/
 ├── src/
 │   ├── core/                          # 核心能力层（新增）
 │   │   ├── browser_controller.py      # browser-use 原子能力封装
@@ -989,43 +989,43 @@ Response:
 
 ### 会话管理
 ```bash
-agent-browser session create --name <name> [--browser local|remote] [--cdp-url <url>]
-agent-browser session list
-agent-browser session info --session <id>
-agent-browser session destroy --session <id>
+stealth-browser session create --name <name> [--browser local|remote] [--cdp-url <url>]
+stealth-browser session list
+stealth-browser session info --session <id>
+stealth-browser session destroy --session <id>
 ```
 
 ### 导航操作
 ```bash
-agent-browser navigate goto --session <id> --url <url>
-agent-browser navigate back --session <id>
-agent-browser navigate forward --session <id>
-agent-browser navigate refresh --session <id>
+stealth-browser navigate goto --session <id> --url <url>
+stealth-browser navigate back --session <id>
+stealth-browser navigate forward --session <id>
+stealth-browser navigate refresh --session <id>
 ```
 
 ### 交互操作
 ```bash
-agent-browser interact click --session <id> --selector <css>
-agent-browser interact input --session <id> --selector <css> --text <text>
-agent-browser interact scroll --session <id> --direction up|down --amount <px>
-agent-browser interact select --session <id> --selector <css> --value <value>
+stealth-browser interact click --session <id> --selector <css>
+stealth-browser interact input --session <id> --selector <css> --text <text>
+stealth-browser interact scroll --session <id> --direction up|down --amount <px>
+stealth-browser interact select --session <id> --selector <css> --value <value>
 ```
 
 ### 内容提取
 ```bash
-agent-browser extract text --session <id> --selector <css>
-agent-browser extract html --session <id> --selector <css>
-agent-browser extract dom --session <id> [--simplified]
-agent-browser extract screenshot --session <id> [--full-page]
-agent-browser extract elements --session <id> --selector <css>
+stealth-browser extract text --session <id> --selector <css>
+stealth-browser extract html --session <id> --selector <css>
+stealth-browser extract dom --session <id> [--simplified]
+stealth-browser extract screenshot --session <id> [--full-page]
+stealth-browser extract elements --session <id> --selector <css>
 ```
 
 ### 页面管理
 ```bash
-agent-browser page new --session <id> [--url <url>]
-agent-browser page switch --session <id> --index <n>
-agent-browser page close --session <id> --index <n>
-agent-browser page list --session <id>
+stealth-browser page new --session <id> [--url <url>]
+stealth-browser page switch --session <id> --index <n>
+stealth-browser page close --session <id> --index <n>
+stealth-browser page list --session <id>
 ```
 
 
@@ -1054,23 +1054,23 @@ curl -X POST http://localhost:8000/sessions/alice_abc123/task \
 
 ```bash
 # 创建会话
-agent-browser session create --name job-search --browser local
+stealth-browser session create --name job-search --browser local
 # 输出：{"status": "success", "data": {"session_id": "job-search"}}
 
 # 导航到网站
-agent-browser navigate goto --session job-search --url https://www.zhipin.com
+stealth-browser navigate goto --session job-search --url https://www.zhipin.com
 
 # 输入搜索关键词
-agent-browser interact input --session job-search --selector "#search-input" --text "Python开发"
+stealth-browser interact input --session job-search --selector "#search-input" --text "Python开发"
 
 # 点击搜索按钮
-agent-browser interact click --session job-search --selector "#search-btn"
+stealth-browser interact click --session job-search --selector "#search-btn"
 
 # 提取结果
-agent-browser extract text --session job-search --selector ".job-list .job-item"
+stealth-browser extract text --session job-search --selector ".job-list .job-item"
 
 # 销毁会话
-agent-browser session destroy --session job-search
+stealth-browser session destroy --session job-search
 ```
 
 
@@ -1083,7 +1083,7 @@ curl -X POST http://gateway:8001/allocate \
 # 返回：{"cdp_url": "http://10.0.1.5:19222", "token": "jwt_token"}
 
 # CLI 使用远程浏览器
-agent-browser session create --name remote-session \
+stealth-browser session create --name remote-session \
   --browser remote \
   --cdp-url http://10.0.1.5:19222
 
@@ -2010,7 +2010,7 @@ class DOMCompressor:
 
 ### 时序图总结
 
-以上 9 个时序图覆盖了 agent-browser 重构后的核心场景：
+以上 9 个时序图覆盖了 stealth-browser 重构后的核心场景：
 
 1. **场景 1**：API 模式 + 本地浏览器 + 自主 Agent
 2. **场景 2**：CLI 模式 + 本地浏览器 + 原子命令

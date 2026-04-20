@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== Agent Browser: Install Traefik (Gateway API) ==="
+echo "=== Stealth Browser: Install Traefik (Gateway API) ==="
 
 # Step 1: Install Gateway API CRDs (standard)
 echo "Installing Gateway API CRDs..."

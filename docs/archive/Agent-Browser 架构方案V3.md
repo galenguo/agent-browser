@@ -1,4 +1,4 @@
-# Agent-Browser 架构方案V3
+# Stealth-Browser 架构方案V3
 
 ## 一、架构图解读
 
@@ -311,27 +311,27 @@ CLI/API → Gateway (释放) → Docker/K8s (销毁容器)
 
 ```bash
 # 1. 创建会话
-agent-browser session create --name job-search --browser local
+stealth-browser session create --name job-search --browser local
 # 返回：{"session_id": "job-search", "cdp_url": "http://localhost:19222"}
 
 # 2. 导航到网站
-agent-browser navigate goto --session job-search --url https://www.zhipin.com
+stealth-browser navigate goto --session job-search --url https://www.zhipin.com
 # 返回：{"status": "success", "url": "https://www.zhipin.com", "trace": {...}}
 
 # 3. 输入搜索关键词
-agent-browser interact input --session job-search --selector "#search-input" --text "Python开发"
+stealth-browser interact input --session job-search --selector "#search-input" --text "Python开发"
 # 返回：{"status": "success", "selector": "#search-input", "trace": {...}}
 
 # 4. 点击搜索
-agent-browser interact click --session job-search --selector "#search-btn"
+stealth-browser interact click --session job-search --selector "#search-btn"
 # 返回：{"status": "success", "selector": "#search-btn", "trace": {...}}
 
 # 5. 提取结果
-agent-browser extract text --session job-search --selector ".job-list .job-item"
+stealth-browser extract text --session job-search --selector ".job-list .job-item"
 # 返回：{"status": "success", "text": "...", "trace": {...}}
 
 # 6. 销毁会话
-agent-browser session destroy --session job-search
+stealth-browser session destroy --session job-search
 # 返回：{"status": "destroyed"}
 ```
 
@@ -381,16 +381,16 @@ export BROWSER_GATEWAY_URL=http://gateway:8001
 export BROWSER_GATEWAY_KEY=key_abc123
 
 # 1. 创建会话（自动通过 Gateway 分配浏览器）
-agent-browser session create --name remote-job --browser remote --use-gateway
+stealth-browser session create --name remote-job --browser remote --use-gateway
 # CLI 内部调用：Gateway /allocate → 返回 cdp_url
 # 返回：{"session_id": "remote-job", "cdp_url": "http://10.0.1.5:19222"}
 
 # 2-5. 执行操作（与本地浏览器相同）
-agent-browser navigate goto --session remote-job --url https://www.zhipin.com
+stealth-browser navigate goto --session remote-job --url https://www.zhipin.com
 # ...
 
 # 6. 销毁会话（自动释放 Gateway 资源）
-agent-browser session destroy --session remote-job
+stealth-browser session destroy --session remote-job
 # CLI 内部调用：Gateway /release
 # 返回：{"status": "destroyed"}
 ```
@@ -1008,7 +1008,7 @@ session_mgr = UnifiedSessionManager(mode="cli")
 
 @click.group()
 def cli():
-    """Agent Browser CLI"""
+    """Stealth Browser CLI"""
     pass
 
 @cli.group()
@@ -1158,7 +1158,7 @@ async def test_cli_local_basic_operations():
 
     # 1. 创建会话
     result = subprocess.run(
-        ["agent-browser", "session", "create", "--name", "test1", "--browser", "local"],
+        ["stealth-browser", "session", "create", "--name", "test1", "--browser", "local"],
         capture_output=True, text=True
     )
     data = json.loads(result.stdout)
@@ -1167,7 +1167,7 @@ async def test_cli_local_basic_operations():
 
     # 2. 导航
     result = subprocess.run(
-        ["agent-browser", "navigate", "goto", "--session", session_id, "--url", "https://example.com"],
+        ["stealth-browser", "navigate", "goto", "--session", session_id, "--url", "https://example.com"],
         capture_output=True, text=True
     )
     data = json.loads(result.stdout)
@@ -1176,7 +1176,7 @@ async def test_cli_local_basic_operations():
 
     # 3. 提取文本
     result = subprocess.run(
-        ["agent-browser", "extract", "text", "--session", session_id, "--selector", "h1"],
+        ["stealth-browser", "extract", "text", "--session", session_id, "--selector", "h1"],
         capture_output=True, text=True
     )
     data = json.loads(result.stdout)
@@ -1185,7 +1185,7 @@ async def test_cli_local_basic_operations():
 
     # 4. 销毁会话
     result = subprocess.run(
-        ["agent-browser", "session", "destroy", "--session", session_id],
+        ["stealth-browser", "session", "destroy", "--session", session_id],
         capture_output=True, text=True
     )
     data = json.loads(result.stdout)
@@ -1208,32 +1208,32 @@ async def test_cli_local_full_task():
     try:
         # 创建会话
         result = subprocess.run(
-            ["agent-browser", "session", "create", "--name", "job-search", "--browser", "local"],
+            ["stealth-browser", "session", "create", "--name", "job-search", "--browser", "local"],
             capture_output=True, text=True
         )
         session_id = json.loads(result.stdout)["data"]["session_id"]
 
         # 导航到 Boss 直聘
         subprocess.run(
-            ["agent-browser", "navigate", "goto", "--session", session_id, "--url", "https://www.zhipin.com"],
+            ["stealth-browser", "navigate", "goto", "--session", session_id, "--url", "https://www.zhipin.com"],
             capture_output=True, text=True
         )
 
         # 输入搜索关键词
         subprocess.run(
-            ["agent-browser", "interact", "input", "--session", session_id, "--selector", "#search-input", "--text", "Python开发"],
+            ["stealth-browser", "interact", "input", "--session", session_id, "--selector", "#search-input", "--text", "Python开发"],
             capture_output=True, text=True
         )
 
         # 点击搜索按钮
         subprocess.run(
-            ["agent-browser", "interact", "click", "--session", session_id, "--selector", "#search-btn"],
+            ["stealth-browser", "interact", "click", "--session", session_id, "--selector", "#search-btn"],
             capture_output=True, text=True
         )
 
         # 提取结果
         result = subprocess.run(
-            ["agent-browser", "extract", "text", "--session", session_id, "--selector", ".job-list"],
+            ["stealth-browser", "extract", "text", "--session", session_id, "--selector", ".job-list"],
             capture_output=True, text=True
         )
         data = json.loads(result.stdout)
@@ -1243,7 +1243,7 @@ async def test_cli_local_full_task():
     finally:
         if session_id:
             subprocess.run(
-                ["agent-browser", "session", "destroy", "--session", session_id],
+                ["stealth-browser", "session", "destroy", "--session", session_id],
                 capture_output=True, text=True
             )
 ```
@@ -1313,7 +1313,7 @@ async def test_cli_remote_gateway():
     try:
         # 创建远程会话
         result = subprocess.run(
-            ["agent-browser", "session", "create", "--name", "remote1", "--browser", "remote", "--use-gateway"],
+            ["stealth-browser", "session", "create", "--name", "remote1", "--browser", "remote", "--use-gateway"],
             capture_output=True, text=True
         )
         data = json.loads(result.stdout)
@@ -1323,7 +1323,7 @@ async def test_cli_remote_gateway():
 
         # 执行操作
         result = subprocess.run(
-            ["agent-browser", "navigate", "goto", "--session", session_id, "--url", "https://example.com"],
+            ["stealth-browser", "navigate", "goto", "--session", session_id, "--url", "https://example.com"],
             capture_output=True, text=True
         )
         assert json.loads(result.stdout)["status"] == "success"
@@ -1331,7 +1331,7 @@ async def test_cli_remote_gateway():
     finally:
         if session_id:
             subprocess.run(
-                ["agent-browser", "session", "destroy", "--session", session_id],
+                ["stealth-browser", "session", "destroy", "--session", session_id],
                 capture_output=True, text=True
             )
 ```

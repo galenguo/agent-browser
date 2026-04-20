@@ -1,5 +1,5 @@
 """
-E2E Workflow Test -- Full agent_browser API lifecycle.
+E2E Workflow Test -- Full stealth_browser API lifecycle.
 
 Validates the complete user workflow:
   1. create_session -> get a browser session
@@ -16,7 +16,7 @@ Prerequisites:
 
 import pytest
 
-from agent_browser import AgentBrowser, SkillConfig
+from stealth_browser import StealthBrowser, SkillConfig
 
 
 @pytest.mark.requires_browser
@@ -27,7 +27,7 @@ class TestE2EWorkflow:
     async def test_full_lifecycle(self, cdp_url):
         """Complete workflow: create -> navigate -> snapshot -> extract -> delete."""
         cfg = SkillConfig(cdp_url=cdp_url)
-        ab = AgentBrowser(cfg)
+        ab = StealthBrowser(cfg)
 
         # Step 1: Create session
         session_id = await ab.create_session()
@@ -69,7 +69,7 @@ class TestE2EWorkflow:
     async def test_evaluate_structured_data(self, cdp_url):
         """Extract structured data (links, headings) from a real page."""
         cfg = SkillConfig(cdp_url=cdp_url)
-        ab = AgentBrowser(cfg)
+        ab = StealthBrowser(cfg)
 
         session_id = await ab.create_session()
         try:
@@ -107,10 +107,10 @@ class TestE2EWorkflow:
 
     @pytest.mark.asyncio
     async def test_context_manager(self, cdp_url):
-        """Test AgentBrowser as an async context manager."""
+        """Test StealthBrowser as an async context manager."""
         cfg = SkillConfig(cdp_url=cdp_url)
 
-        async with AgentBrowser(cfg) as ab:
+        async with StealthBrowser(cfg) as ab:
             session_id = await ab.create_session()
             try:
                 await ab.open_page("https://example.com", session_id=session_id)
@@ -128,7 +128,7 @@ class TestE2EPipelineWorkflow:
     @pytest.mark.asyncio
     async def test_execute_navigate_and_evaluate(self, cdp_url):
         """Execute a minimal pipeline: navigate + evaluate."""
-        from agent_browser.pipeline.executor import execute_pipeline
+        from stealth_browser.pipeline.executor import execute_pipeline
 
         steps = [
             {"navigate": "https://example.com"},
@@ -136,7 +136,7 @@ class TestE2EPipelineWorkflow:
         ]
 
         cfg = SkillConfig(cdp_url=cdp_url)
-        ab = AgentBrowser(cfg)
+        ab = StealthBrowser(cfg)
         session_id = await ab.create_session()
 
         try:

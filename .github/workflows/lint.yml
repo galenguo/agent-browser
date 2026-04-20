@@ -33,7 +33,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Run ruff lint
-        run: ruff check agent_browser/ tests/
+        run: ruff check stealth_browser/ tests/
 
       - name: Run ruff format check
-        run: ruff format --check agent_browser/ tests/
+        run: ruff format --check stealth_browser/ tests/

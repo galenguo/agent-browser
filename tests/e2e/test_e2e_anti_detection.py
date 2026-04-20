@@ -209,7 +209,7 @@ class TestBossZhipinAntiDetection:
     """
     Boss 直聘反检测验证 — 核心产品 claim 测试。
 
-    这是 Agent-Browser 的关键用例：如果 CloakBrowser + StealthMiddleware
+    这是 Stealth-Browser 的关键用例：如果 CloakBrowser + StealthMiddleware
     能让 Zhipin 正常显示 QR 登录页（而非白屏/跳转/验证码墙），
     则证明 7 层反检测栈在高防护中文站点上有效。
     """

@@ -43,7 +43,7 @@ class TestModeMatrix:
     @pytest.mark.asyncio
     async def test_mode_combo_configures(self, calling, browser, intel, mock_backend_for_modes):
         """configure() accepts all mode combos without error."""
-        from agent_browser.config import load_config
+        from stealth_browser.config import load_config
 
         cfg = load_config(
             calling_mode=calling,
@@ -57,7 +57,7 @@ class TestModeMatrix:
     @pytest.mark.parametrize("calling,browser,intel", MODE_COMBOS)
     def test_mode_combo_load_config_sync(self, calling, browser, intel):
         """load_config() is synchronous and returns valid config."""
-        from agent_browser.config import load_config
+        from stealth_browser.config import load_config
 
         cfg = load_config(
             calling_mode=calling,
@@ -80,7 +80,7 @@ class TestCLIRemoteFallback:
 
     def test_cli_remote_corrected_to_local(self):
         """configure(calling='cli', browser='remote') → browser becomes 'local'."""
-        from agent_browser.config import load_config
+        from stealth_browser.config import load_config
 
         cfg = load_config(
             calling_mode="cli",
@@ -90,7 +90,7 @@ class TestCLIRemoteFallback:
 
     def test_api_remote_not_corrected(self):
         """API+remote is NOT corrected (only CLI triggers fallback)."""
-        from agent_browser.config import load_config
+        from stealth_browser.config import load_config
 
         cfg = load_config(
             calling_mode="api",
@@ -100,7 +100,7 @@ class TestCLIRemoteFallback:
 
     def test_cli_local_unchanged(self):
         """CLI+local stays as-is."""
-        from agent_browser.config import load_config
+        from stealth_browser.config import load_config
 
         cfg = load_config(
             calling_mode="cli",
@@ -119,7 +119,7 @@ class TestConfigDefaults:
 
     def test_default_is_cli_local_llm(self):
         """Default config is API + remote + LLM."""
-        from agent_browser.config import SkillConfig
+        from stealth_browser.config import SkillConfig
 
         cfg = SkillConfig()
         assert cfg.calling_mode == "api"
@@ -128,21 +128,21 @@ class TestConfigDefaults:
 
     def test_default_cdp_url(self):
         """Default CDP URL points to CloakBrowser port."""
-        from agent_browser.config import SkillConfig
+        from stealth_browser.config import SkillConfig
 
         cfg = SkillConfig()
         assert "19222" in cfg.cdp_url
 
     def test_default_stealth_enabled(self):
         """Stealth is enabled by default."""
-        from agent_browser.config import SkillConfig
+        from stealth_browser.config import SkillConfig
 
         cfg = SkillConfig()
         assert cfg.stealth_enabled is True
 
     def test_override_individual_fields(self):
         """Each field can be overridden independently."""
-        from agent_browser.config import load_config
+        from stealth_browser.config import load_config
 
         cfg = load_config(
             cdp_url="http://custom:9999",

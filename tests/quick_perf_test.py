@@ -11,7 +11,7 @@ import pytest
 
 
 def _api_server_available():
-    """Check if the agent-browser API server is reachable and healthy."""
+    """Check if the stealth-browser API server is reachable and healthy."""
     try:
         import httpx
 
@@ -121,7 +121,7 @@ async def test_memory_stress():
         for i in range(20):  # 监控 60 秒
             try:
                 result = subprocess.run(
-                    ["docker", "stats", "agent-browser", "--no-stream", "--format", "{{.CPUPerc}},{{.MemUsage}}"],
+                    ["docker", "stats", "stealth-browser", "--no-stream", "--format", "{{.CPUPerc}},{{.MemUsage}}"],
                     capture_output=True,
                     text=True,
                     timeout=5,

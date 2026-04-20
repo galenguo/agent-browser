@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from agent_browser.explore.synthesizer import (
+from stealth_browser.explore.synthesizer import (
     build_adapter,
     detect_strategy,
     distill_trace,

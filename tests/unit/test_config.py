@@ -59,7 +59,7 @@ class TestSkillConfigDefaults:
         cfg = SkillConfig()
         assert cfg.daemon_enabled is True
         assert cfg.daemon_idle_timeout == 1800
-        assert cfg.daemon_state_path == "~/.agent-browser/daemon-state.json"
+        assert cfg.daemon_state_path == "~/.stealth-browser/daemon-state.json"
 
     def test_default_stealth_settings(self):
         """默认隐匿配置"""
@@ -72,73 +72,73 @@ class TestEnvOverrides:
     """A1.2 环境变量覆盖测试"""
 
     def test_env_calling_mode(self):
-        """AGENT_BROWSER_CALLING_MODE 环境变量"""
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_CALLING_MODE": "api"}):
+        """STEALTH_BROWSER_CALLING_MODE 环境变量"""
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_CALLING_MODE": "api"}):
             cfg = SkillConfig()
             cfg = _apply_env_overrides(cfg)
             assert cfg.calling_mode == "api"
 
     def test_env_browser_mode(self):
-        """AGENT_BROWSER_BROWSER_MODE 环境变量"""
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_BROWSER_MODE": "remote"}):
+        """STEALTH_BROWSER_BROWSER_MODE 环境变量"""
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_BROWSER_MODE": "remote"}):
             cfg = SkillConfig()
             cfg = _apply_env_overrides(cfg)
             assert cfg.browser_mode == "remote"
 
     def test_env_intelligence(self):
-        """AGENT_BROWSER_INTELLIGENCE 环境变量"""
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_INTELLIGENCE": "agent"}):
+        """STEALTH_BROWSER_INTELLIGENCE 环境变量"""
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_INTELLIGENCE": "agent"}):
             cfg = SkillConfig()
             cfg = _apply_env_overrides(cfg)
             assert cfg.intelligence == "agent"
 
     def test_env_cdp_url(self):
-        """AGENT_BROWSER_CDP_URL 环境变量"""
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_CDP_URL": "http://192.168.1.100:9222"}):
+        """STEALTH_BROWSER_CDP_URL 环境变量"""
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_CDP_URL": "http://192.168.1.100:9222"}):
             cfg = SkillConfig()
             cfg = _apply_env_overrides(cfg)
             assert cfg.cdp_url == "http://192.168.1.100:9222"
 
     def test_env_api_url(self):
-        """AGENT_BROWSER_API_URL 环境变量"""
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_API_URL": "http://api.example.com:8080"}):
+        """STEALTH_BROWSER_API_URL 环境变量"""
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_API_URL": "http://api.example.com:8080"}):
             cfg = SkillConfig()
             cfg = _apply_env_overrides(cfg)
             assert cfg.api_url == "http://api.example.com:8080"
 
     def test_env_api_key(self):
-        """AGENT_BROWSER_API_KEY 环境变量"""
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_API_KEY": "test-key-123"}):
+        """STEALTH_BROWSER_API_KEY 环境变量"""
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_API_KEY": "test-key-123"}):
             cfg = SkillConfig()
             cfg = _apply_env_overrides(cfg)
             assert cfg.api_key == "test-key-123"
 
     def test_env_daemon_enabled_true(self):
-        """AGENT_BROWSER_DAEMON_ENABLED=true"""
+        """STEALTH_BROWSER_DAEMON_ENABLED=true"""
         for val in ("1", "true", "yes"):
-            with mock.patch.dict(os.environ, {"AGENT_BROWSER_DAEMON_ENABLED": val}):
+            with mock.patch.dict(os.environ, {"STEALTH_BROWSER_DAEMON_ENABLED": val}):
                 cfg = SkillConfig()
                 cfg = _apply_env_overrides(cfg)
                 assert cfg.daemon_enabled is True
 
     def test_env_daemon_enabled_false(self):
-        """AGENT_BROWSER_DAEMON_ENABLED=false"""
+        """STEALTH_BROWSER_DAEMON_ENABLED=false"""
         for val in ("0", "false", "no"):
-            with mock.patch.dict(os.environ, {"AGENT_BROWSER_DAEMON_ENABLED": val}):
+            with mock.patch.dict(os.environ, {"STEALTH_BROWSER_DAEMON_ENABLED": val}):
                 cfg = SkillConfig()
                 cfg = _apply_env_overrides(cfg)
                 assert cfg.daemon_enabled is False
 
     def test_env_daemon_idle_timeout(self):
-        """AGENT_BROWSER_DAEMON_IDLE_TIMEOUT 环境变量"""
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_DAEMON_IDLE_TIMEOUT": "3600"}):
+        """STEALTH_BROWSER_DAEMON_IDLE_TIMEOUT 环境变量"""
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_DAEMON_IDLE_TIMEOUT": "3600"}):
             cfg = SkillConfig()
             cfg = _apply_env_overrides(cfg)
             assert cfg.daemon_idle_timeout == 3600
 
     def test_env_stealth_enabled(self):
-        """AGENT_BROWSER_STEALTH_ENABLED 环境变量"""
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_STEALTH_ENABLED": "false"}):
+        """STEALTH_BROWSER_STEALTH_ENABLED 环境变量"""
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_STEALTH_ENABLED": "false"}):
             cfg = SkillConfig()
             cfg = _apply_env_overrides(cfg)
             assert cfg.stealth_enabled is False
@@ -213,14 +213,14 @@ class TestLoadConfigPriority:
 
     def test_explicit_params_override_all(self):
         """显式参数优先级最高"""
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_CALLING_MODE": "api"}):
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_CALLING_MODE": "api"}):
             cfg = load_config(calling_mode="cli")
             assert cfg.calling_mode == "cli"
 
     def test_env_overrides_yaml(self):
         """环境变量优先级高于 YAML"""
         yaml_data = {"calling_mode": "api"}
-        with mock.patch.dict(os.environ, {"AGENT_BROWSER_CALLING_MODE": "cli"}):
+        with mock.patch.dict(os.environ, {"STEALTH_BROWSER_CALLING_MODE": "cli"}):
             cfg = SkillConfig()
             cfg = _apply_yaml_overrides(cfg, yaml_data)
             cfg = _apply_env_overrides(cfg)

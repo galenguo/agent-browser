@@ -1,12 +1,12 @@
 [project]
-name = "agent-browser"
+name = "stealth-browser"
 version = "0.2.1"
 description = "Anti-detection browser automation framework built on browser-use"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.11"
 authors = [
-    {name = "Agent Browser Contributors"},
+    {name = "Stealth Browser Contributors"},
 ]
 keywords = [
     "browser-automation",
@@ -44,8 +44,8 @@ cloak = [
     "patchright>=0.1.0",
 ]
 full = [
-    "agent-browser[cloak]",
-    "agent-browser[redis]",
+    "stealth-browser[cloak]",
+    "stealth-browser[redis]",
     "langchain-openai>=0.1",
     "langchain-anthropic>=0.1",
     "fastapi>=0.100",
@@ -61,13 +61,13 @@ dev = [
 ]
 
 [project.scripts]
-agent-browser = "agent_browser.cli.main:cli"
-agent-browser-daemon = "agent_browser.skill.daemon:main"
+stealth-browser = "stealth_browser.cli.main:cli"
+stealth-browser-daemon = "stealth_browser.skill.daemon:main"
 
 [project.urls]
-Homepage = "https://github.com/your-org/agent-browser"
-Repository = "https://github.com/your-org/agent-browser"
-Issues = "https://github.com/your-org/agent-browser/issues"
+Homepage = "https://github.com/your-org/stealth-browser"
+Repository = "https://github.com/your-org/stealth-browser"
+Issues = "https://github.com/your-org/stealth-browser/issues"
 
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
@@ -138,105 +138,105 @@ max-complexity = 18
 ]
 
 # Source files with intentional complexity or API patterns
-"agent_browser/explore/*" = [
+"stealth_browser/explore/*" = [
     "ARG001",  # API signatures with unused params for consistency
     "C901",    # exploration logic is inherently complex
     "PTH",     # explore uses os.path extensively for artifact paths
 ]
-"agent_browser/browser/daemon.py" = [
+"stealth_browser/browser/daemon.py" = [
     "C901",    # daemon WebSocket server is complex by nature
 ]
-"agent_browser/pipeline/steps.py" = [
+"stealth_browser/pipeline/steps.py" = [
     "ARG001",  # stealth, data, context params for interface consistency
     "C901",    # step handlers are complex (snapshot especially)
     "PTH",     # steps use os.path for file operations
 ]
-"agent_browser/adapters/loader.py" = [
+"stealth_browser/adapters/loader.py" = [
     "PTH",     # loader uses os.path for adapter discovery
 ]
-"agent_browser/browser/extension.py" = [
+"stealth_browser/browser/extension.py" = [
     "ARG002",  # Interface params (wait_until, timeout) for ABC compatibility
 ]
-"agent_browser/browser/instance_pool.py" = [
+"stealth_browser/browser/instance_pool.py" = [
     "ARG001",  # browser_type param for consistency
     "ARG002",  # browser_type method param for API consistency
     "PTH",     # Docker path operations use os.path
 ]
-"agent_browser/session/*" = [
+"stealth_browser/session/*" = [
     "ARG002",  # interactive_only etc. for API compatibility
     "PTH",     # profile management uses os.path/open
 ]
-"agent_browser/api/*" = [
+"stealth_browser/api/*" = [
     "E402",    # stale file, will be removed on next migration
     "PTH",     # api uses os.path for profile paths
     "ARG001",  # unused args in request handlers
     "B904",    # HTTPException re-raise style
     "UP045",   # Optional[X | None] vs X | None style
 ]
-"agent_browser/browser/local.py" = [
+"stealth_browser/browser/local.py" = [
     "ARG002",  # kwargs in page handle methods for ABC compatibility
     "C901",    # run_task is complex (agent mode with chunking)
     "RUF006",  # create_task return value intentionally unused
 ]
-"agent_browser/browser/remote.py" = [
+"stealth_browser/browser/remote.py" = [
     "ARG002",  # intelligence, llm_config params for API consistency
 ]
-"agent_browser/browser/stealth_launcher.py" = [
+"stealth_browser/browser/stealth_launcher.py" = [
     "PTH",     # launcher uses os.path for profile/chromium paths
 ]
-"agent_browser/cli/main.py" = [
+"stealth_browser/cli/main.py" = [
     "ARG001",  # CLI command handlers have unused params from click
 ]
-"agent_browser/main.py" = [
+"stealth_browser/main.py" = [
     "ARG001",  # debug_pipeline params (cdp_url, kwargs) for API consistency
     "RUF006",  # create_task return value intentionally unused
 ]
-"agent_browser/pipeline/fallback.py" = [
+"stealth_browser/pipeline/fallback.py" = [
     "ARG001",  # session_id param for interface consistency
 ]
-"agent_browser/pipeline/template.py" = [
+"stealth_browser/pipeline/template.py" = [
     "ARG001",  # **kw param in filter functions for API consistency
 ]
-"agent_browser/stealth/enhancer.py" = [
+"stealth_browser/stealth/enhancer.py" = [
     "ARG002",  # action_type param for interface consistency
 ]
-"agent_browser/config.py" = [
+"stealth_browser/config.py" = [
     "PTH",     # config uses open() for YAML files
 ]
-"agent_browser/deploy_config.py" = [
+"stealth_browser/deploy_config.py" = [
     "C901",    # validate_config checks many conditions
     "E402",    # async imports inside conditional blocks
     "PTH",     # deploy_config uses open() for YAML
 ]
-"agent_browser/pipeline/executor.py" = [
+"stealth_browser/pipeline/executor.py" = [
     "C901",    # execute_pipeline is complex (step loop + error handling)
 ]
-"agent_browser/pipeline/classifier.py" = [
+"stealth_browser/pipeline/classifier.py" = [
     "C901",    # classify has many heuristic branches
 ]
-"agent_browser/intelligence/agent_runner.py" = [
+"stealth_browser/intelligence/agent_runner.py" = [
     "C901",    # register_stealth_actions + agent setup
     "RUF006",  # create_task return intentionally unused
 ]
-"agent_browser/adapters/validator.py" = [
+"stealth_browser/adapters/validator.py" = [
     "C901",    # validate_adapter has 5 validation passes
 ]
-"agent_browser/llm/factory.py" = [
+"stealth_browser/llm/factory.py" = [
     "ARG004",  # **kwargs accepted for API consistency
 ]
-"agent_browser/session/pool_manager.py" = [
+"stealth_browser/session/pool_manager.py" = [
     "RUF006", # create_task return intentionally unused
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["agent_browser"]
+known-first-party = ["stealth_browser"]
 
 [tool.setuptools.packages.find]
-include = ["agent_browser*"]
+include = ["stealth_browser*"]
 exclude = ["tests*", "docs*", "examples*", "scripts*", "adapters*", "data*", "docker*", "helm*", "k8s*", "config*"]
 
 [tool.setuptools.package-data]
-agent_browser = [
+stealth_browser = [
     "skill/SKILL.md",
     "skill/config.yaml",
     "skill/daemon.py",

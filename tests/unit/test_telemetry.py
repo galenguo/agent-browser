@@ -2,7 +2,7 @@
 
 import pytest
 
-from agent_browser.pipeline.telemetry import _TEL_FILE, Telemetry
+from stealth_browser.pipeline.telemetry import _TEL_FILE, Telemetry
 
 
 @pytest.fixture(autouse=True)

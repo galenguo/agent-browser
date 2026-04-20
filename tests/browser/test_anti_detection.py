@@ -15,7 +15,7 @@ try:
     from patchright.async_api import async_playwright
 except ImportError:
     pytest.skip(
-        reason="patchright not installed (install with: pip install agent-browser[cloak])",
+        reason="patchright not installed (install with: pip install stealth-browser[cloak])",
         allow_module_level=True,
     )
 

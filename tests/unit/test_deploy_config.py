@@ -3,7 +3,7 @@
 import os
 from unittest import mock
 
-from agent_browser.deploy_config import (
+from stealth_browser.deploy_config import (
     DeployConfig,
     detect_environment,
     generate_config,
@@ -119,7 +119,7 @@ class TestLoadDeployConfig:
 
     def test_missing_file_returns_defaults(self, tmp_path):
         """Non-existent file should return defaults without error."""
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", tmp_path / "nonexistent.yaml"):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", tmp_path / "nonexistent.yaml"):
             cfg = load_deploy_config()
             assert isinstance(cfg, DeployConfig)
             assert cfg.mode == "local"
@@ -135,7 +135,7 @@ browser:
   type: cloakbrowser
   cdp_url: "http://127.0.0.1:19222"
 """)
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", cfg_file):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", cfg_file):
             cfg = load_deploy_config()
             assert cfg.mode == "docker-aio"
             assert cfg.os == "linux"
@@ -150,7 +150,7 @@ browser:
   headless: true
   max_sessions: 5
 """)
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", cfg_file):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", cfg_file):
             cfg = load_deploy_config()
             assert cfg.browser_type == "chrome"
             assert cfg.cdp_url == "http://localhost:9222"
@@ -168,7 +168,7 @@ docker:
     memory: "4Gi"
     cpu: "4000m"
 """)
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", cfg_file):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", cfg_file):
             cfg = load_deploy_config()
             assert cfg.docker_registry == "ghcr.io"
             assert cfg.docker_image_tag == "v2.0"
@@ -179,7 +179,7 @@ docker:
     def test_falls_back_to_defaults_for_missing_sections(self, tmp_path):
         cfg_file = tmp_path / "config.yaml"
         cfg_file.write_text("deployment:\n  mode: local\n")
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", cfg_file):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", cfg_file):
             cfg = load_deploy_config()
             # Should have defaults for sections not in YAML
             assert cfg.browser_type == "cloakbrowser"  # default
@@ -248,7 +248,7 @@ class TestGenerateConfig:
         target = tmp_path / "roundtrip.yaml"
         generate_config(original, path=target)
 
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", target):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", target):
             loaded = load_deploy_config()
 
         assert loaded.mode == original.mode

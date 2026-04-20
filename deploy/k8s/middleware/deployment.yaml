@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agent-browser
+  name: stealth-browser
   namespace: middleware
   labels:
-    app: agent-browser
+    app: stealth-browser
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: agent-browser
+      app: stealth-browser
   template:
     metadata:
       labels:
-        app: agent-browser
+        app: stealth-browser
     spec:
       containers:
-      - name: agent-browser
-        image: registry-cn-gimc-local.gimccloud.com/library/agent-browser:latest
+      - name: stealth-browser
+        image: registry-cn-gimc-local.gimccloud.com/library/stealth-browser:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
@@ -74,7 +74,7 @@ spec:
       volumes:
       - name: profiles
         persistentVolumeClaim:
-          claimName: agent-browser-profiles
+          claimName: stealth-browser-profiles
       - name: logs
         persistentVolumeClaim:
-          claimName: agent-browser-logs
+          claimName: stealth-browser-logs

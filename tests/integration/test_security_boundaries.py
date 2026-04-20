@@ -18,7 +18,7 @@ import pytest
 
 def _make_config_with_stealth():
     """Config with stealth ON (for circuit-dependent tests)."""
-    from agent_browser.config import SkillConfig
+    from stealth_browser.config import SkillConfig
 
     return SkillConfig(
         calling_mode="cli",
@@ -39,8 +39,8 @@ class TestSessionIsolation:
     @pytest.mark.asyncio
     async def test_different_sessions_get_different_handles(self):
         """create_session returns distinct handles for different session IDs."""
-        from agent_browser.config import SkillConfig
-        from agent_browser.stealth.middleware import StealthMiddleware
+        from stealth_browser.config import SkillConfig
+        from stealth_browser.stealth.middleware import StealthMiddleware
 
         backend = mock.MagicMock()
         handle_a = mock.MagicMock()
@@ -64,8 +64,8 @@ class TestSessionIsolation:
     @pytest.mark.asyncio
     async def test_delete_one_session_doesnt_affect_other(self):
         """Deleting session A doesn't invalidate session B's circuit."""
-        from agent_browser.stealth.enhancer import StealthEnhancer
-        from agent_browser.stealth.middleware import StealthMiddleware
+        from stealth_browser.stealth.enhancer import StealthEnhancer
+        from stealth_browser.stealth.middleware import StealthMiddleware
 
         if StealthEnhancer is None:
             pytest.skip("StealthEnhancer not available")
@@ -97,8 +97,8 @@ class TestSessionCleanup:
     @pytest.mark.asyncio
     async def test_delete_removes_circuit_state(self):
         """After delete, circuit is gone (stealth ON)."""
-        from agent_browser.stealth.enhancer import StealthEnhancer
-        from agent_browser.stealth.middleware import StealthMiddleware
+        from stealth_browser.stealth.enhancer import StealthEnhancer
+        from stealth_browser.stealth.middleware import StealthMiddleware
 
         if StealthEnhancer is None:
             pytest.skip("StealthEnhancer not available")
@@ -118,8 +118,8 @@ class TestSessionCleanup:
     @pytest.mark.asyncio
     async def test_delete_nonexistent_is_safe(self):
         """Deleting already-deleted or never-created session doesn't crash."""
-        from agent_browser.config import SkillConfig
-        from agent_browser.stealth.middleware import StealthMiddleware
+        from stealth_browser.config import SkillConfig
+        from stealth_browser.stealth.middleware import StealthMiddleware
 
         backend = mock.MagicMock()
         backend.delete_session = mock.AsyncMock()
@@ -140,7 +140,7 @@ class TestResourceLimits:
 
     def test_default_max_sessions_configurable(self):
         """SkillConfig has fields for resource limits."""
-        from agent_browser.config import SkillConfig
+        from stealth_browser.config import SkillConfig
 
         cfg = SkillConfig()
         # Config doesn't hardcode max_sessions; that's a backend concern
@@ -163,7 +163,7 @@ class TestCDPURLValidation:
 
     def test_cdp_url_rejects_public_ip_TODO(self):
         """TODO: Public IP as CDP URL should be rejected."""
-        from agent_browser.config import SkillConfig
+        from stealth_browser.config import SkillConfig
 
         # Currently accepts any URL — validates future enforcement
         cfg = SkillConfig(cdp_url="http://93.184.216.34:19222")
@@ -171,7 +171,7 @@ class TestCDPURLValidation:
 
     def test_cdp_url_allows_localhost(self):
         """localhost CDP URLs should be accepted."""
-        from agent_browser.config import SkillConfig
+        from stealth_browser.config import SkillConfig
 
         cfg = SkillConfig(cdp_url="http://127.0.0.1:19222")
         assert cfg.cdp_url == "http://127.0.0.1:19222"
@@ -187,42 +187,42 @@ class TestSelectorInjection:
 
     def test_normal_selector_accepted(self):
         """Standard CSS selectors pass validation."""
-        from agent_browser.pipeline.steps import _escape_selector
+        from stealth_browser.pipeline.steps import _escape_selector
 
         result = _escape_selector(".container .item:nth-child(2)")
         assert ".container" in result
 
     def test_script_tag_rejected(self):
         """Selector containing <script> tag is rejected."""
-        from agent_browser.pipeline.steps import _escape_selector
+        from stealth_browser.pipeline.steps import _escape_selector
 
         with pytest.raises(ValueError, match="Invalid CSS"):
             _escape_selector("<script>alert(1)</script>")
 
     def test_empty_selector_rejected(self):
         """Empty string rejected."""
-        from agent_browser.pipeline.steps import _escape_selector
+        from stealth_browser.pipeline.steps import _escape_selector
 
         with pytest.raises(ValueError, match="Empty"):
             _escape_selector("")
 
     def test_backslash_characters_rejected(self):
         """Backslash characters not in allowlist are rejected."""
-        from agent_browser.pipeline.steps import _escape_selector
+        from stealth_browser.pipeline.steps import _escape_selector
 
         with pytest.raises(ValueError, match="Invalid"):
             _escape_selector("div\\img[src*='xss']")
 
     def test_id_and_class_selectors_accepted(self):
         """Common ID/class selectors work fine."""
-        from agent_browser.pipeline.steps import _escape_selector
+        from stealth_browser.pipeline.steps import _escape_selector
 
         assert _escape_selector("#main-btn") == "#main-btn"
         assert _escape_selector(".nav-item.active") == ".nav-item.active"
 
     def test_attribute_selectors_accepted(self):
         """Attribute selectors within allowlist pass."""
-        from agent_browser.pipeline.steps import _escape_selector
+        from stealth_browser.pipeline.steps import _escape_selector
 
         result = _escape_selector("input[type='text']")
         assert "input" in result
@@ -238,7 +238,7 @@ class TestPathTraversal:
 
     def test_normalize_adapter_no_traversal(self):
         """_normalize_adapter doesn't perform path operations on names."""
-        from agent_browser.adapters.loader import _normalize_adapter
+        from stealth_browser.adapters.loader import _normalize_adapter
 
         # Even if someone puts weird chars in name, it stays a string key
         adapter = _normalize_adapter(
@@ -254,7 +254,7 @@ class TestPathTraversal:
 
     def test_loader_walks_adapters_dir_only(self):
         """Loader only scans adapters/ directory, not arbitrary paths."""
-        from agent_browser.adapters.loader import _ADAPTER_DIR
+        from stealth_browser.adapters.loader import _ADAPTER_DIR
 
         # Verify _ADAPTER_DIR points to adapters/ under project root
         assert "adapters" in _ADAPTER_DIR
@@ -272,7 +272,7 @@ class TestJSEvaluateBlocking:
     @pytest.mark.asyncio
     async def test_evaluate_blocks_fetch(self):
         """evaluate step rejects fetch() calls."""
-        from agent_browser.pipeline.steps import step_evaluate
+        from stealth_browser.pipeline.steps import step_evaluate
 
         with pytest.raises(ValueError, match="Blocked JavaScript"):
             await step_evaluate(
@@ -286,7 +286,7 @@ class TestJSEvaluateBlocking:
     @pytest.mark.asyncio
     async def test_evaluate_blocks_xmlhttprequest(self):
         """evaluate step rejects XMLHttpRequest."""
-        from agent_browser.pipeline.steps import step_evaluate
+        from stealth_browser.pipeline.steps import step_evaluate
 
         with pytest.raises(ValueError, match="Blocked JavaScript"):
             await step_evaluate(
@@ -300,7 +300,7 @@ class TestJSEvaluateBlocking:
     @pytest.mark.asyncio
     async def test_evaluate_blocks_script_tag(self):
         """evaluate step rejects <script> injection."""
-        from agent_browser.pipeline.steps import step_evaluate
+        from stealth_browser.pipeline.steps import step_evaluate
 
         with pytest.raises(ValueError, match="Blocked JavaScript"):
             await step_evaluate(
@@ -314,7 +314,7 @@ class TestJSEvaluateBlocking:
     @pytest.mark.asyncio
     async def test_evaluate_allows_safe_js(self, patched_get_handle, mock_page_for_steps):
         """Safe JS expressions are allowed through."""
-        from agent_browser.pipeline.steps import step_evaluate
+        from stealth_browser.pipeline.steps import step_evaluate
 
         mock_page_for_steps.evaluate.return_value = 42
         result = await step_evaluate(

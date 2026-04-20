@@ -2,8 +2,8 @@
 
 import pytest
 
-from agent_browser.adapters.loader import get_adapter
-from agent_browser.adapters.validator import validate_adapter
+from stealth_browser.adapters.loader import get_adapter
+from stealth_browser.adapters.validator import validate_adapter
 
 
 class TestAllAdaptersLoad:
@@ -58,7 +58,7 @@ class TestPipelineErrors:
     """PipelineError 层次和序列化"""
 
     def test_pipeline_error_to_dict(self):
-        from agent_browser.pipeline.errors import PipelineError
+        from stealth_browser.pipeline.errors import PipelineError
 
         err = PipelineError(
             message="test error",
@@ -74,7 +74,7 @@ class TestPipelineErrors:
         assert d["fix_hint"] == "Check selector"
 
     def test_user_message_format(self):
-        from agent_browser.pipeline.errors import PipelineError
+        from stealth_browser.pipeline.errors import PipelineError
 
         err = PipelineError(
             message="element not found",
@@ -90,7 +90,7 @@ class TestPipelineErrors:
         assert "element not found" in msg
 
     def test_subclass_hierarchy(self):
-        from agent_browser.pipeline.errors import (
+        from stealth_browser.pipeline.errors import (
             PipelineError,
             PipelineStepError,
             SelectorNotFoundError,
@@ -100,7 +100,7 @@ class TestPipelineErrors:
         assert issubclass(PipelineStepError, PipelineError)
 
     def test_fix_hint_generation(self):
-        from agent_browser.pipeline.errors import _generate_fix_hint
+        from stealth_browser.pipeline.errors import _generate_fix_hint
 
         hint = _generate_fix_hint("select", "element not found")
         assert hint  # should always return something

@@ -1,0 +1,34 @@
+{{- if eq .Values.deploymentMode "all-in-one" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stealth-browser.fullname" . }}-aio
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "stealth-browser.labels" . | nindent 4 }}
+    mode: all-in-one
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "stealth-browser.selectorLabels" . | nindent 4 }}
+    mode: all-in-one
+  ports:
+  - name: api
+    port: {{ .Values.service.aio.apiPort }}
+    targetPort: 8000
+    {{- if eq .Values.service.type "NodePort" }}
+    nodePort: {{ .Values.service.aio.apiNodePort }}
+    {{- end }}
+  - name: novnc
+    port: {{ .Values.service.aio.novncPort }}
+    targetPort: 6080
+    {{- if eq .Values.service.type "NodePort" }}
+    nodePort: {{ .Values.service.aio.novncNodePort }}
+    {{- end }}
+  - name: vnc
+    port: {{ .Values.service.aio.vncPort }}
+    targetPort: 5900
+    {{- if eq .Values.service.type "NodePort" }}
+    nodePort: {{ .Values.service.aio.vncNodePort }}
+    {{- end }}
+{{- end }}

@@ -1,7 +1,7 @@
 """
 Mode Matrix Real Browser Tests — 4 Genuine Mode Combinations
 
-测试 Agent-Browser 的 4 个真实调用模式组合：
+测试 Stealth-Browser 的 4 个真实调用模式组合：
   M1: CLI + Local + LLM     (main.py facade → LocalCDPBackend → CDP)
   M2: CLI + Local + Agent   (run_task → browser-use Agent → LLM → CDP)
   M3: API + Local + LLM     (HTTP POST → FastAPI → LocalCDPBackend)
@@ -312,7 +312,7 @@ class TestCLIRemoteFallback:
     @pytest.mark.asyncio
     async def test_cli_remote_becomes_local(self, scorecard_writer):
         """CLI 模式下 browser_mode='remote' 应自动变为 'local'"""
-        from agent_browser.config import load_config
+        from stealth_browser.config import load_config
 
         cfg = load_config(
             calling_mode="cli",

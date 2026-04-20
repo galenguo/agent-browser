@@ -17,4 +17,4 @@ skill:
   daemon:
     enabled: true
     idle_timeout: 1800
-    state_path: "~/.agent-browser/daemon-state.json"
+    state_path: "~/.stealth-browser/daemon-state.json"

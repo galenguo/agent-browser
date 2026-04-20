@@ -1,6 +1,6 @@
 """Detection module tests — intervention detection logic."""
 
-from agent_browser.detection import detect_intervention
+from stealth_browser.detection import detect_intervention
 
 
 class TestURLPatterns:

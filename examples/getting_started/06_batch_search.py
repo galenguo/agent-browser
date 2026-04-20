@@ -1,4 +1,4 @@
-"""Agent Browser 示例：多站点批量搜索
+"""Stealth Browser 示例：多站点批量搜索
 
 同时在 Boss直聘 和百度搜索 同一关键词，合并去重后输出。
 演示：同一 session 复用、多 adapter 串行执行、结果聚合。
@@ -9,8 +9,8 @@
 """
 import asyncio
 import json
-from agent_browseradapters.runner import run_adapter
-from agent_browsermain import create_session
+from stealth_browser.adapters.runner import run_adapter
+from stealth_browser.main import create_session
 
 
 # ── 配置：修改这里来搜索不同关键词 ──

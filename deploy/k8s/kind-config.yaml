@@ -1,6 +1,6 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-name: agent-browser
+name: stealth-browser
 nodes:
   - role: control-plane
     extraPortMappings:
@@ -23,8 +23,8 @@ nodes:
       - hostPath: /var/run/docker.sock
         containerPath: /var/run/docker.sock
       - hostPath: ./deploy/k8s/data/profiles
-        containerPath: /var/lib/agent-browser/profiles
+        containerPath: /var/lib/stealth-browser/profiles
       - hostPath: ./deploy/k8s/data/logs
-        containerPath: /var/lib/agent-browser/logs
+        containerPath: /var/lib/stealth-browser/logs
   - role: worker
   - role: worker

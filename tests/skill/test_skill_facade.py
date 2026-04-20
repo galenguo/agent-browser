@@ -29,8 +29,8 @@ from unittest import mock
 
 import pytest
 
-from agent_browser.config import SkillConfig
-from agent_browser.main import (
+from stealth_browser.config import SkillConfig
+from stealth_browser.main import (
     DepStatus,
     FirstSessionError,
     RecoveryReport,
@@ -63,7 +63,7 @@ from agent_browser.main import (
 @pytest.fixture(autouse=True)
 def _reset_globals():
     """Reset module-level globals before/after each test."""
-    import agent_browser.main as mod
+    import stealth_browser.main as mod
 
     saved_config = mod._config
     saved_middleware = mod._middleware
@@ -127,15 +127,15 @@ class TestSetup:
     async def test_setup_returns_structured_dict(self):
         """setup() returns dict with expected top-level keys."""
         with (
-            mock.patch("agent_browser.deploy_config.detect_environment", return_value={"os": "linux", "arch": "amd64"}),
-            mock.patch("agent_browser.deploy_config.load_deploy_config") as mock_load,
-            mock.patch("agent_browser.deploy_config.validate_config", return_value=[]),
-            mock.patch("agent_browser.deploy_config.generate_config", return_value="/tmp/config.yaml"),
+            mock.patch("stealth_browser.deploy_config.detect_environment", return_value={"os": "linux", "arch": "amd64"}),
+            mock.patch("stealth_browser.deploy_config.load_deploy_config") as mock_load,
+            mock.patch("stealth_browser.deploy_config.validate_config", return_value=[]),
+            mock.patch("stealth_browser.deploy_config.generate_config", return_value="/tmp/config.yaml"),
             mock.patch(
-                "agent_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()
+                "stealth_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()
             ),
         ):
-            from agent_browser.deploy_config import DeployConfig
+            from stealth_browser.deploy_config import DeployConfig
 
             mock_load.return_value = DeployConfig(mode="local")
             result = await setup()
@@ -150,15 +150,15 @@ class TestSetup:
     async def test_setup_ready_when_no_errors(self):
         """setup() ready=True when no errors and no missing deps."""
         with (
-            mock.patch("agent_browser.deploy_config.detect_environment", return_value={"os": "linux", "arch": "amd64"}),
-            mock.patch("agent_browser.deploy_config.load_deploy_config") as mock_load,
-            mock.patch("agent_browser.deploy_config.validate_config", return_value=[]),
-            mock.patch("agent_browser.deploy_config.generate_config", return_value="/tmp/config.yaml"),
+            mock.patch("stealth_browser.deploy_config.detect_environment", return_value={"os": "linux", "arch": "amd64"}),
+            mock.patch("stealth_browser.deploy_config.load_deploy_config") as mock_load,
+            mock.patch("stealth_browser.deploy_config.validate_config", return_value=[]),
+            mock.patch("stealth_browser.deploy_config.generate_config", return_value="/tmp/config.yaml"),
             mock.patch(
-                "agent_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()
+                "stealth_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()
             ),
         ):
-            from agent_browser.deploy_config import DeployConfig
+            from stealth_browser.deploy_config import DeployConfig
 
             mock_load.return_value = DeployConfig(mode="local")
             result = await setup()
@@ -166,19 +166,19 @@ class TestSetup:
 
     async def test_setup_not_ready_with_errors(self):
         """setup() ready=False when validation errors exist."""
-        from agent_browser.deploy_config import ConfigIssue
+        from stealth_browser.deploy_config import ConfigIssue
 
         issues = [ConfigIssue(severity="error", section="deployment", message="bad mode")]
         with (
-            mock.patch("agent_browser.deploy_config.detect_environment", return_value={"os": "linux", "arch": "amd64"}),
-            mock.patch("agent_browser.deploy_config.load_deploy_config") as mock_load,
-            mock.patch("agent_browser.deploy_config.validate_config", return_value=issues),
-            mock.patch("agent_browser.deploy_config.generate_config", return_value="/tmp/config.yaml"),
+            mock.patch("stealth_browser.deploy_config.detect_environment", return_value={"os": "linux", "arch": "amd64"}),
+            mock.patch("stealth_browser.deploy_config.load_deploy_config") as mock_load,
+            mock.patch("stealth_browser.deploy_config.validate_config", return_value=issues),
+            mock.patch("stealth_browser.deploy_config.generate_config", return_value="/tmp/config.yaml"),
             mock.patch(
-                "agent_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()
+                "stealth_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()
             ),
         ):
-            from agent_browser.deploy_config import DeployConfig
+            from stealth_browser.deploy_config import DeployConfig
 
             mock_load.return_value = DeployConfig(mode="local")
             result = await setup()
@@ -187,15 +187,15 @@ class TestSetup:
     async def test_setup_calls_generate_config(self):
         """setup() calls generate_config() to write config file."""
         with (
-            mock.patch("agent_browser.deploy_config.detect_environment", return_value={"os": "linux", "arch": "amd64"}),
-            mock.patch("agent_browser.deploy_config.load_deploy_config") as mock_load,
-            mock.patch("agent_browser.deploy_config.validate_config", return_value=[]),
-            mock.patch("agent_browser.deploy_config.generate_config", return_value="/tmp/test-config.yaml") as mock_gen,
+            mock.patch("stealth_browser.deploy_config.detect_environment", return_value={"os": "linux", "arch": "amd64"}),
+            mock.patch("stealth_browser.deploy_config.load_deploy_config") as mock_load,
+            mock.patch("stealth_browser.deploy_config.validate_config", return_value=[]),
+            mock.patch("stealth_browser.deploy_config.generate_config", return_value="/tmp/test-config.yaml") as mock_gen,
             mock.patch(
-                "agent_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()
+                "stealth_browser.main.detect_missing_deps", new_callable=mock.AsyncMock, return_value=RecoveryReport()
             ),
         ):
-            from agent_browser.deploy_config import DeployConfig
+            from stealth_browser.deploy_config import DeployConfig
 
             mock_load.return_value = DeployConfig(mode="local")
             result = await setup()
@@ -219,13 +219,13 @@ class TestConfigureReset:
     def test_configure_returns_skillconfig(self):
         """configure() returns a SkillConfig instance."""
         cfg = configure()
-        from agent_browser.config import SkillConfig
+        from stealth_browser.config import SkillConfig
 
         assert isinstance(cfg, SkillConfig)
 
     def test_reset_clears_globals(self):
         """reset() sets _config and _middleware to None."""
-        import agent_browser.main as mod
+        import stealth_browser.main as mod
 
         mod._config = SkillConfig(calling_mode="api")
         mod._middleware = _make_mock_middleware()
@@ -248,7 +248,7 @@ class TestCreateSession:
     async def test_create_session_returns_uuid_hex(self):
         """create_session() returns a hex string (UUID format)."""
         mw = _make_mock_middleware()
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             sid = await create_session()
             assert isinstance(sid, str)
             assert len(sid) == 32  # UUID hex length
@@ -257,7 +257,7 @@ class TestCreateSession:
     async def test_create_session_calls_middleware(self):
         """create_session() delegates to middleware.create_session()."""
         mw = _make_mock_middleware()
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             sid = await create_session()
             mw.create_session.assert_called_once_with(sid)
 
@@ -265,8 +265,8 @@ class TestCreateSession:
         """create_session(mode='api') passes mode to load_config."""
         mw = _make_mock_middleware()
         with (
-            mock.patch("agent_browser.main.load_config", return_value=SkillConfig(calling_mode="api")),
-            mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw),
+            mock.patch("stealth_browser.main.load_config", return_value=SkillConfig(calling_mode="api")),
+            mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw),
         ):
             sid = await create_session(mode="api")
             assert isinstance(sid, str)
@@ -275,7 +275,7 @@ class TestCreateSession:
         """create_session(cdp_url=...) passes custom CDP URL."""
         mw = _make_mock_middleware()
         with mock.patch(
-            "agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw
+            "stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw
         ) as mock_ens:
             await create_session(cdp_url="http://localhost:9222")
             call_kwargs = mock_ens.call_args[0][0] if mock_ens.call_args else None
@@ -294,7 +294,7 @@ class TestReactCycle:
         mw = _make_mock_middleware()
         page = _make_mock_page()
         mw.get_page.return_value = page
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             result = await snapshot("test-session")
             assert "url" in result
             assert "title" in result
@@ -307,7 +307,7 @@ class TestReactCycle:
         mw = _make_mock_middleware()
         page = _make_mock_page()
         mw.get_page.return_value = page
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             result = await snapshot("test-session")
             for elem in result["elements"]:
                 assert "ref" in elem
@@ -319,7 +319,7 @@ class TestReactCycle:
         page = _make_mock_page()
         page.evaluate.return_value = {"status": "ok"}
         mw.get_page.return_value = page
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await click("sid", "@e0")
             page.evaluate.assert_called_once()
             call_js = page.evaluate.call_args[0][0]
@@ -331,7 +331,7 @@ class TestReactCycle:
         page = _make_mock_page()
         page.evaluate.return_value = {"status": "ok"}
         mw.get_page.return_value = page
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await fill("sid", "@e1", "hello world")
             page.evaluate.assert_called_once()
             call_js = page.evaluate.call_args[0][0]
@@ -355,7 +355,7 @@ class TestOtherOperations:
         mw = _make_mock_middleware()
         page = _make_mock_page()
         mw.get_page.return_value = page
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await open_page("sid", "https://example.com")
             page.goto.assert_called_once_with("https://example.com")
 
@@ -364,7 +364,7 @@ class TestOtherOperations:
         mw = _make_mock_middleware()
         page = _make_mock_page()
         mw.get_page.return_value = page
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await scroll("sid", "down", 300)
             page.mouse_wheel.assert_called_once_with(0, 300)
 
@@ -373,7 +373,7 @@ class TestOtherOperations:
         mw = _make_mock_middleware()
         page = _make_mock_page()
         mw.get_page.return_value = page
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await scroll("sid", "up", 200)
             page.mouse_wheel.assert_called_once_with(0, -200)
 
@@ -383,7 +383,7 @@ class TestOtherOperations:
         page = _make_mock_page()
         page.evaluate.return_value = {"x": 150, "y": 250}
         mw.get_page.return_value = page
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await hover("sid", "@e0")
             page.mouse_move.assert_called_once_with(150, 250)
 
@@ -392,7 +392,7 @@ class TestOtherOperations:
         mw = _make_mock_middleware()
         page = _make_mock_page()
         mw.get_page.return_value = page
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await press_key("sid", "Enter")
             page.keyboard_press.assert_called_once_with("Enter")
 
@@ -401,7 +401,7 @@ class TestOtherOperations:
         mw = _make_mock_middleware()
         page = _make_mock_page()
         mw.get_page.return_value = page
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await wait_for_selector("sid", ".result", timeout=5000)
             page.wait_for_selector.assert_called_once_with(".result", timeout=5000)
 
@@ -410,14 +410,14 @@ class TestOtherOperations:
         mw = _make_mock_middleware()
         page = _make_mock_page()
         mw.get_page.return_value = page
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await go_back("sid")
             page.go_back.assert_called_once()
 
     async def test_delete_session_delegates(self):
         """delete_session() calls middleware.delete_session()."""
         mw = _make_mock_middleware()
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await delete_session("sid")
             mw.delete_session.assert_called_once_with("sid")
 
@@ -427,7 +427,7 @@ class TestOtherOperations:
         page = _make_mock_page()
         page.evaluate.return_value = {"status": "ok"}
         mw.get_page.return_value = page
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await select_option("sid", "@e0", "option-value")
             call_js = page.evaluate.call_args[0][0]
             assert "option-value" in call_js
@@ -443,7 +443,7 @@ class TestRunTask:
     async def test_run_task_delegates_to_middleware(self):
         """run_task() calls middleware.run_task() with correct args."""
         mw = _make_mock_middleware()
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await run_task("sid", "search for Python jobs", intelligence="agent")
             mw.run_task.assert_called_once()
             call_args = mw.run_task.call_args
@@ -455,7 +455,7 @@ class TestRunTask:
     async def test_run_task_llm_mode(self):
         """run_task(intelligence='llm') passes llm mode through."""
         mw = _make_mock_middleware()
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await run_task("sid", "summarize page", intelligence="llm")
             _, kwargs = mw.run_task.call_args
             assert kwargs.get("intelligence") == "llm"
@@ -463,7 +463,7 @@ class TestRunTask:
     async def test_run_task_max_steps_passed(self):
         """max_steps kwarg forwarded to middleware."""
         mw = _make_mock_middleware()
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await run_task("sid", "task", max_steps=3)
             _, kwargs = mw.run_task.call_args
             assert kwargs.get("max_steps") == 3
@@ -471,7 +471,7 @@ class TestRunTask:
     async def test_run_task_timeout_passed(self):
         """total_timeout kwarg forwarded to middleware."""
         mw = _make_mock_middleware()
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             await run_task("sid", "task", total_timeout=60.0)
             _, kwargs = mw.run_task.call_args
             assert kwargs.get("total_timeout") == 60.0
@@ -484,7 +484,7 @@ class TestRunTask:
             "result": "Found 42 results",
             "steps_taken": 5,
         }
-        with mock.patch("agent_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", new_callable=mock.AsyncMock, return_value=mw):
             result = await run_task("sid", "search")
             assert result["status"] == "completed"
             assert "result" in result
@@ -500,10 +500,10 @@ class TestBackendSelection:
         """CLI calling_mode selects LocalCDPBackend (no extension)."""
         cfg = SkillConfig(calling_mode="cli")
         with mock.patch(
-            "agent_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=False
+            "stealth_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=False
         ):
             backend = asyncio.get_event_loop().run_until_complete(_select_backend(cfg))
-            from agent_browser.browser.local import LocalCDPBackend
+            from stealth_browser.browser.local import LocalCDPBackend
 
             assert isinstance(backend, LocalCDPBackend)
 
@@ -511,10 +511,10 @@ class TestBackendSelection:
         """API calling_mode selects RemoteAPIBackend."""
         cfg = SkillConfig(calling_mode="api")
         with mock.patch(
-            "agent_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=False
+            "stealth_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=False
         ):
             backend = asyncio.get_event_loop().run_until_complete(_select_backend(cfg))
-            from agent_browser.browser.remote import RemoteAPIBackend
+            from stealth_browser.browser.remote import RemoteAPIBackend
 
             assert isinstance(backend, RemoteAPIBackend)
 
@@ -522,10 +522,10 @@ class TestBackendSelection:
         """Unknown calling_mode falls back to LocalCDPBackend."""
         cfg = SkillConfig(calling_mode="weird-mode")
         with mock.patch(
-            "agent_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=False
+            "stealth_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=False
         ):
             backend = asyncio.get_event_loop().run_until_complete(_select_backend(cfg))
-            from agent_browser.browser.local import LocalCDPBackend
+            from stealth_browser.browser.local import LocalCDPBackend
 
             assert isinstance(backend, LocalCDPBackend)
 
@@ -533,7 +533,7 @@ class TestBackendSelection:
         """Extension connection takes priority over local/remote."""
         cfg = SkillConfig(calling_mode="cli")
         with (
-            mock.patch("agent_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=True),
+            mock.patch("stealth_browser.main._try_extension_connection", new_callable=mock.AsyncMock, return_value=True),
         ):
             backend = asyncio.get_event_loop().run_until_complete(_select_backend(cfg))
             # ExtensionBackend should be selected when extension is available

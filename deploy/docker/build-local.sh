@@ -2,7 +2,7 @@
 set -e
 
 # 本地单架构构建脚本
-# 用法: cd agent-browser && bash docker/build-local.sh [all|aio|distributed]
+# 用法: cd stealth-browser && bash docker/build-local.sh [all|aio|distributed]
 
 # 自动切换到项目根目录（docker/ 的祖父目录）
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -51,16 +51,16 @@ case "$TARGET" in
     all)
         echo ""
         echo "=== Building all images ==="
-        build_image "deploy/docker/Dockerfile" "agent-browser-aio"
-        build_image "deploy/docker/Dockerfile.api" "agent-browser-api"
-        build_image "deploy/docker/Dockerfile.browser" "agent-browser-browser"
+        build_image "deploy/docker/Dockerfile" "stealth-browser"
+        build_image "deploy/docker/Dockerfile.api" "stealth-browser-api"
+        build_image "deploy/docker/Dockerfile.browser" "stealth-browser-browser"
         ;;
     aio)
-        build_image "deploy/docker/Dockerfile" "agent-browser-aio"
+        build_image "deploy/docker/Dockerfile" "stealth-browser"
         ;;
     distributed)
-        build_image "deploy/docker/Dockerfile.api" "agent-browser-api"
-        build_image "deploy/docker/Dockerfile.browser" "agent-browser-browser"
+        build_image "deploy/docker/Dockerfile.api" "stealth-browser-api"
+        build_image "deploy/docker/Dockerfile.browser" "stealth-browser-browser"
         ;;
     *)
         echo "❌ Unknown target: $TARGET"
@@ -75,4 +75,4 @@ esac
 
 echo ""
 echo "🎉 Build completed!"
-docker images | grep -E "agent-browser|REPOSITORY" | head -10
+docker images | grep -E "stealth-browser|REPOSITORY" | head -10

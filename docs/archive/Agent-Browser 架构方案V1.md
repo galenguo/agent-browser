@@ -1,11 +1,11 @@
-# Agent-Browser 架构方案V1
+# Stealth-Browser 架构方案V1
 
 ## Context
 
 基于对以下项目的深度探索：
-1. **agent-browser** - 当前实现（FastAPI + browser-use + 5层反检测）
+1. **stealth-browser** - 当前实现（FastAPI + browser-use + 5层反检测）
 2. **browser-use Cloud** - 官方云服务（Task API + Browser Sessions API）
-3. **agent-browser-vercel** - Rust CLI + Daemon + refs 快照模式
+3. **stealth-browser-vercel** - Rust CLI + Daemon + refs 快照模式
 4. **openclaw** - Skill 系统 + MCP 集成 + 浏览器工具
 
 ## 用户需求
@@ -76,7 +76,7 @@ agb_<env>_<user_id>_<random>
 ```python
 api_key → user_id → {
     "mode": "k8s",  # local | k8s | cloud
-    "k8s_namespace": "agent-browser-user123",
+    "k8s_namespace": "stealth-browser-user123",
     "max_sessions": 5,
     "webhook_url": "https://example.com/webhook",
     "websocket_enabled": true
@@ -163,7 +163,7 @@ POST /sessions/create
 ```http
 POST https://example.com/webhook
 Content-Type: application/json
-X-Agent-Browser-Signature: sha256=xxx
+X-Stealth-Browser-Signature: sha256=xxx
 
 {
   "event": "intervention.needed",
@@ -296,16 +296,16 @@ class InterventionDetector:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: agent-browser-{user_id}-{instance_id}
-  namespace: agent-browser-{user_id}
+  name: stealth-browser-{user_id}-{instance_id}
+  namespace: stealth-browser-{user_id}
   labels:
-    app: agent-browser
+    app: stealth-browser
     user_id: user123
     api_key_hash: sha256(api_key)
 spec:
   containers:
   - name: browser
-    image: agent-browser-chromium:latest
+    image: stealth-browser-chromium:latest
     resources:
       requests:
         memory: "2Gi"
@@ -345,13 +345,13 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: agent-browser-hpa
-  namespace: agent-browser-{user_id}
+  name: stealth-browser-hpa
+  namespace: stealth-browser-{user_id}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: agent-browser
+    name: stealth-browser
   minReplicas: 1
   maxReplicas: 10
   metrics:
@@ -377,11 +377,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: agent-browser-service
-  namespace: agent-browser-{user_id}
+  name: stealth-browser-service
+  namespace: stealth-browser-{user_id}
 spec:
   selector:
-    app: agent-browser
+    app: stealth-browser
     user_id: user123
   ports:
   - name: cdp
@@ -398,12 +398,12 @@ spec:
 class K8sBackend:
     async def get_or_create_pod(self, api_key: str) -> PodInfo:
         user_id = self._extract_user_id(api_key)
-        namespace = f"agent-browser-{user_id}"
+        namespace = f"stealth-browser-{user_id}"
 
         # 1. 查找空闲 Pod
         pods = await self.k8s_client.list_pods(
             namespace=namespace,
-            label_selector=f"app=agent-browser,user_id={user_id}"
+            label_selector=f"app=stealth-browser,user_id={user_id}"
         )
 
         for pod in pods:
@@ -556,14 +556,14 @@ class ProfileSyncService:
 **SKILL.md 结构：**
 ```markdown
 ---
-name: agent-browser
+name: stealth-browser
 description: 反检测浏览器自动化，支持高防护网站
 command-dispatch: tool
-command-tool: agent-browser
+command-tool: stealth-browser
 command-arg-mode: raw
 ---
 
-# Agent Browser Skill
+# Stealth Browser Skill
 
 ## 能力
 - 5层反检测栈（CloakBrowser + patchright + rebrowser-patches）
@@ -575,32 +575,32 @@ command-arg-mode: raw
 
 ### 1. 创建会话
 \`\`\`
-agent-browser create-session --api-key <key> --mode k8s
+stealth-browser create-session --api-key <key> --mode k8s
 \`\`\`
 
 ### 2. 提交任务（自主模式）
 \`\`\`
-agent-browser run-task --session-id <id> --task "登录网站" --mode autonomous
+stealth-browser run-task --session-id <id> --task "登录网站" --mode autonomous
 \`\`\`
 
 ### 3. 获取快照（介入模式）
 \`\`\`
-agent-browser snapshot --session-id <id> --filter interactive
+stealth-browser snapshot --session-id <id> --filter interactive
 \`\`\`
 
 ### 4. 执行操作
 \`\`\`
-agent-browser action --session-id <id> --actions '[{"type":"click","ref":"@e3"}]'
+stealth-browser action --session-id <id> --actions '[{"type":"click","ref":"@e3"}]'
 \`\`\`
 ```
 
 ### 6.2 MCP Tool 映射
 
-**将 agent-browser 封装为 MCP Tool：**
+**将 stealth-browser 封装为 MCP Tool：**
 ```typescript
 // openclaw 侧的 MCP 工具定义
 const agentBrowserTools = {
-  "agent-browser.create-session": {
+  "stealth-browser.create-session": {
     description: "创建浏览器会话",
     inputSchema: {
       type: "object",
@@ -611,7 +611,7 @@ const agentBrowserTools = {
       }
     }
   },
-  "agent-browser.run-task": {
+  "stealth-browser.run-task": {
     description: "运行自动化任务",
     inputSchema: {
       type: "object",
@@ -622,7 +622,7 @@ const agentBrowserTools = {
       }
     }
   },
-  "agent-browser.snapshot": {
+  "stealth-browser.snapshot": {
     description: "获取页面快照和可交互元素",
     inputSchema: {
       type: "object",
@@ -632,7 +632,7 @@ const agentBrowserTools = {
       }
     }
   },
-  "agent-browser.action": {
+  "stealth-browser.action": {
     description: "执行页面操作",
     inputSchema: {
       type: "object",
@@ -659,16 +659,16 @@ const agentBrowserTools = {
 ```python
 # src/openclaw/mcp_bridge.py
 class MCPBridge:
-    """将 agent-browser API 桥接为 MCP 工具"""
+    """将 stealth-browser API 桥接为 MCP 工具"""
 
     async def call_tool(self, tool_name: str, arguments: Dict) -> Dict:
-        if tool_name == "agent-browser.create-session":
+        if tool_name == "stealth-browser.create-session":
             return await self._create_session(**arguments)
-        elif tool_name == "agent-browser.run-task":
+        elif tool_name == "stealth-browser.run-task":
             return await self._run_task(**arguments)
-        elif tool_name == "agent-browser.snapshot":
+        elif tool_name == "stealth-browser.snapshot":
             return await self._snapshot(**arguments)
-        elif tool_name == "agent-browser.action":
+        elif tool_name == "stealth-browser.action":
             return await self._action(**arguments)
 ```
 
@@ -701,12 +701,12 @@ class AgentBrowserNotifier {
 
 ### 6.4 自动安装模式
 
-**参考 agent-browser-vercel 的安装方式：**
+**参考 stealth-browser-vercel 的安装方式：**
 ```bash
 # 在 SKILL.md 中定义安装钩子
 ---
 install-command: |
-  curl -fsSL https://agent-browser.example.com/install.sh | sh
+  curl -fsSL https://stealth-browser.example.com/install.sh | sh
 ---
 ```
 
@@ -714,17 +714,17 @@ install-command: |
 ```bash
 #!/bin/bash
 # install.sh
-if command -v agent-browser &> /dev/null; then
-    echo "✅ agent-browser already installed"
+if command -v stealth-browser &> /dev/null; then
+    echo "✅ stealth-browser already installed"
     exit 0
 fi
 
 # 检测操作系统
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    brew install agent-browser
+    brew install stealth-browser
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    curl -L https://github.com/.../agent-browser-linux -o /usr/local/bin/agent-browser
-    chmod +x /usr/local/bin/agent-browser
+    curl -L https://github.com/.../stealth-browser-linux -o /usr/local/bin/stealth-browser
+    chmod +x /usr/local/bin/stealth-browser
 fi
 ```
 
@@ -817,7 +817,7 @@ for i in {1..10}; do
 done
 
 # 检查 Pod 数量
-kubectl get pods -n agent-browser-test
+kubectl get pods -n stealth-browser-test
 ```
 
 ### 7.4 Phase 4: Browser-Use Cloud 集成（1-2周）
@@ -855,8 +855,8 @@ curl -H "X-API-Key: agb_test_xxx" \
 **目标：** 优化 skill 集成，支持实时通知和自动安装
 
 **关键文件：**
-- `skills/agent-browser/SKILL.md` - 更新 skill 定义
-- `skills/agent-browser/install.sh` (新建) - 自动安装脚本
+- `skills/stealth-browser/SKILL.md` - 更新 skill 定义
+- `skills/stealth-browser/install.sh` (新建) - 自动安装脚本
 - `src/openclaw/mcp_bridge.py` (新建) - MCP 工具桥接
 
 **实现步骤：**
@@ -869,11 +869,11 @@ curl -H "X-API-Key: agb_test_xxx" \
 **验证：**
 ```bash
 # 测试自动安装
-curl -fsSL https://agent-browser.example.com/install.sh | sh
+curl -fsSL https://stealth-browser.example.com/install.sh | sh
 
 # 测试 skill 调用
-agent-browser create-session --api-key agb_test_xxx
-agent-browser run-task --session-id sess_123 --task "登录网站" --mode hybrid
+stealth-browser create-session --api-key agb_test_xxx
+stealth-browser run-task --session-id sess_123 --task "登录网站" --mode hybrid
 ```
 
 ---
@@ -1031,15 +1031,15 @@ Response:
 
 ```markdown
 ---
-name: agent-browser
+name: stealth-browser
 description: 反检测浏览器自动化，支持本地/K8s/Cloud 三种模式
 version: 2.0.0
 command-dispatch: tool
-command-tool: agent-browser
-install-command: curl -fsSL https://agent-browser.example.com/install.sh | sh
+command-tool: stealth-browser
+install-command: curl -fsSL https://stealth-browser.example.com/install.sh | sh
 ---
 
-# Agent Browser Skill v2
+# Stealth Browser Skill v2
 
 ## 核心能力
 
@@ -1054,7 +1054,7 @@ install-command: curl -fsSL https://agent-browser.example.com/install.sh | sh
 
 **1. 创建会话：**
 ```bash
-agent-browser create-session \
+stealth-browser create-session \
   --api-key agb_prod_user123_xxx \
   --mode hybrid \
   --backend k8s
@@ -1062,7 +1062,7 @@ agent-browser create-session \
 
 **2. 提交任务（自主模式）：**
 ```bash
-agent-browser run-task \
+stealth-browser run-task \
   --session-id sess_abc123 \
   --task "登录 Boss直聘并搜索 Python 工程师" \
   --max-steps 50
@@ -1070,17 +1070,17 @@ agent-browser run-task \
 
 **3. 监听通知：**
 ```bash
-agent-browser watch --session-id sess_abc123
+stealth-browser watch --session-id sess_abc123
 # 输出实时事件流
 ```
 
 **4. 处理卡点：**
 ```bash
 # 获取快照
-agent-browser snapshot --session-id sess_abc123
+stealth-browser snapshot --session-id sess_abc123
 
 # 执行操作
-agent-browser action --session-id sess_abc123 \
+stealth-browser action --session-id sess_abc123 \
   --actions '[{"type":"click","ref":"@e3"}]'
 ```
 

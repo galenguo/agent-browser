@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: agent-browser
+  name: stealth-browser
   labels:
-    app: agent-browser
+    app: stealth-browser
     istio-bind: allowed

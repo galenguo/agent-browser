@@ -1,8 +1,8 @@
-# Agent-Browser 测试说明文档
+# Stealth-Browser 测试说明文档
 
 ## 1. 概述
 
-本文档描述 Agent-Browser 项目的测试架构、测试分类、运行指南和最佳实践，旨在指导后续单元测试开发。
+本文档描述 Stealth-Browser 项目的测试架构、测试分类、运行指南和最佳实践，旨在指导后续单元测试开发。
 
 ### 1.1 测试状态
 
@@ -35,7 +35,7 @@ tests/
 │   ├── __init__.py                    # 导出 load_skill_module, get_skill_classes
 │   ├── cli_runner.py                  # CLIRunner (subprocess 执行)
 │   ├── api_client.py                  # APIClient (httpx AsyncClient)
-│   └── skill_loader.py               # 动态加载 agent_browser 模块
+│   └── skill_loader.py               # 动态加载 stealth_browser 模块
 │
 ├── unit/                              # ★ 单元测试（~31 文件，无需浏览器）
 │   ├── test_config.py                 # 配置系统
@@ -162,7 +162,7 @@ markers = [
 
 - `TestBrowserDaemonSingleton` - 单例模式
 - `TestDaemonInitialState` - 初始状态
-- `TestStatePersistence` - 状态持久化到 `~/.agent-browser/daemon-state.json`
+- `TestStatePersistence` - 状态持久化到 `~/.stealth-browser/daemon-state.json`
 - `TestIdleMonitorControl` - 双条件空闲监控
 - `TestSessionManagement` - 会话管理
 - `TestDisconnect` / `TestShutdown` - 断开与清理
@@ -374,7 +374,7 @@ python -m cloakbrowser --remote-debugging-port=19222 --user-data-dir=/tmp/cb-tes
 curl http://127.0.0.1:19222/json/version
 
 # 4. (可选) 启动 FastAPI (远程/API 模式测试)
-python -m uvicorn agent_browser.api:app --host 127.0.0.1 --port 8000 &
+python -m uvicorn stealth_browser.api:app --host 127.0.0.1 --port 8000 &
 ```
 
 ---
@@ -448,7 +448,7 @@ class TestPipelineStep:
 ### 5.4 动态模块加载
 
 ```python
-# 由于 agent-browser 包名含连字符，需要动态加载
+# 由于 stealth-browser 包名含连字符，需要动态加载
 from helpers.skill_loader import load_skill_module
 
 config = load_skill_module("config")
@@ -465,9 +465,9 @@ classifier = load_skill_module("pipeline.classifier")
 @pytest.fixture(autouse=True)
 async def reset_global_state():
     """每个测试前重置全局状态"""
-    from agent_browser import main
-    from agent_browser.browser import daemon
-    from agent_browser.adapters import loader
+    from stealth_browser import main
+    from stealth_browser.browser import daemon
+    from stealth_browser.adapters import loader
     main._config = None
     main._middleware = None
     main._middleware_lock = asyncio.Lock()
@@ -481,22 +481,22 @@ async def reset_global_state():
 
 | 文件 | 用途 | 关键类/函数 |
 |------|------|-----------|
-| `agent_browser/config.py` | 配置系统 | `SkillConfig`, `load_config`, `detect_mode` |
-| `agent_browser/stealth/enhancer.py` | 隐匿增强（第6层） | `StealthEnhancer` |
-| `agent_browser/browser/daemon.py` | 浏览器守护 | `BrowserDaemon` |
-| `agent_browser/stealth/middleware.py` | 集中隐匿层（第7层） | `StealthMiddleware`, `_PerSessionCircuit` |
-| `agent_browser/browser/local.py` | 本地后端 | `LocalCDPBackend` |
-| `agent_browser/browser/remote.py` | 远程后端 | `RemoteAPIBackend` |
-| `agent_browser/browser/extension.py` | Chrome 扩展后端 | `ExtensionBackend` |
-| `agent_browser/pipeline/classifier.py` | 错误分类 | `ErrorCategory`, `classify_error` |
-| `agent_browser/pipeline/fallback.py` | 自动恢复 | `attempt_fallback`, `FallbackResult` |
-| `agent_browser/pipeline/debugger.py` | 调试器 | `DebugSession`, `debug_pipeline` |
-| `agent_browser/pipeline/telemetry.py` | 遥测 | `record`, `get_stats`, `clear` |
-| `agent_browser/pipeline/errors.py` | 类型化错误 | `PipelineError` 层次 |
-| `agent_browser/pipeline/executor.py` | 执行器入口 | `execute_pipeline` |
-| `agent_browser/explore/explorer.py` | 站点探索 | `explore_site` |
-| `agent_browser/adapters/validator.py` | 适配器校验 | `validate_adapter` |
-| `agent_browser/api.py` | FastAPI 端点 | 原子操作端点 |
+| `stealth_browser/config.py` | 配置系统 | `SkillConfig`, `load_config`, `detect_mode` |
+| `stealth_browser/stealth/enhancer.py` | 隐匿增强（第6层） | `StealthEnhancer` |
+| `stealth_browser/browser/daemon.py` | 浏览器守护 | `BrowserDaemon` |
+| `stealth_browser/stealth/middleware.py` | 集中隐匿层（第7层） | `StealthMiddleware`, `_PerSessionCircuit` |
+| `stealth_browser/browser/local.py` | 本地后端 | `LocalCDPBackend` |
+| `stealth_browser/browser/remote.py` | 远程后端 | `RemoteAPIBackend` |
+| `stealth_browser/browser/extension.py` | Chrome 扩展后端 | `ExtensionBackend` |
+| `stealth_browser/pipeline/classifier.py` | 错误分类 | `ErrorCategory`, `classify_error` |
+| `stealth_browser/pipeline/fallback.py` | 自动恢复 | `attempt_fallback`, `FallbackResult` |
+| `stealth_browser/pipeline/debugger.py` | 调试器 | `DebugSession`, `debug_pipeline` |
+| `stealth_browser/pipeline/telemetry.py` | 遥测 | `record`, `get_stats`, `clear` |
+| `stealth_browser/pipeline/errors.py` | 类型化错误 | `PipelineError` 层次 |
+| `stealth_browser/pipeline/executor.py` | 执行器入口 | `execute_pipeline` |
+| `stealth_browser/explore/explorer.py` | 站点探索 | `explore_site` |
+| `stealth_browser/adapters/validator.py` | 适配器校验 | `validate_adapter` |
+| `stealth_browser/api.py` | FastAPI 端点 | 原子操作端点 |
 
 ---
 

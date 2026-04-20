@@ -41,7 +41,7 @@ _RESULT_DIR = Path(__file__).parent / "results"
 @pytest.fixture
 def skill_config():
     """默认 SkillConfig"""
-    from agent_browser.config import SkillConfig
+    from stealth_browser.config import SkillConfig
 
     return SkillConfig()
 
@@ -94,7 +94,7 @@ def temp_state_path():
 @pytest.fixture
 def reset_daemon():
     """每个测试后重置 BrowserDaemon singleton"""
-    from agent_browser.browser.daemon import BrowserDaemon
+    from stealth_browser.browser.daemon import BrowserDaemon
 
     yield
     BrowserDaemon.reset()
@@ -103,7 +103,7 @@ def reset_daemon():
 @pytest.fixture
 def clean_env():
     """清理环境变量"""
-    env_keys = [k for k in os.environ if k.startswith("AGENT_BROWSER_")]
+    env_keys = [k for k in os.environ if k.startswith("STEALTH_BROWSER_")]
     original_values = {k: os.environ.get(k) for k in env_keys}
 
     # 清理
@@ -159,7 +159,7 @@ def cdp_url(request):
     # 端口空闲 — 通过 Playwright 启动有头模式（macOS 兼容）
     print(f"\n[CloakBrowser] Port {_CDP_PORT} free, launching headed browser...")
     try:
-        from agent_browser.browser.stealth_launcher import close_browser, launch_stealth_browser
+        from stealth_browser.browser.stealth_launcher import close_browser, launch_stealth_browser
 
         loop = asyncio.new_event_loop()
         try:

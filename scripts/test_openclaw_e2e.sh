@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════
-# Agent Browser × OpenClaw E2E 测试脚本
+# Stealth Browser × OpenClaw E2E 测试脚本
 #
-# 通过 openclaw agent CLI 调用 agent-browser skill，
+# 通过 openclaw agent CLI 调用 stealth-browser skill，
 # 覆盖 4 个场景（5 个子测试），自动验证并输出报告。
 #
 # 用法：bash scripts/test_openclaw_e2e.sh
@@ -228,7 +228,7 @@ run_scenario() {
 scenario_1_docker_basic() {
     run_scenario \
         "1-Docker基础" \
-        '使用 agent-browser skill，docker 模式打开 http://example.com，告诉我页面的 H1 标题是什么' \
+        '使用 stealth-browser skill，docker 模式打开 http://example.com，告诉我页面的 H1 标题是什么' \
         "$OPENCLAW_TIMEOUT" \
         "Example Domain"
 }
@@ -238,7 +238,7 @@ scenario_2_local_mode() {
     # 此场景验证不同端点访问能力，使用 docker 模式访问 httpbin.org/get
     run_scenario \
         "2-HttpBin验证" \
-        '使用 agent-browser skill，docker 模式打开 http://httpbin.org/get，告诉我页面返回的 JSON 中 url 字段的值' \
+        '使用 stealth-browser skill，docker 模式打开 http://httpbin.org/get，告诉我页面返回的 JSON 中 url 字段的值' \
         "$OPENCLAW_TIMEOUT" \
         "httpbin"
 }
@@ -246,7 +246,7 @@ scenario_2_local_mode() {
 scenario_3_multi_turn() {
     run_scenario \
         "3-多轮交互" \
-        '使用 agent-browser skill，docker 模式，分两步操作：第一步访问 http://example.com 记录页面标题，第二步在同一个会话内再访问 http://httpbin.org/ip 记录返回的 IP 信息。最后汇总两次访问的结果告诉我。' \
+        '使用 stealth-browser skill，docker 模式，分两步操作：第一步访问 http://example.com 记录页面标题，第二步在同一个会话内再访问 http://httpbin.org/ip 记录返回的 IP 信息。最后汇总两次访问的结果告诉我。' \
         "$OPENCLAW_TIMEOUT_LONG" \
         "Example Domain" "origin"
 }
@@ -264,7 +264,7 @@ scenario_4_concurrent() {
 
     log "  执行 4A-UUID..."
     openclaw agent \
-        -m '使用 agent-browser skill，docker 模式访问 http://httpbin.org/uuid，告诉我页面返回的 uuid 值' \
+        -m '使用 stealth-browser skill，docker 模式访问 http://httpbin.org/uuid，告诉我页面返回的 uuid 值' \
         --to "+100000${rand_a}" \
         --json \
         --timeout "$OPENCLAW_TIMEOUT" \
@@ -272,7 +272,7 @@ scenario_4_concurrent() {
 
     log "  执行 4B-IP..."
     openclaw agent \
-        -m '使用 agent-browser skill，docker 模式访问 http://httpbin.org/ip，告诉我页面返回的 IP 地址' \
+        -m '使用 stealth-browser skill，docker 模式访问 http://httpbin.org/ip，告诉我页面返回的 IP 地址' \
         --to "+100000${rand_b}" \
         --json \
         --timeout "$OPENCLAW_TIMEOUT" \
@@ -344,7 +344,7 @@ _validate_concurrent() {
 print_report() {
     echo ""
     echo "================================================================="
-    echo " Agent Browser x OpenClaw E2E Test Report"
+    echo " Stealth Browser x OpenClaw E2E Test Report"
     echo " Date: $(date '+%Y-%m-%d %H:%M:%S')"
     echo "================================================================="
     echo ""
@@ -380,7 +380,7 @@ print_report() {
 main() {
     echo ""
     echo "================================================================="
-    echo " Agent Browser x OpenClaw E2E Test"
+    echo " Stealth Browser x OpenClaw E2E Test"
     echo "================================================================="
     echo ""
 

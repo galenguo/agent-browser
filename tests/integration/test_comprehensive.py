@@ -84,7 +84,7 @@ def temp_adapter_dir():
 
 
 def _make_config(**overrides):
-    from agent_browser.config import SkillConfig
+    from stealth_browser.config import SkillConfig
 
     defaults = {
         "calling_mode": "cli",
@@ -104,7 +104,7 @@ def _make_config(**overrides):
 
 class TestStealthRecovery:
     def test_circuit_recovers_after_cooldown(self):
-        from agent_browser.stealth.middleware import CircuitState, _PerSessionCircuit
+        from stealth_browser.stealth.middleware import CircuitState, _PerSessionCircuit
 
         circuit = _PerSessionCircuit(threshold=2)
         circuit.record_failure()
@@ -119,7 +119,7 @@ class TestStealthRecovery:
 
     @pytest.mark.asyncio
     async def test_concurrent_sessions_independent_circuits(self, mock_backend):
-        from agent_browser.stealth.middleware import StealthMiddleware
+        from stealth_browser.stealth.middleware import StealthMiddleware
 
         cfg = _make_config(stealth_enabled=True)
         mw = StealthMiddleware(mock_backend, cfg)
@@ -142,7 +142,7 @@ class TestStealthRecovery:
 
     @pytest.mark.asyncio
     async def test_vanilla_mode_no_stealth_overhead(self, mock_backend):
-        from agent_browser.stealth.middleware import StealthMiddleware
+        from stealth_browser.stealth.middleware import StealthMiddleware
 
         cfg = _make_config(stealth_enabled=True, stealth_mode="vanilla")
         mw = StealthMiddleware(mock_backend, cfg)
@@ -154,7 +154,7 @@ class TestStealthRecovery:
 
     @pytest.mark.asyncio
     async def test_stealth_off_zero_overhead(self, mock_backend):
-        from agent_browser.stealth.middleware import StealthMiddleware, StealthPageHandle
+        from stealth_browser.stealth.middleware import StealthMiddleware, StealthPageHandle
 
         cfg = _make_config(stealth_enabled=False)
         mw = StealthMiddleware(mock_backend, cfg)
@@ -171,7 +171,7 @@ class TestStealthRecovery:
 
 class TestStealthOperationClassification:
     def test_all_known_ops_classified(self):
-        from agent_browser.stealth.middleware import _PASSTHROUGH_OPS, _STEALTH_OPS
+        from stealth_browser.stealth.middleware import _PASSTHROUGH_OPS, _STEALTH_OPS
 
         all_ops = _STEALTH_OPS.keys() | _PASSTHROUGH_OPS
         expected = {
@@ -191,7 +191,7 @@ class TestStealthOperationClassification:
         assert all_ops == expected
 
     def test_new_op_defaults_to_general(self):
-        from agent_browser.stealth.middleware import _STEALTH_OPS
+        from stealth_browser.stealth.middleware import _STEALTH_OPS
 
         assert _STEALTH_OPS.get("nonexistent_op", "general") == "general"
 
@@ -204,7 +204,7 @@ class TestStealthOperationClassification:
 class TestPerformanceLatency:
     @pytest.mark.asyncio
     async def test_pipeline_step_latency_breakdown(self, mock_backend):
-        from agent_browser.stealth.middleware import StealthMiddleware
+        from stealth_browser.stealth.middleware import StealthMiddleware
 
         cfg = _make_config(stealth_enabled=True)
         mw = StealthMiddleware(mock_backend, cfg)
@@ -223,7 +223,7 @@ class TestPerformanceLatency:
 
     @pytest.mark.asyncio
     async def test_memory_stability_many_sessions(self, mock_backend):
-        from agent_browser.stealth.middleware import StealthMiddleware
+        from stealth_browser.stealth.middleware import StealthMiddleware
 
         cfg = _make_config(stealth_enabled=True)
         mw = StealthMiddleware(mock_backend, cfg)
@@ -261,7 +261,7 @@ class TestPerformanceLatency:
 
     @pytest.mark.asyncio
     async def test_template_rendering_performance(self):
-        from agent_browser.pipeline.template import TemplateContext, render_value
+        from stealth_browser.pipeline.template import TemplateContext, render_value
 
         ctx = TemplateContext(args={"query": "test", "limit": 20})
         start = time.monotonic()
@@ -327,7 +327,7 @@ class TestTokenEfficiency:
             assert op not in ("llm", "agent", "vision")
 
     def test_template_output_minimal_tokens(self):
-        from agent_browser.pipeline.template import TemplateContext, render_value
+        from stealth_browser.pipeline.template import TemplateContext, render_value
 
         ctx = TemplateContext(args={"q": "python"})
         result = render_value("${{ q | upper }}", ctx)
@@ -343,14 +343,14 @@ class TestTokenEfficiency:
 class TestAdaptiveYAMLPipeline:
     @pytest.mark.asyncio
     async def test_pipeline_fail_fast_stops_on_error(self):
-        from agent_browser.pipeline.executor import execute_pipeline
+        from stealth_browser.pipeline.executor import execute_pipeline
 
         steps = [
             {"navigate": "https://example.com"},
             {"click": "#nonexistent"},
             {"snapshot": "body"},
         ]
-        with mock.patch("agent_browser.pipeline.steps._get_handle") as mock_get:
+        with mock.patch("stealth_browser.pipeline.steps._get_handle") as mock_get:
             h = mock.MagicMock()
             h.goto = mock.AsyncMock()
             h.evaluate = mock.AsyncMock(
@@ -362,7 +362,7 @@ class TestAdaptiveYAMLPipeline:
 
     @pytest.mark.asyncio
     async def test_pipeline_fail_slow_continues_despite_errors(self):
-        from agent_browser.pipeline.executor import execute_pipeline
+        from stealth_browser.pipeline.executor import execute_pipeline
 
         steps = [
             {"navigate": "https://example.com"},
@@ -370,7 +370,7 @@ class TestAdaptiveYAMLPipeline:
             {"snapshot": "body"},
             {"click": "#missing2"},
         ]
-        with mock.patch("agent_browser.pipeline.steps._get_handle") as mock_get:
+        with mock.patch("stealth_browser.pipeline.steps._get_handle") as mock_get:
             h = mock.MagicMock()
             h.goto = mock.AsyncMock()
             h.evaluate = mock.AsyncMock(
@@ -382,15 +382,15 @@ class TestAdaptiveYAMLPipeline:
 
     @pytest.mark.asyncio
     async def test_telemetry_non_blocking(self, tmp_path):
-        from agent_browser.pipeline import telemetry as tel_module
-        from agent_browser.pipeline.executor import execute_pipeline
+        from stealth_browser.pipeline import telemetry as tel_module
+        from stealth_browser.pipeline.executor import execute_pipeline
 
         tel_file = tmp_path / "tel.jsonl"
         original_tel_file = tel_module._TEL_FILE
         tel_module._TEL_FILE = tel_file
         try:
             steps = [{"navigate": "https://example.com"}]
-            with mock.patch("agent_browser.pipeline.steps._get_handle") as mock_get:
+            with mock.patch("stealth_browser.pipeline.steps._get_handle") as mock_get:
                 h = mock.MagicMock()
                 h.goto = mock.AsyncMock()
                 mock_get.return_value = h
@@ -404,7 +404,7 @@ class TestAdaptiveYAMLPipeline:
                 assert entry["success"] is True
 
     def test_template_data_context_resolution(self):
-        from agent_browser.pipeline.template import TemplateContext, resolve
+        from stealth_browser.pipeline.template import TemplateContext, resolve
 
         ctx = TemplateContext(args={"query": "test"})
         ctx._data = [
@@ -424,8 +424,8 @@ class TestAdaptiveYAMLPipeline:
         assert result == "TEST"
 
     def test_error_classification_all_types(self):
-        from agent_browser.pipeline.classifier import ErrorCategory, classify
-        from agent_browser.pipeline.errors import (
+        from stealth_browser.pipeline.classifier import ErrorCategory, classify
+        from stealth_browser.pipeline.errors import (
             PipelineStepError,
             SelectorNotFoundError,
             StepTimeoutError,
@@ -456,11 +456,11 @@ class TestAdaptiveYAMLPipeline:
 class TestExploreOrchestrator:
     @pytest.mark.asyncio
     async def test_explore_mocked_full_flow(self, mock_page_handle):
-        from agent_browser.explore.explorer import ExplorationResult, explore
+        from stealth_browser.explore.explorer import ExplorationResult, explore
 
         mw = mock.MagicMock()
         mw.get_page = mock.AsyncMock(return_value=mock_page_handle)
-        with mock.patch("agent_browser.main._ensure_middleware", return_value=mw):
+        with mock.patch("stealth_browser.main._ensure_middleware", return_value=mw):
             mock_page_handle.goto = mock.AsyncMock()
             mock_page_handle.title = mock.AsyncMock(return_value="Test Site")
             # explore() calls evaluate for: final_url, scroll via raw_page (1x), framework detection, store discovery
@@ -476,7 +476,7 @@ class TestExploreOrchestrator:
             mock_page_handle.on = mock.MagicMock()
             mock_page_handle.remove_listener = mock.MagicMock()
             # Prevent _get_behavior from returning a real simulator (would use raw_page)
-            with mock.patch("agent_browser.explore.explorer._get_behavior", return_value=None):
+            with mock.patch("stealth_browser.explore.explorer._get_behavior", return_value=None):
                 result = await explore(session_id="exp_test", url="https://example.com", scroll_count=1, timeout=10.0)
             assert isinstance(result, ExplorationResult)
             assert result.url == "https://example.com"
@@ -486,10 +486,10 @@ class TestExploreOrchestrator:
         # (synthesizer.py uses InferredCapability at line 931 but doesn't import it)
         import importlib
 
-        from agent_browser.explore.analysis import InferredCapability
-        from agent_browser.explore.synthesizer import synthesize_from_artifacts
+        from stealth_browser.explore.analysis import InferredCapability
+        from stealth_browser.explore.synthesizer import synthesize_from_artifacts
 
-        synth_module = importlib.import_module("agent_browser.explore.synthesizer")
+        synth_module = importlib.import_module("stealth_browser.explore.synthesizer")
         synth_module.InferredCapability = InferredCapability
 
         # Also add a .get() method to InferredCapability since _build_pipeline calls cap.get()
@@ -553,8 +553,8 @@ class TestExploreOrchestrator:
         assert adapter["strategy"] == "public"
 
     def test_synthesize_detects_strategy_from_exploration(self):
-        from agent_browser.explore.explorer import Endpoint, ExplorationResult
-        from agent_browser.explore.synthesizer import synthesize
+        from stealth_browser.explore.explorer import Endpoint, ExplorationResult
+        from stealth_browser.explore.synthesizer import synthesize
 
         # Use dict-based capabilities (legacy format) since _build_pipeline uses .get()
         # which works on dicts but not on InferredCapability dataclass instances.
@@ -612,7 +612,7 @@ class TestExploreOrchestrator:
         assert adapter["strategy"] in ("intercept", "ui")
 
     def test_distill_trace_removes_noise(self):
-        from agent_browser.explore.synthesizer import distill_trace
+        from stealth_browser.explore.synthesizer import distill_trace
 
         noisy_trace = [
             {"action": [{"type": "navigate"}], "params": {"url": "https://example.com"}},
@@ -641,7 +641,7 @@ class TestExploreOrchestrator:
 
 class TestYAMLUniversality:
     def test_adapter_portable_across_similar_sites(self):
-        from agent_browser.adapters.validator import validate_adapter
+        from stealth_browser.adapters.validator import validate_adapter
 
         generic = {
             "site": "generic-list",
@@ -664,8 +664,8 @@ class TestYAMLUniversality:
             assert len(errors) == 0, f"Portable to {site}: {errors}"
 
     def test_selector_drift_fallback_updates_selector(self):
-        from agent_browser.pipeline.errors import PipelineStepError
-        from agent_browser.pipeline.fallback import _retry_with_fresh_selector
+        from stealth_browser.pipeline.errors import PipelineStepError
+        from stealth_browser.pipeline.fallback import _retry_with_fresh_selector
 
         error = PipelineStepError(
             message="Element .item-card not found",
@@ -681,7 +681,7 @@ class TestYAMLUniversality:
                 "elements": [{"_index": 0, "tag": "div", "text": "New Item"}],
             }
         )
-        with mock.patch("agent_browser.main.snapshot", mock_snap):
+        with mock.patch("stealth_browser.main.snapshot", mock_snap):
             loop = asyncio.new_event_loop()
             try:
                 recovered = loop.run_until_complete(
@@ -693,7 +693,7 @@ class TestYAMLUniversality:
             assert "_fallback_snapshot" in context
 
     def test_adapter_validation_catches_invalid_steps(self):
-        from agent_browser.adapters.validator import validate_adapter
+        from stealth_browser.adapters.validator import validate_adapter
 
         bad = {
             "site": "test",
@@ -708,9 +708,9 @@ class TestYAMLUniversality:
         assert len(errors) > 0
 
     def test_synthesized_adapter_passes_validation(self, temp_adapter_dir):
-        from agent_browser.adapters.validator import validate_adapter
-        from agent_browser.explore.explorer import ExplorationResult
-        from agent_browser.explore.synthesizer import synthesize
+        from stealth_browser.adapters.validator import validate_adapter
+        from stealth_browser.explore.explorer import ExplorationResult
+        from stealth_browser.explore.synthesizer import synthesize
 
         # Use dict-based capability to avoid .get() AttributeError on dataclass
         exp = ExplorationResult(
@@ -753,7 +753,7 @@ MODE_MATRIX = [
 class TestDeploymentModeMatrix:
     @pytest.mark.parametrize("calling,browser,intel", MODE_MATRIX)
     def test_mode_config_valid(self, calling, browser, intel):
-        from agent_browser.config import load_config
+        from stealth_browser.config import load_config
 
         cfg = load_config(calling_mode=calling, browser_mode=browser, intelligence=intel, stealth_enabled=False)
         assert cfg.calling_mode in ("cli", "api")
@@ -762,7 +762,7 @@ class TestDeploymentModeMatrix:
 
     @pytest.mark.parametrize("calling,browser,intel", MODE_MATRIX)
     def test_mode_stealth_configurable(self, calling, browser, intel):
-        from agent_browser.config import load_config
+        from stealth_browser.config import load_config
 
         cfg_on = load_config(calling_mode=calling, browser_mode=browser, intelligence=intel, stealth_enabled=True)
         assert cfg_on.stealth_enabled is True
@@ -772,7 +772,7 @@ class TestDeploymentModeMatrix:
     @pytest.mark.parametrize("calling,browser,intel", MODE_MATRIX)
     @pytest.mark.asyncio
     async def test_mode_middleware_initializes(self, calling, browser, intel, mock_backend):
-        from agent_browser.stealth.middleware import StealthMiddleware
+        from stealth_browser.stealth.middleware import StealthMiddleware
 
         cfg = _make_config(calling_mode=calling, browser_mode=browser, intelligence=intel, stealth_enabled=False)
         mw = StealthMiddleware(mock_backend, cfg)
@@ -785,13 +785,13 @@ class TestDeploymentModeMatrix:
 
 class TestCLIRemoteFallback:
     def test_cli_remote_becomes_local(self):
-        from agent_browser.config import load_config
+        from stealth_browser.config import load_config
 
         cfg = load_config(calling_mode="cli", browser_mode="remote")
         assert cfg.browser_mode == "local"
 
     def test_api_remote_stays_remote(self):
-        from agent_browser.config import load_config
+        from stealth_browser.config import load_config
 
         cfg = load_config(calling_mode="api", browser_mode="remote")
         assert cfg.browser_mode == "remote"
@@ -800,8 +800,8 @@ class TestCLIRemoteFallback:
 class TestDockerRemoteBackend:
     @pytest.mark.asyncio
     async def test_remote_backend_translates_to_http(self):
-        from agent_browser.browser.remote import RemoteAPIBackend, RemotePageHandle
-        from agent_browser.config import SkillConfig
+        from stealth_browser.browser.remote import RemoteAPIBackend, RemotePageHandle
+        from stealth_browser.config import SkillConfig
 
         cfg = SkillConfig(
             calling_mode="api",
@@ -822,8 +822,8 @@ class TestDockerRemoteBackend:
 
     @pytest.mark.asyncio
     async def test_remote_backend_sends_auth_header(self):
-        from agent_browser.browser.remote import RemoteAPIBackend
-        from agent_browser.config import SkillConfig
+        from stealth_browser.browser.remote import RemoteAPIBackend
+        from stealth_browser.config import SkillConfig
 
         cfg = SkillConfig(
             calling_mode="api",
@@ -850,8 +850,8 @@ class TestDockerRemoteBackend:
 class TestPipelineEndToEnd:
     @pytest.mark.asyncio
     async def test_full_navigate_extract_pipeline(self, mock_backend):
-        from agent_browser.pipeline.executor import execute_pipeline
-        from agent_browser.stealth.middleware import StealthMiddleware
+        from stealth_browser.pipeline.executor import execute_pipeline
+        from stealth_browser.stealth.middleware import StealthMiddleware
 
         cfg = _make_config(stealth_enabled=True)
         mw = StealthMiddleware(mock_backend, cfg)
@@ -865,7 +865,7 @@ class TestPipelineEndToEnd:
             {"limit": "2"},
         ]
         # Patch _get_handle so all step handlers get our mock page handle
-        with mock.patch("agent_browser.pipeline.steps._get_handle") as mock_get:
+        with mock.patch("stealth_browser.pipeline.steps._get_handle") as mock_get:
             h = mock.MagicMock()
             h.goto = mock.AsyncMock()
             h.wait_for_selector = mock.AsyncMock()
@@ -884,19 +884,19 @@ class TestPipelineEndToEnd:
             mock_get.return_value = h
             # Also patch _ensure_middleware to prevent snapshot fallback from
             # trying to create real middleware connections
-            with mock.patch("agent_browser.main._ensure_middleware", return_value=mw):
+            with mock.patch("stealth_browser.main._ensure_middleware", return_value=mw):
                 data = await execute_pipeline(pipeline, session_id="e2e", args={}, fail_fast=True)
                 assert data is not None
         await mw.disconnect()
 
     @pytest.mark.asyncio
     async def test_pipeline_template_variables_in_steps(self, mock_backend):
-        from agent_browser.pipeline.executor import execute_pipeline
+        from stealth_browser.pipeline.executor import execute_pipeline
 
         pipeline = [
             {"navigate": "https://${{ args.host }}/search?q=${{ args.query }}"},
         ]
-        with mock.patch("agent_browser.pipeline.steps._get_handle") as mock_get:
+        with mock.patch("stealth_browser.pipeline.steps._get_handle") as mock_get:
             h = mock.MagicMock()
             h.goto = mock.AsyncMock()
             mock_get.return_value = h

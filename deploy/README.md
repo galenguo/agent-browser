@@ -24,7 +24,7 @@ v2 架构支持多用户隔离，每个用户拥有独立的浏览器会话、Pr
 
 ```bash
 cd deploy/docker
-cp .env.v2.example .env
+cp .env.example .env
 ```
 
 编辑 `.env` 文件：
@@ -46,7 +46,7 @@ IDLE_TIMEOUT_SECONDS=1800
 ### 2. 启动服务
 
 ```bash
-docker-compose -f docker-compose-v2.yml up -d
+docker-compose --profile all-in-one up -d
 ```
 
 ### 3. 验证服务
@@ -236,6 +236,15 @@ GET /tasks/{task_id}
 | `IDLE_TIMEOUT_SECONDS` | `1800` | 会话空闲超时（秒） |
 | `PROFILE_STORAGE` | `/data/profiles` | Profile 存储目录 |
 | `LOG_LEVEL` | `info` | 日志级别 |
+| `API_KEY` | — | API 认证密钥（单 key，优先级低于 keys.yaml 文件） |
+| `API_KEYS` | — | API 认证密钥列表（JSON 数组或逗号分隔，优先级低于 keys.yaml） |
+| `API_AUTH_DISABLED` | `false` | 禁用 API 认证（仅限本地开发） |
+| `VNC_BASE_URL` | — | noVNC 公网访问地址（如 `http://your-domain:6080`） |
+| `BROWSER_PUBLIC_HOST` | — | 浏览器节点公网域名（分布式模式使用） |
+| `BROWSER_PORT_OFFSET` | `0` | noVNC 端口偏移量 |
+| `OPENAI_API_KEY` | — | OpenAI API Key（Agent 模式必需） |
+| `OPENAI_BASE_URL` | — | OpenAI API Base URL（支持第三方兼容 API） |
+| `ANTHROPIC_API_KEY` | — | Anthropic API Key |
 
 ### 资源限制
 
@@ -245,8 +254,8 @@ All-in-One 模式（推荐配置）：
 deploy:
   resources:
     limits:
-      memory: 1G        # 硬限制
-      cpus: '1.0'
+      memory: 2G        # 硬限制
+      cpus: '2.0'
     reservations:
       memory: 512M      # 软限制
 ```
@@ -293,10 +302,10 @@ curl http://localhost:8000/health
 
 ```bash
 # 查看容器日志
-docker logs -f agent-browser-v2-all-in-one
+docker logs -f stealth-browser
 
 # 查看应用日志
-docker exec agent-browser-v2-all-in-one tail -f /data/logs/info.log
+docker exec stealth-browser tail -f /data/logs/info.log
 ```
 
 ## 故障排查
@@ -335,8 +344,8 @@ docker exec agent-browser-v2-all-in-one tail -f /data/logs/info.log
 1. **备份数据**
 
 ```bash
-docker cp agent-browser-scheme1:/data/profiles ./backup/profiles
-docker cp agent-browser-scheme1:/data/logs ./backup/logs
+docker cp stealth-browser:/data/profiles ./backup/profiles
+docker cp stealth-browser:/data/logs ./backup/logs
 ```
 
 2. **停止旧容器**
@@ -348,7 +357,7 @@ docker-compose down
 3. **启动 v2 容器**
 
 ```bash
-docker-compose -f docker-compose-v2.yml up -d
+docker-compose --profile all-in-one up -d
 ```
 
 4. **验证服务**
@@ -386,7 +395,7 @@ v2 完全兼容 v1 的 `/tasks` API，无需修改客户端代码。
 
 ## Kubernetes 部署
 
-Agent Browser 支持在 Kubernetes 集群中部署，提供更强的可扩展性和高可用性。
+Stealth Browser 支持在 Kubernetes 集群中部署，提供更强的可扩展性和高可用性。
 
 ### 部署模式
 
@@ -450,13 +459,13 @@ kubectl apply -f k8s/browser-service.yaml
 
 ```bash
 # 检查 Pod 状态
-kubectl get pods -n agent-browser
+kubectl get pods -n stealth-browser
 
 # 检查 Service
-kubectl get svc -n agent-browser
+kubectl get svc -n stealth-browser
 
 # 获取访问地址
-NODE_PORT=$(kubectl get svc agent-browser-aio -n agent-browser -o jsonpath='{.spec.ports[0].nodePort}')
+NODE_PORT=$(kubectl get svc stealth-browser-aio -n stealth-browser -o jsonpath='{.spec.ports[0].nodePort}')
 echo "API: http://<node-ip>:${NODE_PORT}"
 
 # 测试健康检查
@@ -478,39 +487,39 @@ curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 #### 2. 部署 All-in-One 模式
 
 ```bash
-helm install agent-browser ./helm/agent-browser \
-  -f helm/agent-browser/values-aio.yaml \
+helm install stealth-browser ./helm/stealth-browser \
+  -f helm/stealth-browser/values-aio.yaml \
   --set secrets.anthropicApiKey=your-anthropic-key \
   --set secrets.openaiApiKey=your-openai-key \
   --set image.registry=registry.example.com \
-  --namespace agent-browser \
+  --namespace stealth-browser \
   --create-namespace
 ```
 
 #### 3. 部署分布式模式
 
 ```bash
-helm install agent-browser ./helm/agent-browser \
-  -f helm/agent-browser/values-distributed.yaml \
+helm install stealth-browser ./helm/stealth-browser \
+  -f helm/stealth-browser/values-distributed.yaml \
   --set secrets.anthropicApiKey=your-anthropic-key \
   --set secrets.openaiApiKey=your-openai-key \
   --set image.registry=registry.example.com \
-  --namespace agent-browser \
+  --namespace stealth-browser \
   --create-namespace
 ```
 
 #### 4. 升级部署
 
 ```bash
-helm upgrade agent-browser ./helm/agent-browser \
+helm upgrade stealth-browser ./helm/stealth-browser \
   -f my-values.yaml \
-  --namespace agent-browser
+  --namespace stealth-browser
 ```
 
 #### 5. 卸载
 
 ```bash
-helm uninstall agent-browser --namespace agent-browser
+helm uninstall stealth-browser --namespace stealth-browser
 ```
 
 ### 资源配置
@@ -570,13 +579,13 @@ persistence:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: agent-browser-api
-  namespace: agent-browser
+  name: stealth-browser-api
+  namespace: stealth-browser
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: agent-browser-api
+    name: stealth-browser-api
   minReplicas: 2
   maxReplicas: 10
   metrics:
@@ -600,20 +609,20 @@ spec:
 
 ```bash
 # 查看 Pod 日志
-kubectl logs -n agent-browser <pod-name>
+kubectl logs -n stealth-browser <pod-name>
 
 # 实时查看日志
-kubectl logs -n agent-browser <pod-name> -f
+kubectl logs -n stealth-browser <pod-name> -f
 
 # 查看上一个容器的日志
-kubectl logs -n agent-browser <pod-name> --previous
+kubectl logs -n stealth-browser <pod-name> --previous
 ```
 
 #### 监控指标
 
 ```bash
 # 查看资源使用情况
-kubectl top pods -n agent-browser
+kubectl top pods -n stealth-browser
 kubectl top nodes
 ```
 
@@ -623,26 +632,26 @@ kubectl top nodes
 
 ```bash
 # 查看 Pod 事件
-kubectl describe pod -n agent-browser <pod-name>
+kubectl describe pod -n stealth-browser <pod-name>
 
 # 查看 Pod 日志
-kubectl logs -n agent-browser <pod-name>
+kubectl logs -n stealth-browser <pod-name>
 
 # 检查镜像拉取
-kubectl get events -n agent-browser --sort-by='.lastTimestamp'
+kubectl get events -n stealth-browser --sort-by='.lastTimestamp'
 ```
 
 #### 健康检查失败
 
 ```bash
 # 进入容器调试
-kubectl exec -it -n agent-browser <pod-name> -- /bin/bash
+kubectl exec -it -n stealth-browser <pod-name> -- /bin/bash
 
 # 检查环境变量
-kubectl exec -n agent-browser <pod-name> -- env
+kubectl exec -n stealth-browser <pod-name> -- env
 
 # 测试健康检查端点
-kubectl exec -n agent-browser <pod-name> -- curl http://localhost:8000/health
+kubectl exec -n stealth-browser <pod-name> -- curl http://localhost:8000/health
 ```
 
 ### 成本估算
@@ -664,5 +673,5 @@ kubectl exec -n agent-browser <pod-name> -- curl http://localhost:8000/health
 
 更多详细信息请参考：
 - [Kubernetes 配置](./k8s/)
-- [Helm Chart](./helm/agent-browser/)
+- [Helm Chart](./helm/stealth-browser/)
 - [ ] 实现自动扩缩容

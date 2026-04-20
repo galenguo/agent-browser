@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== Agent Browser: Setup kind Cluster ==="
+echo "=== Stealth Browser: Setup kind Cluster ==="
 cd "$(dirname "$0")"
 
 # Step 1: Install kind
@@ -14,9 +14,9 @@ fi
 mkdir -p data/profiles data/logs
 
 # Step 3: Delete existing cluster if present
-if kind get clusters 2>/dev/null | grep -q "agent-browser"; then
-  echo "Deleting existing agent-browser cluster..."
-  kind delete cluster --name agent-browser
+if kind get clusters 2>/dev/null | grep -q "stealth-browser"; then
+  echo "Deleting existing stealth-browser cluster..."
+  kind delete cluster --name stealth-browser
 fi
 
 # Step 4: Create cluster

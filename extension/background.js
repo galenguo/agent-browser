@@ -1,7 +1,7 @@
 /**
- * Agent Browser Bridge — Background Service Worker (MV3)
+ * Stealth Browser Bridge — Background Service Worker (MV3)
  *
- * Connects to agent-browser daemon via WebSocket (ws://127.0.0.1:19825/ext).
+ * Connects to stealth-browser daemon via WebSocket (ws://127.0.0.1:19825/ext).
  * Routes commands from daemon → chrome.debugger API → returns results.
  * Uses chrome.alarms for service worker keepalive (MV3: SW killed after ~30s idle).
  */

@@ -1,8 +1,8 @@
-# Agent Browser - Development Guide
+# Stealth Browser - Development Guide
 
 ## Overview
 
-Agent Browser is an AI-driven anti-detection browser automation platform designed for high-protection websites. It combines browser automation with AI agents to enable intelligent web interaction while evading detection systems.
+Stealth Browser is an AI-driven anti-detection browser automation platform designed for high-protection websites. It combines browser automation with AI agents to enable intelligent web interaction while evading detection systems.
 
 **Core capabilities:**
 - Industrial-grade anti-detection (7-layer protection stack + StealthMiddleware circuit breaker)
@@ -32,13 +32,13 @@ Agent Browser is an AI-driven anti-detection browser automation platform designe
 | 6 | StealthEnhancer | Human delays + Bezier mouse + character-by-character typing |
 | 7 | **StealthMiddleware** | **Centralized stealth layer: auto pre/post delay + circuit breaker** |
 
-**Note on optional dependencies:** Layers 1-5 require the `[cloak]` extra (`pip install agent-browser[cloak]`). A basic install (`pip install agent-browser`) works with plain Playwright and provides layers 6-7 only.
+**Note on optional dependencies:** Layers 1-5 require the `[cloak]` extra (`pip install stealth-browser[cloak]`). A basic install (`pip install stealth-browser`) works with plain Playwright and provides layers 6-7 only.
 
 ### Package Architecture
 
 ```
-agent-browser/                          # Project root
-├── agent_browser/                      # Single pip-installable package
+stealth-browser/                          # Project root
+├── stealth_browser/                      # Single pip-installable package
 │   ├── main.py                        # Facade API (create_session, snapshot, click, etc.)
 │   ├── config.py                      # SkillConfig dataclass + load_config / detect_mode
 │   ├── deploy_config.py               # DeployConfig for Docker/K8s deployments
@@ -153,7 +153,7 @@ agent-browser/                          # Project root
          +----------------------+------------------------------+
                                 |
 +-------------------------------v---------------------------------------+
-|              StealthMiddleware (agent_browser.stealth.middleware)      |
+|              StealthMiddleware (stealth_browser.stealth.middleware)      |
 |        pre/post delay + Bezier mouse + human typing + circuit breaker |
 |                          (per-session scope)                          |
 +-------------------------------+---------------------------------------+
@@ -363,7 +363,7 @@ asyncio.create_task(idle_monitor_loop())
 
 Use custom exceptions from the typed error hierarchy introduced in Pipeline engine v2.2:
 ```python
-from agent_browser.pipeline.errors import (
+from stealth_browser.pipeline.errors import (
     PipelineError,              # Base class
     AdapterLoadError,           # Adapter loading failure
     AdapterValidationError,     # Adapter YAML validation failure
@@ -387,22 +387,22 @@ All code and comments must be in English. Variable names, function names, and cl
 
 ```bash
 # Calling mode
-AGENT_BROWSER_CALLING_MODE=cli          # cli | api
-AGENT_BROWSER_BROWSER_MODE=local        # local | extension | remote
-AGENT_BROWSER_INTELLIGENCE=llm          # llm | agent
+STEALTH_BROWSER_CALLING_MODE=cli          # cli | api
+STEALTH_BROWSER_BROWSER_MODE=local        # local | extension | remote
+STEALTH_BROWSER_INTELLIGENCE=llm          # llm | agent
 
 # Connection config
-AGENT_BROWSER_CDP_URL=http://127.0.0.1:19222
-AGENT_BROWSER_API_URL=http://localhost:8000
-AGENT_BROWSER_API_KEY=xxx
+STEALTH_BROWSER_CDP_URL=http://127.0.0.1:19222
+STEALTH_BROWSER_API_URL=http://localhost:8000
+STEALTH_BROWSER_API_KEY=xxx
 
 # Daemon config
-AGENT_BROWSER_DAEMON_ENABLED=true
-AGENT_BROWSER_DAEMON_IDLE_TIMEOUT=1800
+STEALTH_BROWSER_DAEMON_ENABLED=true
+STEALTH_BROWSER_DAEMON_IDLE_TIMEOUT=1800
 
 # Stealth config
-AGENT_BROWSER_STEALTH_ENABLED=true
-AGENT_BROWSER_STEALTH_MODE=full           # full | vanilla
+STEALTH_BROWSER_STEALTH_ENABLED=true
+STEALTH_BROWSER_STEALTH_MODE=full           # full | vanilla
 
 # LLM config (Agent mode / Pipeline engine)
 LLM_PROVIDER=openai                     # openai | anthropic
@@ -415,8 +415,8 @@ ANTHROPIC_API_KEY=sk-ant-xxx
 ### Configuration Priority
 
 1. Explicit parameters (`create_session(mode="api")`)
-2. Environment variables (`AGENT_BROWSER_CALLING_MODE`)
-3. YAML config (`~/.agent-browser/config.yaml`)
+2. Environment variables (`STEALTH_BROWSER_CALLING_MODE`)
+3. YAML config (`~/.stealth-browser/config.yaml`)
 4. Auto-detection (localhost:8000/health)
 5. Hardcoded default (CLI + local)
 
@@ -450,36 +450,36 @@ async def detect_mode() -> SkillConfig:
 
 ### Adding a New Atomic Operation
 
-1. Define interface in `BrowserPageHandle` ABC (`agent_browser/browser/__init__.py`)
-2. Implement in `PlaywrightPageHandle` (`agent_browser/browser/local.py`)
-3. Implement in `ExtensionPageHandle` (`agent_browser/browser/extension.py`)
-4. Add HTTP mapping in `RemotePageHandle` (`agent_browser/browser/remote.py`)
-5. Expose API in `agent_browser/main.py`
-6. Export from `agent_browser/__init__.py`
+1. Define interface in `BrowserPageHandle` ABC (`stealth_browser/browser/__init__.py`)
+2. Implement in `PlaywrightPageHandle` (`stealth_browser/browser/local.py`)
+3. Implement in `ExtensionPageHandle` (`stealth_browser/browser/extension.py`)
+4. Add HTTP mapping in `RemotePageHandle` (`stealth_browser/browser/remote.py`)
+5. Expose API in `stealth_browser/main.py`
+6. Export from `stealth_browser/__init__.py`
 
 ### Adding a New FastAPI Endpoint
 
-1. Add endpoint in the FastAPI app (the server runs `agent_browser` internally)
-2. Add corresponding HTTP call in `RemotePageHandle` (`agent_browser/browser/remote.py`)
+1. Add endpoint in the FastAPI app (the server runs `stealth_browser` internally)
+2. Add corresponding HTTP call in `RemotePageHandle` (`stealth_browser/browser/remote.py`)
 
 ### Adding a New Pipeline Step
 
-1. Add step implementation in `agent_browser/pipeline/steps.py` (executes via StealthPageHandle)
-2. Register step template in `agent_browser/pipeline/template.py` (if variable substitution needed)
-3. Register in STEPS registry of `agent_browser/adapters/validator.py` (auto-detected)
-4. Add corresponding error type in `agent_browser/pipeline/errors.py` (if needed)
-5. Add heuristic classification rule in `agent_browser/pipeline/classifier.py` (if needed)
+1. Add step implementation in `stealth_browser/pipeline/steps.py` (executes via StealthPageHandle)
+2. Register step template in `stealth_browser/pipeline/template.py` (if variable substitution needed)
+3. Register in STEPS registry of `stealth_browser/adapters/validator.py` (auto-detected)
+4. Add corresponding error type in `stealth_browser/pipeline/errors.py` (if needed)
+5. Add heuristic classification rule in `stealth_browser/pipeline/classifier.py` (if needed)
 
 ### Enhancing StealthMiddleware
 
-**Key file:** `agent_browser/stealth/middleware.py`
+**Key file:** `stealth_browser/stealth/middleware.py`
 
 ```python
 # Add new operation type mapping
 delay_map["new_action"] = (0.3, 0.8)
 ```
 
-**Also update:** `stealth_actions` in `agent_browser/intelligence/agent_runner.py`
+**Also update:** `stealth_actions` in `stealth_browser/intelligence/agent_runner.py`
 
 ### Adding a New Site Adapter
 
@@ -488,11 +488,11 @@ delay_map["new_action"] = (0.3, 0.8)
 
 ### Adding a New Browser Backend
 
-1. Create new backend file in `agent_browser/browser/`
+1. Create new backend file in `stealth_browser/browser/`
 2. Implement `BrowserBackend` and `BrowserPageHandle` ABCs
-3. Register in `agent_browser/browser/__init__.py`
-4. Add routing branch in `_ensure_backend()` in `agent_browser/main.py`
-5. Update `browser_mode` enum in `agent_browser/config.py`
+3. Register in `stealth_browser/browser/__init__.py`
+4. Add routing branch in `_ensure_backend()` in `stealth_browser/main.py`
+5. Update `browser_mode` enum in `stealth_browser/config.py`
 
 ## Important Notes
 
@@ -508,7 +508,7 @@ delay_map["new_action"] = (0.3, 0.8)
 ### Backend Abstraction
 
 **Keep LocalCDPBackend as the sole browser operation core:**
-- All browser operation logic is only implemented in `agent_browser/browser/local.py`
+- All browser operation logic is only implemented in `stealth_browser/browser/local.py`
 - RemoteAPIBackend only does HTTP serialization, zero business logic
 - ExtensionBackend proxies via chrome.debugger, does not re-implement operation logic
 - FastAPI server internally runs LocalCDPBackend
@@ -525,7 +525,7 @@ delay_map["new_action"] = (0.3, 0.8)
 **BrowserDaemon lifecycle:**
 - Lazy connection on first `ensure_connected()`
 - Dual-condition disconnect: no active sessions AND exceeds idle_timeout
-- State persisted to `~/.agent-browser/daemon-state.json`
+- State persisted to `~/.stealth-browser/daemon-state.json`
 
 **StealthMiddleware circuit breaker:**
 - Per-session scope (not global), so one session cannot affect others
@@ -538,13 +538,13 @@ The package has two installation modes:
 
 **Basic install** (layers 6-7 only):
 ```bash
-pip install agent-browser
+pip install stealth-browser
 ```
 Works with plain Playwright. Provides StealthEnhancer and StealthMiddleware (human behavior simulation), but no C++-level fingerprint spoofing.
 
 **Full install** (all 7 layers):
 ```bash
-pip install agent-browser[cloak]
+pip install stealth-browser[cloak]
 ```
 Adds CloakBrowser (C++ compiled Chromium with 33 fingerprint patches), patchright driver-level patches, rebrowser-patches runtime fixes, and non-standard CDP port binding. This activates layers 1-5 of the anti-detection stack.
 

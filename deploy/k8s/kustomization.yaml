@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: agent-browser
+namespace: stealth-browser
 
 resources:
   - namespace.yaml
@@ -30,9 +30,9 @@ resources:
 
 # Image replacement (adjust registry as needed)
 images:
-  - name: ${REGISTRY_URL}/agent-browser-api
-    newName: agent-browser-api
+  - name: ${REGISTRY_URL}/stealth-browser-api
+    newName: stealth-browser-api
     newTag: latest
-  - name: ${REGISTRY_URL}/agent-browser-browser
-    newName: agent-browser-browser
+  - name: ${REGISTRY_URL}/stealth-browser-browser
+    newName: stealth-browser-browser
     newTag: latest

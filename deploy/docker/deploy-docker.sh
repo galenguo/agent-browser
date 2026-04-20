@@ -1,8 +1,13 @@
 #!/bin/bash
 
 # Docker 部署脚本
+# 可从任意目录运行
 
 set -e
+
+# 自动检测项目根目录
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -63,27 +68,38 @@ check_images() {
     print_info "检查镜像..."
 
     if [[ "$MODE" == "aio" ]]; then
-        REQUIRED_IMAGES=("agent-browser:latest")
+        REQUIRED_IMAGES=("stealth-browser:latest")
     else
-        REQUIRED_IMAGES=("agent-browser-api:latest" "agent-browser-browser:latest")
+        REQUIRED_IMAGES=("stealth-browser-api:latest" "stealth-browser-browser:latest")
     fi
 
     MISSING_IMAGES=()
-    for image in "${REQUIRED_IMAGES[@]}"; do
-        if ! docker image inspect ${REGISTRY_URL}/${image} &> /dev/null; then
-            MISSING_IMAGES+=("$image")
-        fi
-    done
+
+    # 本地构建镜像不带 registry 前缀
+    if [[ "$REGISTRY_URL" == "localhost:5000" ]]; then
+        for image in "${REQUIRED_IMAGES[@]}"; do
+            if ! docker image inspect "$image" &> /dev/null; then
+                MISSING_IMAGES+=("$image")
+            fi
+        done
+    else
+        for image in "${REQUIRED_IMAGES[@]}"; do
+            if ! docker image inspect "${REGISTRY_URL}/${image}" &> /dev/null; then
+                MISSING_IMAGES+=("${REGISTRY_URL}/${image}")
+            fi
+        done
+    fi
 
     if [[ ${#MISSING_IMAGES[@]} -gt 0 ]]; then
         print_warning "以下镜像不存在:"
         for image in "${MISSING_IMAGES[@]}"; do
-            echo "  - ${REGISTRY_URL}/${image}"
+            echo "  - $image"
         done
         print_info "是否构建镜像? [y/N]"
         read -r response
         if [[ "$response" =~ ^[Yy]$ ]]; then
-            ./scripts/build-multiarch.sh --registry $REGISTRY_URL
+            cd "$PROJECT_ROOT"
+            bash "$SCRIPT_DIR/build-local.sh" "$([[ "$MODE" == "aio" ]] && echo aio || echo distributed)"
         else
             print_error "缺少必需的镜像"
             exit 1
@@ -98,18 +114,19 @@ setup_env() {
     print_info "配置环境..."
 
     # 复制 .env 文件
-    if [[ ! -f docker/.env ]]; then
-        if [[ -f docker/.env.example ]]; then
-            cp docker/.env.example docker/.env
-            print_success "已创建 docker/.env 文件"
+    if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
+        if [[ -f "$SCRIPT_DIR/.env.example" ]]; then
+            cp "$SCRIPT_DIR/.env.example" "$SCRIPT_DIR/.env"
+            print_success "已创建 .env 文件"
         else
-            print_warning "docker/.env.example 不存在"
+            print_warning ".env.example 不存在"
         fi
     fi
 
     # 设置部署模式
-    if [[ -f docker/.env ]]; then
-        sed -i.bak "s/^DEPLOYMENT_MODE=.*/DEPLOYMENT_MODE=${MODE}/" docker/.env
+    if [[ -f "$SCRIPT_DIR/.env" ]]; then
+        sed -i.bak "s/^DEPLOYMENT_MODE=.*/DEPLOYMENT_MODE=${MODE}/" "$SCRIPT_DIR/.env"
+        rm -f "$SCRIPT_DIR/.env.bak"
         print_success "部署模式设置为: $MODE"
     fi
 }
@@ -118,7 +135,7 @@ setup_env() {
 start_services() {
     print_info "启动服务..."
 
-    cd docker
+    cd "$SCRIPT_DIR"
 
     if [[ "$MODE" == "aio" ]]; then
         print_info "启动 All-in-One 模式..."
@@ -127,8 +144,6 @@ start_services() {
         print_info "启动分布式模式..."
         docker-compose --profile distributed up -d
     fi
-
-    cd ..
 
     print_success "服务已启动"
 }
@@ -184,7 +199,7 @@ show_status() {
     host_ip=$(get_host_ip)
 
     print_info "服务状态:"
-    docker ps --filter "name=agent-browser"
+    docker ps --filter "name=stealth-browser"
 
     echo ""
     print_info "访问地址:"
@@ -202,7 +217,7 @@ show_status() {
 # 主函数
 main() {
     echo ""
-    print_info "Agent Browser Docker 部署"
+    print_info "Stealth Browser Docker 部署"
     echo ""
 
     # 检查 Docker
@@ -245,7 +260,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --validate)
             # 验证 config.yaml 中 Docker 相关字段是否存在
-            CFG="${CONFIG_PATH:-$HOME/.agent-browser/config.yaml}"
+            CFG="${CONFIG_PATH:-$HOME/.stealth-browser/config.yaml}"
             if [[ -f "$CFG" ]]; then
                 print_info "验证配置文件: $CFG"
                 for key in docker registry image_tag; do

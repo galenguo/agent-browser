@@ -5,8 +5,8 @@ from unittest import mock
 
 import pytest
 
-from agent_browser.deploy_config import DeployConfig
-from agent_browser.main import (
+from stealth_browser.deploy_config import DeployConfig
+from stealth_browser.main import (
     DepStatus,
     FirstSessionError,
     RecoveryReport,
@@ -116,7 +116,7 @@ class TestSetupFunction:
     @pytest.mark.asyncio
     async def test_returns_dict_with_required_keys(self, tmp_path):
         """setup() should return dict with config, issues, report, ready, config_path."""
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
             result = await setup()
 
             assert "config" in result
@@ -128,14 +128,14 @@ class TestSetupFunction:
 
     @pytest.mark.asyncio
     async def test_returns_deploy_config(self, tmp_path):
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
             result = await setup()
             assert isinstance(result["config"], DeployConfig)
 
     @pytest.mark.asyncio
     async def test_writes_config_file(self, tmp_path):
         cfg_path = tmp_path / "config.yaml"
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", cfg_path):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", cfg_path):
             await setup()
             assert cfg_path.exists()
             content = cfg_path.read_text()
@@ -145,14 +145,14 @@ class TestSetupFunction:
     async def test_accepts_kwargs_override(self, tmp_path):
         """Passing mode= should override default."""
         cfg_path = tmp_path / "config.yaml"
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", cfg_path):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", cfg_path):
             result = await setup(mode="docker-aio")
             assert result["config"].mode == "docker-aio"
 
     @pytest.mark.asyncio
     async def test_detects_environment(self, tmp_path):
         """Result should include environment detection info."""
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
             result = await setup()
             env = result["environment"]
             assert "os" in env
@@ -161,7 +161,7 @@ class TestSetupFunction:
     @pytest.mark.asyncio
     async def test_validates_config(self, tmp_path):
         """Issues list should come from validate_config()."""
-        with mock.patch("agent_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
+        with mock.patch("stealth_browser.deploy_config.CONFIG_PATH", tmp_path / "config.yaml"):
             result = await setup()
             assert isinstance(result["issues"], list)
 

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: stealth-browser
+description: AI-driven anti-detection browser automation platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - browser-automation
+  - anti-detection
+  - ai-agent
+  - web-scraping
+maintainers:
+  - name: Stealth Browser Team
+    email: support@example.com

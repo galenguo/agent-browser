@@ -1,4 +1,4 @@
-# autoresearch -- Agent Browser Autonomous Optimization
+# autoresearch -- Stealth Browser Autonomous Optimization
 
 ## Setup
 
@@ -29,19 +29,19 @@ After user confirmation:
 ## In-Scope Files (Agent may modify)
 
 ### Facade API layer (most frequently modified)
-- `agent_browser/main.py` -- Facade API (create_session, snapshot, click, fill)
-- `agent_browser/utils/refs_generator.py` -- Element reference generation
-- `agent_browser/session/session_manager.py` -- Session management
+- `stealth_browser/main.py` -- Facade API (create_session, snapshot, click, fill)
+- `stealth_browser/utils/refs_generator.py` -- Element reference generation
+- `stealth_browser/session/session_manager.py` -- Session management
 
 ### Agent layer
-- `agent_browser/intelligence/agent_runner.py` -- Agent execution logic, prompt templates, action registration
-- `agent_browser/stealth/actions.py` -- Stealth action overrides
+- `stealth_browser/intelligence/agent_runner.py` -- Agent execution logic, prompt templates, action registration
+- `stealth_browser/stealth/actions.py` -- Stealth action overrides
 
 ### Behavior simulation
-- `agent_browser/browser/human_behavior.py` -- Human behavior simulation parameters
+- `stealth_browser/browser/human_behavior.py` -- Human behavior simulation parameters
 
 ### DOM processing
-- `agent_browser/explore/analysis.py` -- DOM structure analysis
+- `stealth_browser/explore/analysis.py` -- DOM structure analysis
 - Explore module for LLM-friendly DOM serialization
 
 ### Agent enhancements
@@ -52,8 +52,8 @@ After user confirmation:
 - `AUTORESEARCH.md` -- This file (experiment rules)
 - `pyproject.toml` -- Project dependencies
 - Test files and benchmark scripts
-- Core stealth stack (`agent_browser/browser/stealth_launcher.py`)
-- Browser instance pool (`agent_browser/browser/instance_pool.py`)
+- Core stealth stack (`stealth_browser/browser/stealth_launcher.py`)
+- Browser instance pool (`stealth_browser/browser/instance_pool.py`)
 
 ## Experiment Loop
 

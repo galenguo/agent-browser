@@ -1,6 +1,6 @@
-"""Test helper for loading agent_browser modules.
+"""Test helper for loading stealth_browser modules.
 
-In the restructured package, agent_browser is a proper installable package.
+In the restructured package, stealth_browser is a proper installable package.
 This helper provides convenient access to core classes for tests that
 need them without importing the full package at module level.
 """
@@ -9,14 +9,14 @@ from typing import Any
 
 
 def get_skill_classes() -> dict[str, Any]:
-    """Get core classes from the agent_browser package.
+    """Get core classes from the stealth_browser package.
 
     Returns:
         Dict containing SkillConfig, load_config, BrowserDaemon, StealthEnhancer
     """
-    from agent_browser.browser.daemon import BrowserDaemon
-    from agent_browser.config import SkillConfig, load_config
-    from agent_browser.stealth.enhancer import StealthEnhancer
+    from stealth_browser.browser.daemon import BrowserDaemon
+    from stealth_browser.config import SkillConfig, load_config
+    from stealth_browser.stealth.enhancer import StealthEnhancer
 
     return {
         "SkillConfig": SkillConfig,
@@ -56,7 +56,7 @@ def StealthEnhancer(*args, **kwargs):
 
 
 def load_skill_module(module_name: str):
-    """Load a module from agent_browser package by name.
+    """Load a module from stealth_browser package by name.
 
     Args:
         module_name: e.g. "config", "daemon", "stealth", "main"
@@ -66,4 +66,4 @@ def load_skill_module(module_name: str):
     """
     import importlib
 
-    return importlib.import_module(f"agent_browser.{module_name}")
+    return importlib.import_module(f"stealth_browser.{module_name}")

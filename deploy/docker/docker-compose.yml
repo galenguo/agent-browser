@@ -13,11 +13,11 @@ services:
   # ══════════════════════════════════════════════════════════
   all-in-one:
     profiles: ["all-in-one"]
-    image: agent-browser:latest
+    image: stealth-browser:latest
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
-    container_name: agent-browser
+    container_name: stealth-browser
     ports:
       - "8000:8000"   # FastAPI API
       - "6080:6080"   # noVNC Web 查看器
@@ -26,6 +26,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - API_KEY=${API_KEY:-ab_f2d637aa9d3741d8f48784cb90a9b6fb}
       - DEPLOYMENT_MODE=all-in-one
       - BROWSER_MODE=local
       - MAX_SESSIONS=10
@@ -37,6 +38,8 @@ services:
       - LOG_LEVEL=info
       - BROWSER_PUBLIC_HOST=${BROWSER_PUBLIC_HOST:-}
       - BROWSER_PORT_OFFSET=${BROWSER_PORT_OFFSET:-0}
+      - VNC_BASE_URL=${VNC_BASE_URL:-http://www.aiecho.site:8000}
+      - DISPLAY_RESOLUTION=${DISPLAY_RESOLUTION:-1280x720x24}
     volumes:
       - ./data/profiles:/data/profiles
       - ./data/logs:/data/logs
@@ -45,7 +48,7 @@ services:
       resources:
         limits:
           memory: 2G
-          cpus: '2.0'
+          cpus: '4.0'
         reservations:
           memory: 512M
     restart: unless-stopped
@@ -61,17 +64,18 @@ services:
   # ══════════════════════════════════════════════════════════
   api-server:
     profiles: ["distributed"]
-    image: agent-browser-api:latest
+    image: stealth-browser-api:latest
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.api
-    container_name: agent-browser-api
+    container_name: stealth-browser-api
     ports:
       - "8000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - API_KEY=${API_KEY:-ab_f2d637aa9d3741d8f48784cb90a9b6fb}
       - DEPLOYMENT_MODE=distributed
       - BROWSER_MODE=docker
       - MAX_SESSIONS=50
@@ -99,11 +103,11 @@ services:
       start_period: 20s
 
   # 浏览器容器由 BrowserInstancePool 动态创建
-  # 需要先构建镜像: docker build -t agent-browser-browser:latest -f docker/Dockerfile.browser ..
+  # 需要先构建镜像: docker build -t stealth-browser-browser:latest -f docker/Dockerfile.browser ..
 
   # ══════════════════════════════════════════════════════════
 
 networks:
   browser-network:
     driver: bridge
-    name: agent-browser-network
+    name: stealth-browser-network

@@ -1,4 +1,4 @@
-# Contributing to Agent Browser
+# Contributing to Stealth Browser
 
 Thank you for contributing! This document covers development setup, code style, and the pull request process.
 
@@ -14,8 +14,8 @@ Thank you for contributing! This document covers development setup, code style, 
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-org/agent-browser.git
-cd agent-browser
+git clone https://github.com/your-org/stealth-browser.git
+cd stealth-browser
 
 # Create virtual environment
 python -m venv .venv
@@ -38,7 +38,7 @@ pytest
 pytest tests/stealth/test_stealth_middleware.py -v
 
 # Run with coverage
-pytest --cov=agent_browser --cov-report=term-missing
+pytest --cov=stealth_browser --cov-report=term-missing
 
 # Run e2e tests (require running browser)
 pytest tests/e2e/ -v
@@ -54,7 +54,7 @@ pytest tests/e2e/ -v
 
 ### Import Style
 
-- Use absolute imports within the package: `from agent_browser.stealth.middleware import StealthMiddleware`
+- Use absolute imports within the package: `from stealth_browser.stealth.middleware import StealthMiddleware`
 - Use relative imports for same-submodule references: `from .config import SkillConfig`
 - Never use `sys.path.insert()` hacks
 - Never use bare module imports that rely on `src/` being on `sys.path` (e.g., `from core.X import Y`)
@@ -83,7 +83,7 @@ pytest tests/e2e/ -v
 ## Project Structure
 
 ```
-agent_browser/           # Package root (all source code here)
+stealth_browser/           # Package root (all source code here)
 ├── browser/            # Backend ABCs + implementations
 ├── stealth/            # Anti-detection layer
 ├── pipeline/           # YAML pipeline engine
@@ -132,26 +132,26 @@ docs/                   # Architecture, install guide, test guide
 
 ### Adding a New Atomic Operation
 
-1. Define interface in `agent_browser/browser/__init__.py` (BrowserPageHandle ABC)
-2. Implement in `agent_browser/browser/local.py` (PlaywrightPageHandle)
-3. Implement in `agent_browser/browser/remote.py` (RemotePageHandle)
-4. Expose in `agent_browser/main.py` as a facade function
-5. Export in `agent_browser/__init__.py`
+1. Define interface in `stealth_browser/browser/__init__.py` (BrowserPageHandle ABC)
+2. Implement in `stealth_browser/browser/local.py` (PlaywrightPageHandle)
+3. Implement in `stealth_browser/browser/remote.py` (RemotePageHandle)
+4. Expose in `stealth_browser/main.py` as a facade function
+5. Export in `stealth_browser/__init__.py`
 6. Add tests
 
 ### Adding a New Pipeline Step
 
-1. Implement in `agent_browser/pipeline/steps.py`
-2. Register template in `agent_browser/pipeline/template.py` (if needed)
-3. Validate in `agent_browser/adapters/validator.py`
-4. Add error type in `agent_browser/pipeline/errors.py` (if needed)
-5. Add classifier rule in `agent_browser/pipeline/classifier.py` (if needed)
+1. Implement in `stealth_browser/pipeline/steps.py`
+2. Register template in `stealth_browser/pipeline/template.py` (if needed)
+3. Validate in `stealth_browser/adapters/validator.py`
+4. Add error type in `stealth_browser/pipeline/errors.py` (if needed)
+5. Add classifier rule in `stealth_browser/pipeline/classifier.py` (if needed)
 
 ### Adding a New Site Adapter
 
 1. Create YAML file in `adapters/{site}/` directory
 2. Follow the adapter schema (see existing examples)
-3. Test with `agent_browser.adapters.run_adapter()`
+3. Test with `stealth_browser.adapters.run_adapter()`
 
 ## Reporting Bugs
 

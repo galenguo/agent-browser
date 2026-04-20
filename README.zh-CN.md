@@ -1,13 +1,13 @@
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
-[![PyPI version](https://img.shields.io/pypi/v/agent-browser.svg)](https://pypi.org/project/agent-browser/)
-[![CI](https://github.com/galen/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/galen/agent-browser/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/stealth-browser.svg)](https://pypi.org/project/stealth-browser/)
+[![CI](https://github.com/galen/stealth-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/galen/stealth-browser/actions/workflows/ci.yml)
 
-# Agent Browser
+# Stealth Browser
 
 > 基于 [browser-use](https://github.com/browser-use/browser-use) 构建的反检测浏览器自动化框架。
 
-Agent Browser 为 **browser-use** 增加了工业级反检测能力、YAML Pipeline 引擎、站点探索和适配器合成功能。专为遇到检测壁垒的 **browser-use 高级用户**设计。
+Stealth Browser 为 **browser-use** 增加了工业级反检测能力、YAML Pipeline 引擎、站点探索和适配器合成功能。专为遇到检测壁垒的 **browser-use 高级用户**设计。
 
 ## 核心能力
 
@@ -19,12 +19,12 @@ Agent Browser 为 **browser-use** 增加了工业级反检测能力、YAML Pipel
 ## 快速开始
 
 ```bash
-pip install agent-browser
+pip install stealth-browser
 ```
 
 ```python
 import asyncio
-from agent_browser import create_session, open_page, snapshot, click, fill
+from stealth_browser import create_session, open_page, snapshot, click, fill
 
 async def main():
     session_id = await create_session()
@@ -81,21 +81,21 @@ asyncio.run(main())
 
 ```bash
 # 基础版（仅第 6-7 层隐匿，使用标准 Playwright）
-pip install agent-browser
+pip install stealth-browser
 
 # 完整反检测（全部 7 层，需要 CloakBrowser）
-pip install agent-browser[cloak]
+pip install stealth-browser[cloak]
 
 # 包含服务器模式（FastAPI + LLM 集成）
-pip install agent-browser[full]
+pip install stealth-browser[full]
 ```
 
 <details>
 <summary>从源码安装</summary>
 
 ```bash
-git clone https://github.com/galen/agent-browser.git
-cd agent-browser
+git clone https://github.com/galen/stealth-browser.git
+cd stealth-browser
 pip install -e ".[full]"
 playwright install chromium
 ```
@@ -108,7 +108,7 @@ playwright install chromium
 
 ```python
 import asyncio
-from agent_browser import create_session, open_page, snapshot, click, fill, evaluate
+from stealth_browser import create_session, open_page, snapshot, click, fill, evaluate
 
 async def main():
     session_id = await create_session()
@@ -126,10 +126,10 @@ asyncio.run(main())
 
 ```python
 import asyncio
-from agent_browser import AgentBrowser
+from stealth_browser import StealthBrowser
 
 async def main():
-    async with AgentBrowser() as ab:
+    async with StealthBrowser() as ab:
         await ab.create_session()
         await ab.open_page("https://example.com")
         snap = await ab.snapshot()
@@ -143,8 +143,8 @@ asyncio.run(main())
 ### 服务器模式（FastAPI）
 
 ```bash
-pip install agent-browser[full]
-uvicorn agent_browser.api:app --port 8000
+pip install stealth-browser[full]
+uvicorn stealth_browser.api:app --port 8000
 curl http://localhost:8000/health
 ```
 
@@ -166,7 +166,7 @@ curl http://localhost:8000/health
 ### Pipeline 模式
 
 ```python
-from agent_browser.pipeline import PipelineExecutor
+from stealth_browser.pipeline import PipelineExecutor
 
 executor = PipelineExecutor(stealth_enabled=True)
 result = await executor.run("adapters/my-site.yaml")
@@ -175,8 +175,8 @@ result = await executor.run("adapters/my-site.yaml")
 ### 探索模式
 
 ```python
-from agent_browser.explore import Explorer, Synthesizer
-from agent_browser import create_session, open_page
+from stealth_browser.explore import Explorer, Synthesizer
+from stealth_browser import create_session, open_page
 
 async def main():
     session_id = await create_session()
@@ -195,7 +195,7 @@ asyncio.run(main())
 ### CLI
 
 ```bash
-agent-browser --help
+stealth-browser --help
 ```
 
 ## 公共 API 参考
@@ -223,10 +223,10 @@ agent-browser --help
 ## 架构
 
 ```
-agent_browser/
+stealth_browser/
 ├── __init__.py      # 公共 API 导出 + __version__
 ├── main.py          # 门面 API（create_session, snapshot, click, run_task 等）
-├── client.py        # AgentBrowser OOP 接口（会话跟踪，上下文管理器）
+├── client.py        # StealthBrowser OOP 接口（会话跟踪，上下文管理器）
 ├── config.py        # SkillConfig 数据类 + 模式检测
 ├── browser/         # 后端 ABC + 实现（local, remote, extension）
 ├── stealth/         # 反检测：middleware, enhancer, actions, patches
@@ -251,7 +251,7 @@ agent_browser/
 
 ## 与原生 browser-use 对比
 
-| 功能 | browser-use | Agent Browser |
+| 功能 | browser-use | Stealth Browser |
 |------|------------|-------------|
 | AI Agent 自动化 | 支持 | 支持（封装 browser-use） |
 | 反检测 | 无 | 7 层防护栈 |

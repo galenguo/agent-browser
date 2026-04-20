@@ -19,7 +19,7 @@ import pytest
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Import ABCs from the new package path
-from agent_browser.browser import BrowserBackend, BrowserPageHandle
+from stealth_browser.browser import BrowserBackend, BrowserPageHandle
 
 # Skip legacy monolithic test (not pytest-compatible, calls sys.exit at import)
 collect_ignore = ["test_skill_scenarios.py"]
@@ -42,13 +42,13 @@ def reset_global_state():
           decorators at import time and is read-only thereafter.
     """
     # 1. Reset main module globals
-    from agent_browser import main as skill_main
+    from stealth_browser import main as skill_main
 
     skill_main.reset()
 
     # 2. Reset BrowserDaemon singleton
     try:
-        from agent_browser.browser.daemon import BrowserDaemon
+        from stealth_browser.browser.daemon import BrowserDaemon
 
         BrowserDaemon.reset()
     except ImportError:
@@ -56,7 +56,7 @@ def reset_global_state():
 
     # 3. Clear adapter registry
     try:
-        from agent_browser.adapters import loader
+        from stealth_browser.adapters import loader
 
         loader._registry = {}
     except (ImportError, AttributeError):
@@ -66,7 +66,7 @@ def reset_global_state():
 
     # Post-test cleanup
     try:
-        from agent_browser.browser.daemon import BrowserDaemon
+        from stealth_browser.browser.daemon import BrowserDaemon
 
         BrowserDaemon.reset()
     except ImportError:
@@ -124,7 +124,7 @@ def mock_backend(mock_page_handle) -> mock.MagicMock:
 @pytest.fixture
 def skill_config_no_stealth():
     """SkillConfig with stealth disabled (avoids StealthEnhancer C extension)."""
-    from agent_browser.config import SkillConfig
+    from stealth_browser.config import SkillConfig
 
     return SkillConfig(
         calling_mode="cli",
@@ -201,8 +201,8 @@ def patched_get_handle(mock_page_for_steps):
     Used by pipeline execution and security tests that call step handlers directly.
     Also covers step_snapshot which calls _ensure_middleware() directly.
     """
-    from agent_browser import main as skill_main
-    from agent_browser.pipeline import steps
+    from stealth_browser import main as skill_main
+    from stealth_browser.pipeline import steps
 
     async def _fake_handle(sid):
         return mock_page_for_steps

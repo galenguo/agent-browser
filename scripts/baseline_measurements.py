@@ -194,11 +194,11 @@ async def measure_browser_operations(stealth_on: bool = True, iterations: int = 
     report = BaselineReport()
 
     try:
-        from agent_browsermain import (
+        from stealth_browser.main import (
             create_session, delete_session, open_page,
             snapshot, click, fill, scroll, go_back, reset,
         )
-        from agent_browserconfig import SkillConfig
+        from stealth_browser.config import SkillConfig
     except ImportError as e:
         logger.warning(f"Cannot import skill modules: {e}")
         return report

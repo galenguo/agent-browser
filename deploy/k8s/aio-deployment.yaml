@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agent-browser-aio
-  namespace: agent-browser
+  name: stealth-browser-aio
+  namespace: stealth-browser
   labels:
-    app: agent-browser
+    app: stealth-browser
     mode: all-in-one
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: agent-browser
+      app: stealth-browser
       mode: all-in-one
   template:
     metadata:
       labels:
-        app: agent-browser
+        app: stealth-browser
         mode: all-in-one
     spec:
       containers:
-      - name: agent-browser
-        image: ${REGISTRY_URL}/agent-browser:latest
+      - name: stealth-browser
+        image: ${REGISTRY_URL}/stealth-browser:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
@@ -36,62 +36,62 @@ spec:
         - name: DEPLOYMENT_MODE
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: DEPLOYMENT_MODE
         - name: BROWSER_MODE
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: BROWSER_MODE
         - name: MAX_SESSIONS
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: MAX_SESSIONS
         - name: IDLE_TIMEOUT_SECONDS
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: IDLE_TIMEOUT_SECONDS
         - name: CDP_PORT
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: CDP_PORT
         - name: CDP_BIND_ADDRESS
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: CDP_BIND_ADDRESS
         - name: PROFILE_STORAGE
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: PROFILE_STORAGE
         - name: LOG_LEVEL
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: LOG_LEVEL
         - name: HEADLESS
           valueFrom:
             configMapKeyRef:
-              name: agent-browser-config
+              name: stealth-browser-config
               key: HEADLESS
         - name: ANTHROPIC_API_KEY
           valueFrom:
             secretKeyRef:
-              name: agent-browser-secret
+              name: stealth-browser-secret
               key: ANTHROPIC_API_KEY
         - name: OPENAI_API_KEY
           valueFrom:
             secretKeyRef:
-              name: agent-browser-secret
+              name: stealth-browser-secret
               key: OPENAI_API_KEY
         - name: OPENAI_BASE_URL
           valueFrom:
             secretKeyRef:
-              name: agent-browser-secret
+              name: stealth-browser-secret
               key: OPENAI_BASE_URL
         volumeMounts:
         - name: profiles
@@ -126,10 +126,10 @@ spec:
       volumes:
       - name: profiles
         persistentVolumeClaim:
-          claimName: agent-browser-profiles
+          claimName: stealth-browser-profiles
       - name: logs
         persistentVolumeClaim:
-          claimName: agent-browser-logs
+          claimName: stealth-browser-logs
       - name: shm
         emptyDir:
           medium: Memory

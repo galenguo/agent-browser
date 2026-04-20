@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: agent-browser-state
-  namespace: agent-browser
+  name: stealth-browser-state
+  namespace: stealth-browser
 data:
   state.json: |
     {"allocations": {}, "key_to_pod": {}, "pod_idle_since": {}, "allocated_pods": {}, "session_counter": 0}

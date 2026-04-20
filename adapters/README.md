@@ -513,7 +513,7 @@ pipeline:
 Run it:
 
 ```python
-from agent_browser.adapters.runner import run_adapter
+from stealth_browser.adapters.runner import run_adapter
 result = await run_adapter(site="example", command="hello")
 # result: ["Example Domain"]
 ```
@@ -638,7 +638,7 @@ Key patterns demonstrated:
 
 ```python
 import yaml
-from agent_browser.adapters.validator import validate_adapter
+from stealth_browser.adapters.validator import validate_adapter
 
 with open("adapters/mysite/mycmd.yaml") as f:
     adapter = yaml.safe_load(f)
@@ -655,7 +655,7 @@ else:
 ### 2. Validate all loaded adapters
 
 ```python
-from agent_browser.adapters.validator import validate_all_adapters
+from stealth_browser.adapters.validator import validate_all_adapters
 
 results = validate_all_adapters()
 for key, errs in results.items():
@@ -667,13 +667,13 @@ for key, errs in results.items():
 
 ```python
 import asyncio
-from agent_browser.adapters.runner import run_adapter
+from stealth_browser.adapters.runner import run_adapter
 
 async def test():
     result = await run_adapter(
         site="baidu",
         command="search",
-        query="agent browser",
+        query="stealth browser",
         limit=3,
     )
     for row in result:
@@ -686,8 +686,8 @@ asyncio.run(test())
 
 ```python
 import asyncio
-from agent_browser.pipeline.executor import execute_pipeline
-from agent_browser.main import create_session, delete_session
+from stealth_browser.pipeline.executor import execute_pipeline
+from stealth_browser.main import create_session, delete_session
 
 async def test_pipeline():
     session_id = await create_session()

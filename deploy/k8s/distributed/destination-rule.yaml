@@ -7,10 +7,10 @@
 apiVersion: networking.istio.io/v1
 kind: DestinationRule
 metadata:
-  name: agent-browser-cp
-  namespace: agent-browser
+  name: stealth-browser-cp
+  namespace: stealth-browser
 spec:
-  host: agent-browser-cp.agent-browser.svc.cluster.local
+  host: stealth-browser-cp.stealth-browser.svc.cluster.local
   trafficPolicy:
     connectionPool:
       http:

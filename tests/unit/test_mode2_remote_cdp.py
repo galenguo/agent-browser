@@ -2,7 +2,7 @@
 
 import pytest
 
-from agent_browser.main import create_session, open_page, snapshot
+from stealth_browser.main import create_session, open_page, snapshot
 
 
 @pytest.mark.asyncio

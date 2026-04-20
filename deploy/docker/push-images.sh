@@ -48,9 +48,9 @@ login_registry() {
 # 推送镜像
 push_images() {
     IMAGES=(
-        "agent-browser:${TAG}"
-        "agent-browser-api:${TAG}"
-        "agent-browser-browser:${TAG}"
+        "stealth-browser:${TAG}"
+        "stealth-browser-api:${TAG}"
+        "stealth-browser-browser:${TAG}"
     )
 
     for image in "${IMAGES[@]}"; do

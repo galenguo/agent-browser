@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from agent_browser.explore.cascade import (
+from stealth_browser.explore.cascade import (
     STRATEGY_LEVELS,
     cascade,
 )
@@ -29,7 +29,7 @@ class TestCascadeIntegration:
     @pytest.mark.asyncio
     async def test_no_endpoints_returns_failure(self):
         """No endpoints to test → all strategies fail → returns results with success=False."""
-        with patch("agent_browser.explore.cascade._get_handle") as mock_handle:
+        with patch("stealth_browser.explore.cascade._get_handle") as mock_handle:
             mock_page = AsyncMock()
             mock_handle.return_value = mock_page
 
@@ -46,7 +46,7 @@ class TestCascadeIntegration:
     @pytest.mark.asyncio
     async def test_returns_list_of_dicts(self):
         """Result is always a list of dicts with expected keys."""
-        with patch("agent_browser.explore.cascade._get_handle") as mock_handle:
+        with patch("stealth_browser.explore.cascade._get_handle") as mock_handle:
             mock_page = AsyncMock()
             mock_handle.return_value = mock_page
 
@@ -66,7 +66,7 @@ class TestCascadeIntegration:
 
         ep = SimpleNamespace(is_json=True, url="https://api.example.com/data")
 
-        with patch("agent_browser.explore.cascade._get_handle") as mock_handle:
+        with patch("stealth_browser.explore.cascade._get_handle") as mock_handle:
             mock_page = AsyncMock()
             mock_handle.return_value = mock_page
 
@@ -79,7 +79,7 @@ class TestCascadeIntegration:
                 "fields": {"title": "title"},
                 "notes": "",
             }
-            with patch("agent_browser.explore.cascade._try_public", return_value=public_result):
+            with patch("stealth_browser.explore.cascade._try_public", return_value=public_result):
                 result = await cascade("s1", "https://example.com", endpoints=[ep])
 
         # Should short-circuit: only 1 result (public succeeded)
@@ -93,7 +93,7 @@ class TestPrivateHelpers:
 
     def test_extract_items_from_list(self):
         """List data passes through."""
-        from agent_browser.explore.cascade import _extract_items
+        from stealth_browser.explore.cascade import _extract_items
 
         data = [{"title": "A"}, {"title": "B"}]
         result = _extract_items(data)
@@ -101,20 +101,20 @@ class TestPrivateHelpers:
 
     def test_extract_items_from_dict_with_data_key(self):
         """Dict with 'data' key unwraps it."""
-        from agent_browser.explore.cascade import _extract_items
+        from stealth_browser.explore.cascade import _extract_items
 
         data = {"data": [{"x": 1}, {"y": 2}]}
         result = _extract_items(data)
         assert result == [{"x": 1}, {"y": 2}]
 
     def test_extract_items_none_input(self):
-        from agent_browser.explore.cascade import _extract_items
+        from stealth_browser.explore.cascade import _extract_items
 
         result = _extract_items(None)
         assert result == []
 
     def test_infer_fields_maps_keys(self):
-        from agent_browser.explore.cascade import _infer_fields
+        from stealth_browser.explore.cascade import _infer_fields
 
         item = {"job_title": "Engineer", "salary": "100k"}
         fields = _infer_fields(item)
@@ -122,7 +122,7 @@ class TestPrivateHelpers:
         assert len(fields) > 0
 
     def test_infer_fields_empty_item(self):
-        from agent_browser.explore.cascade import _infer_fields
+        from stealth_browser.explore.cascade import _infer_fields
 
         fields = _infer_fields({})
         assert isinstance(fields, dict)
@@ -130,7 +130,7 @@ class TestPrivateHelpers:
     def test_get_test_urls_filters_json(self):
         from types import SimpleNamespace
 
-        from agent_browser.explore.cascade import _get_test_urls
+        from stealth_browser.explore.cascade import _get_test_urls
 
         eps = [
             SimpleNamespace(is_json=True, url="https://api.example.com/a"),
@@ -147,6 +147,6 @@ class TestPrivateHelpers:
         assert all("/page" not in u for u in urls)
 
     def test_get_test_urls_empty(self):
-        from agent_browser.explore.cascade import _get_test_urls
+        from stealth_browser.explore.cascade import _get_test_urls
 
         assert _get_test_urls([], "https://example.com") == []

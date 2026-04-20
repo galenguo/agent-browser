@@ -24,8 +24,8 @@ def project_root():
 
 @pytest.fixture
 def skill_dir(project_root):
-    """Return the agent_browser/skill/ directory."""
-    return project_root / "agent_browser" / "skill"
+    """Return the stealth_browser/skill/ directory."""
+    return project_root / "stealth_browser" / "skill"
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ class TestSkillMDLoading:
 
     def test_skill_md_exists(self, skill_dir):
         skill_md = skill_dir / "SKILL.md"
-        assert skill_md.exists(), "SKILL.md must exist in agent_browser/skill/"
+        assert skill_md.exists(), "SKILL.md must exist in stealth_browser/skill/"
 
     def test_skill_md_has_frontmatter(self, skill_dir):
         content = (skill_dir / "SKILL.md").read_text()
@@ -81,7 +81,7 @@ class TestDoctorScript:
 
     @pytest.fixture
     def doctor_mod(self):
-        from agent_browser.skill.scripts.doctor import (
+        from stealth_browser.skill.scripts.doctor import (
             run_diagnosis, DoctorReport, CheckResult,
         )
         return type("NS", (), {
@@ -292,14 +292,14 @@ class TestInstallSkillCommand:
     """install-skill CLI command must copy files correctly."""
 
     def test_install_skill_function_exists(self):
-        src = Path(__file__).resolve().parents[2] / "agent_browser" / "cli" / "main.py"
+        src = Path(__file__).resolve().parents[2] / "stealth_browser" / "cli" / "main.py"
         content = src.read_text()
         assert "def _install_skill" in content, "_install_skill must be defined in cli/main.py"
 
     def test_install_skill_copies_to_target(self, tmp_path, skill_dir):
         import shutil
 
-        target = tmp_path / "skills" / "agent-browser"
+        target = tmp_path / "skills" / "stealth-browser"
         target.mkdir(parents=True, exist_ok=True)
 
         # Copy core skill files (new architecture: no references/)
@@ -349,7 +349,7 @@ class TestInstallSkillCommand:
         shutil.copy2(skill_dir / "SKILL.md", target / "SKILL.md")
 
         content = (target / "SKILL.md").read_text()
-        assert "agent-browser" in content.lower() or "---" in content, "Should be overwritten"
+        assert "stealth-browser" in content.lower() or "---" in content, "Should be overwritten"
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -361,13 +361,13 @@ class TestConfigExtensionField:
     """SkillConfig must include extension_enabled field."""
 
     def test_config_has_extension_enabled(self):
-        from agent_browser.config import SkillConfig
+        from stealth_browser.config import SkillConfig
         config = SkillConfig()
         assert hasattr(config, "extension_enabled")
         assert isinstance(config.extension_enabled, bool)
 
     def test_extension_enabled_default_true(self):
-        from agent_browser.config import SkillConfig
+        from stealth_browser.config import SkillConfig
         config = SkillConfig()
         assert config.extension_enabled is True
 
@@ -381,13 +381,13 @@ class TestExtensionBackendSnapshot:
     """ExtensionBackend.snapshot() must exist and match expected interface."""
 
     def test_snapshot_method_exists(self):
-        from agent_browser.browser.extension import ExtensionBackend
+        from stealth_browser.browser.extension import ExtensionBackend
         assert hasattr(ExtensionBackend, "snapshot")
         assert callable(getattr(ExtensionBackend, "snapshot"))
 
     def test_snapshot_is_async(self):
         import inspect
-        from agent_browser.browser.extension import ExtensionBackend
+        from stealth_browser.browser.extension import ExtensionBackend
         sig = inspect.signature(ExtensionBackend.snapshot)
         assert inspect.iscoroutinefunction(ExtensionBackend.snapshot)
 
@@ -437,9 +437,9 @@ class TestSkillMDConformance:
         assert "NEVER write Python scripts" in content or "NEVER" in content, \
             "Must have CRITICAL RULE forbidding Python script generation"
 
-    def test_has_agent_browser_commands(self, skill_dir):
+    def test_has_stealth_browser_commands(self, skill_dir):
         content = (skill_dir / "SKILL.md").read_text()
-        assert "agent-browser" in content, "Must show agent-browser CLI commands"
+        assert "stealth-browser" in content, "Must show stealth-browser CLI commands"
         assert "session create" in content, "Must document session create command"
         assert "snapshot" in content, "Must document snapshot command"
         assert "click" in content, "Must document click command"
@@ -471,7 +471,7 @@ class TestSkillMDConformance:
 
     def test_no_python_import_examples(self, skill_dir):
         content = (skill_dir / "SKILL.md").read_text()
-        assert "from agent_browser import" not in content, \
+        assert "from stealth_browser import" not in content, \
             "Must NOT have Python import examples (CLI-only architecture)"
 
     def test_no_hardcoded_path(self, skill_dir):

@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from agent_browser.stealth.browser_controller import ActionResult, BrowserController
+from stealth_browser.stealth.browser_controller import ActionResult, BrowserController
 
 
 class TestActionResult:

@@ -1,11 +1,11 @@
-"""Agent Browser 探索模式：快照 + 分析
+"""Stealth Browser 探索模式：快照 + 分析
 
 运行前确保：
   1. CloakBrowser 已启动（CDP 端口 19222）
 """
 import asyncio
-from agent_browsermain import create_session, open_page, snapshot
-from agent_browserexplore.explorer import explore
+from stealth_browser.main import create_session, open_page, snapshot
+from stealth_browser.explore.explorer import explore
 
 
 async def main():

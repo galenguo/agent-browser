@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: agent-browser-cp
-  namespace: agent-browser
+  name: stealth-browser-cp
+  namespace: stealth-browser
   labels:
-    app: agent-browser-cp
+    app: stealth-browser-cp
 spec:
-  serviceName: agent-browser-cp-headless
+  serviceName: stealth-browser-cp-headless
   replicas: 1
   selector:
     matchLabels:
-      app: agent-browser-cp
+      app: stealth-browser-cp
   template:
     metadata:
       labels:
-        app: agent-browser-cp
+        app: stealth-browser-cp
     spec:
-      serviceAccountName: agent-browser-cp
+      serviceAccountName: stealth-browser-cp
       containers:
-      - name: agent-browser
-        image: registry-cn-gimc-local.gimccloud.com/library/agent-browser:latest
+      - name: stealth-browser
+        image: registry-cn-gimc-local.gimccloud.com/library/stealth-browser:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
@@ -27,9 +27,9 @@ spec:
           protocol: TCP
         envFrom:
         - configMapRef:
-            name: agent-browser-config
+            name: stealth-browser-config
         - secretRef:
-            name: agent-browser-secret
+            name: stealth-browser-secret
         env:
         - name: POD_NAME
           valueFrom:
@@ -67,7 +67,7 @@ spec:
       volumes:
       - name: api-keys
         configMap:
-          name: agent-browser-api-keys
+          name: stealth-browser-api-keys
   volumeClaimTemplates:
   - metadata:
       name: profiles

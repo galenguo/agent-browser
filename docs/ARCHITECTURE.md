@@ -1,4 +1,4 @@
-# Agent Browser 架构设计
+# Stealth Browser 架构设计
 
 ## 概览
 
@@ -26,7 +26,7 @@
               └──────────────────────┼────────────────────────┘
                                      │
 ┌────────────────────────────────────▼────────────────────────────────────┐
-│                    StealthMiddleware (agent_browser/stealth/middleware.py)         │
+│                    StealthMiddleware (stealth_browser/stealth/middleware.py)         │
 │     pre/post 延迟 + 贝塞尔鼠标 + 人类打字 + 熔断器 (per-session)         │
 └────────────────────────────────────────┬───────────────────────────────┘
                                      │
@@ -54,13 +54,13 @@
 
 | 层 | 组件 | 功能 | 实现位置 |
 |---|------|------|----------|
-| 1 | CloakBrowser | C++ 编译级指纹伪装（33 项补丁） | `agent_browser/browser/stealth_launcher.py` |
-| 2 | patchright | 驱动级 CDP 修补（移除 `__playwright__binding__`） | `agent_browser/browser/stealth_launcher.py` |
+| 1 | CloakBrowser | C++ 编译级指纹伪装（33 项补丁） | `stealth_browser/browser/stealth_launcher.py` |
+| 2 | patchright | 驱动级 CDP 修补（移除 `__playwright__binding__`） | `stealth_browser/browser/stealth_launcher.py` |
 | 3 | rebrowser-patches | Runtime.Enable 泄漏修复（addBinding 模式） | 环境变量 `REBROWSER_PATCHES_RUNTIME_FIX_MODE` |
-| 4 | 非标准端口 19222 | 绑定 127.0.0.1，连接隐匿 | `agent_browser/browser/stealth_launcher.py` |
-| 5 | BrowserDaemon | 持久单 CDP 会话，禁止频繁 attach/detach | `agent_browser/browser/daemon.py` |
-| 6 | StealthEnhancer | 人类延迟 + 贝塞尔鼠标 + 逐字输入 + 定时器噪声 | `agent_browser/stealth/enhancer.py` |
-| 7 | **StealthMiddleware** | **集中隐匿层：自动 pre/post 延迟 + 熔断器** | `agent_browser/stealth/middleware.py` |
+| 4 | 非标准端口 19222 | 绑定 127.0.0.1，连接隐匿 | `stealth_browser/browser/stealth_launcher.py` |
+| 5 | BrowserDaemon | 持久单 CDP 会话，禁止频繁 attach/detach | `stealth_browser/browser/daemon.py` |
+| 6 | StealthEnhancer | 人类延迟 + 贝塞尔鼠标 + 逐字输入 + 定时器噪声 | `stealth_browser/stealth/enhancer.py` |
+| 7 | **StealthMiddleware** | **集中隐匿层：自动 pre/post 延迟 + 熔断器** | `stealth_browser/stealth/middleware.py` |
 
 ## 模式矩阵
 
@@ -74,7 +74,7 @@
 
 ## 核心组件
 
-### 1. 数据模型 (agent_browser/models.py)
+### 1. 数据模型 (stealth_browser/models.py)
 
 ```python
 class BrowserMode(str, Enum):
@@ -100,7 +100,7 @@ class UserSession:
     task_lock: asyncio.Lock
 ```
 
-### 2. 后端抽象层 (agent_browser/browser/__init__.py)
+### 2. 后端抽象层 (stealth_browser/browser/__init__.py)
 
 ```python
 class BrowserBackend(ABC):
@@ -122,7 +122,7 @@ class BrowserPageHandle(ABC):
     # ... 更多原子操作
 ```
 
-### 2.1 LocalCDPBackend (agent_browser/browser/local.py)
+### 2.1 LocalCDPBackend (stealth_browser/browser/local.py)
 
 浏览器操作的唯一核心实现：
 
@@ -133,7 +133,7 @@ class BrowserPageHandle(ABC):
 - `click()` / `fill()` — 通过 `[data-ab-ref="@eN"]` 精准定位元素
 - Daemon 集成：持久连接 + 空闲断开
 
-### 2.2 ExtensionBackend (agent_browser/browser/extension.py)
+### 2.2 ExtensionBackend (stealth_browser/browser/extension.py)
 
 Chrome Extension 后端，操作用户真实浏览器：
 
@@ -143,7 +143,7 @@ Chrome Extension 后端，操作用户真实浏览器：
 - 继承登录状态（cookies、session、localStorage）
 - 无 Extension 时自动回退到 LocalCDPBackend
 
-### 2.3 RemoteAPIBackend (agent_browser/browser/remote.py)
+### 2.3 RemoteAPIBackend (stealth_browser/browser/remote.py)
 
 零业务逻辑的 HTTP 传输层：
 
@@ -151,7 +151,7 @@ Chrome Extension 后端，操作用户真实浏览器：
 - 支持 `X-API-Key` 认证头
 - 将 `session_id` 映射到服务端会话
 
-### 3. StealthMiddleware (agent_browser/stealth/middleware.py)
+### 3. StealthMiddleware (stealth_browser/stealth/middleware.py)
 
 第 7 层反检测，集中式隐匿中间件：
 
@@ -185,7 +185,7 @@ class StealthMiddleware:
 - 连续 5 次失败 → OPEN（禁用该 session 的隐匿，降级为透传）
 - 新 session 自动 RESET（failure_count = 0）
 
-### 4. Pipeline 引擎 v2.3 (agent_browser/pipeline/)
+### 4. Pipeline 引擎 v2.3 (stealth_browser/pipeline/)
 
 YAML 声明式的适配器执行引擎：
 
@@ -220,7 +220,7 @@ YAML 声明式的适配器执行引擎：
 | 分类器 | `classifier.py` | ErrorCategory 枚举 + 启发式匹配规则 |
 | 恢复 | `fallback.py` | per-category 恢复策略（重验证/重试/标记） |
 | 调试器 | `debugger.py` | 单步执行 + 断点 + step history + state inspection |
-| 遥测 | `telemetry.py` | JSONL 统计 → `~/.agent-browser/telemetry.jsonl` |
+| 遥测 | `telemetry.py` | JSONL 统计 → `~/.stealth-browser/telemetry.jsonl` |
 
 **错误分类体系：**
 
@@ -234,7 +234,7 @@ class ErrorCategory(str, Enum):
     UNKNOWN = "unknown"                 # 未知错误
 ```
 
-### 5. 站点探索模块 (agent_browser/explore/)
+### 5. 站点探索模块 (stealth_browser/explore/)
 
 自动分析网站结构并生成 YAML 适配器：
 
@@ -257,16 +257,16 @@ class ErrorCategory(str, Enum):
                                        adapters/{site}.yaml
 ```
 
-### 6. API 层 (agent_browser/api/)
+### 6. API 层 (stealth_browser/api/)
 
 FastAPI REST API 服务，多租户会话管理：
 
 | 文件 | 功能 |
 |------|------|
 | `app.py` | FastAPI 应用 + KeyManager 多 API Key 认证 |
-| (SessionPoolManager) | 委托给 agent_browser/session/pool_manager.py |
+| (SessionPoolManager) | 委托给 stealth_browser/session/pool_manager.py |
 
-### 7. CLI 模块 (agent_browser/cli/)
+### 7. CLI 模块 (stealth_browser/cli/)
 
 命令行接口：
 
@@ -278,7 +278,7 @@ FastAPI REST API 服务，多租户会话管理：
 | `session_store.py` | 文件系统持久化 |
 | `output.py` | 输出格式化（JSON/table） |
 
-### 8. LLM 工厂 (agent_browser/llm/factory.py)
+### 8. LLM 工厂 (stealth_browser/llm/factory.py)
 
 统一 LLM 创建接口：
 
@@ -291,7 +291,7 @@ class LLMFactory:
         # 返回: browser-use ChatOpenAI 或 langchain ChatAnthropic
 ```
 
-### 9. SessionPoolManager (agent_browser/session/pool_manager.py)
+### 9. SessionPoolManager (stealth_browser/session/pool_manager.py)
 
 **职责**：多用户会话隔离、Session 生命周期管理、任务调度、空闲超时回收。
 
@@ -306,7 +306,7 @@ async def close_session(self, session_id: str):
     """关闭会话，释放资源"""
 ```
 
-### 10. 共享状态层 (agent_browser/state/store.py)
+### 10. 共享状态层 (stealth_browser/state/store.py)
 
 分布式协调的共享状态后端：
 
@@ -591,6 +591,6 @@ StealthMiddleware (自动包装所有操作)
 - 共享状态层 (ConfigMap CAS + InMemory 双后端)
 - 跨 Replica 会话恢复 (_recover_session)
 - KeyManager 多 API Key 1-key-1-browser 绑定
-- noVNC 网关代理 (b.agent-browser.local)
+- noVNC 网关代理 (b.stealth-browser.local)
 - 周期性泄漏清理 + double allocation 防护
 - SkillBrowser client (HTTP facade for Claude Code)

@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 
 # 添加 skill 路径
-_SKILL_DIR = Path(__file__).parent.parent.parent / "agent_browser"
+_SKILL_DIR = Path(__file__).parent.parent.parent / "stealth_browser"
 
 
 @pytest.mark.requires_browser

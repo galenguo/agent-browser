@@ -37,10 +37,10 @@ jobs:
         run: pip install pip-audit bandit
 
       - name: Run pip-audit (dependency vulnerability scan)
-        run: pip-audit --desc -r <(pip freeze | grep -v "^agent-browser")
+        run: pip-audit --desc -r <(pip freeze | grep -v "^stealth-browser")
 
       - name: Run bandit (security lint)
-        run: bandit -r agent_browser/ -ll --skip B101,B311
+        run: bandit -r stealth_browser/ -ll --skip B101,B311
 
   code-security:
     name: Code Security Scan

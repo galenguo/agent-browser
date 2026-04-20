@@ -1,13 +1,14 @@
 #!/bin/bash
 set -e
 
-echo "[entrypoint-v2] Starting Agent Browser - Multi-User Sessions (v2)"
+echo "[entrypoint-v2] Starting Stealth Browser - Multi-User Sessions (v2)"
 
 # ── 1. 启动 Xvfb 虚拟显示 ──────────────────────────────────────
 # 清理残留的 Xvfb 锁文件（容器重启时可能残留）
 rm -f /tmp/.X99-lock
-echo "[entrypoint-v2] Starting Xvfb on :99 (1920x1080x24)..."
-Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp -ac &
+RESOLUTION=${DISPLAY_RESOLUTION:-1280x720x24}
+echo "[entrypoint-v2] Starting Xvfb on :99 ($RESOLUTION)..."
+Xvfb :99 -screen 0 $RESOLUTION -nolisten tcp -ac &
 XVFB_PID=$!
 sleep 1
 
@@ -31,7 +32,6 @@ x11vnc \
     -noxfixes \
     -noxdamage \
     -wait 5 \
-    -noncache \
     2>/data/logs/x11vnc.log &
 sleep 1
 echo "[entrypoint-v2] x11vnc started"
@@ -58,8 +58,7 @@ echo "  API v2:      http://<host>:8000/sessions/create"
 echo "  Health:      http://<host>:8000/health"
 echo "  Legacy API:  http://<host>:8000/tasks (backward compatible)"
 
-cd /app
-exec python -m uvicorn agent_browser.api:app \
+exec python -m uvicorn stealth_browser.api.app:app \
     --host 0.0.0.0 \
     --port 8000 \
     --workers 1 \

@@ -582,8 +582,8 @@ Step 7-16: 逐个 click 职位卡片 → 提取详情 → 返回列表
 cd /Users/galen/OpenSource/browser-controller
 
 # 创建项目
-mkdir -p agent-browser/src/{browser,agent,api}
-cd agent-browser
+mkdir -p stealth-browser/src/{browser,agent,api}
+cd stealth-browser
 
 # Python 环境
 python3.11 -m venv .venv
@@ -674,7 +674,7 @@ cd /app && python -m uvicorn src.api.server:app --host 0.0.0.0 --port 8080
 ```yaml
 # docker-compose.yml
 services:
-  agent-browser:
+  stealth-browser:
     build: .
     ports:
       - "8080:8080"   # FastAPI 控制接口

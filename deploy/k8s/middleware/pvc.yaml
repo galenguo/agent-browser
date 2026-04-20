@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: agent-browser-profiles
+  name: stealth-browser-profiles
   namespace: middleware
 spec:
   accessModes:
@@ -14,7 +14,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: agent-browser-logs
+  name: stealth-browser-logs
   namespace: middleware
 spec:
   accessModes:

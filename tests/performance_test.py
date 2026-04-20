@@ -153,7 +153,7 @@ class PerformanceTest:
             try:
                 # 获取容器资源使用
                 result = subprocess.run(
-                    ["docker", "stats", "agent-browser", "--no-stream", "--format", "{{.CPUPerc}},{{.MemUsage}}"],
+                    ["docker", "stats", "stealth-browser", "--no-stream", "--format", "{{.CPUPerc}},{{.MemUsage}}"],
                     capture_output=True,
                     text=True,
                     timeout=5,

@@ -1,4 +1,4 @@
-# Agent Browser 测试结果报告
+# Stealth Browser 测试结果报告
 
 **测试日期：** 2026-03-31  
 **测试人员：** Claude  
@@ -68,7 +68,7 @@ python -m src.cli.commands session create --name test-s1 --browser local
 **验证：**
 - ✅ CloakBrowser 成功启动
 - ✅ CDP 端口 19222 正常监听
-- ✅ 持久化 profile 创建：`/tmp/agent_browser_profiles/test-s1`
+- ✅ 持久化 profile 创建：`/tmp/stealth_browser_profiles/test-s1`
 - ✅ 进程正常运行（Python + Chromium Helper）
 
 **耗时：** 约 55-60 秒

@@ -6,7 +6,7 @@ import os
 import shutil
 import tempfile
 
-from agent_browser.session.profile_manager import ProfileManager
+from stealth_browser.session.profile_manager import ProfileManager
 
 
 def test_profile_manager():
