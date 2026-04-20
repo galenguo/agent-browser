@@ -154,6 +154,7 @@ CURSOR=0
 SCROLL_COUNT=0
 MAX_SCROLL=5
 COLLECTED_LIST=""
+COLLECTED_DETAILS=""
 NEW_IDS=""
 
 echo "开始流式筛选..."
@@ -313,6 +314,20 @@ while [ "$COLLECTED" -lt "$target" ]; do
     const detailText = popup.textContent.replace(/\s+/g,' ');
     const aiPattern = /AI|大模型|LLM|机器学习|深度学习|NLP|CV|AIGC|RAG|向量数据库|Transformer|GPT|BERT|模型训练|模型部署|Prompt|微调|LangChain|Spring AI|智能体|Agent/i;
     const hasAI = aiPattern.test(detailText);
+    
+    // 提取关键段落供 LLM 分析
+    const extractSection = (title) => {
+      const regex = new RegExp(title + '[：:]?([^]*?)(?=工作经历|项目经验|教育经历|个人优势|期望职位|$)', 'i');
+      const match = detailText.match(regex);
+      return match ? match[1].trim().substring(0, 300) : '';
+    };
+    
+    const sections = {
+      work_exp: extractSection('工作经历'),
+      project_exp: extractSection('项目经验'),
+      education: extractSection('教育经历'),
+      advantage: extractSection('个人优势')
+    };
 
     let collected = false;
     let collectBtnFound = false;
@@ -385,7 +400,14 @@ while [ "$COLLECTED" -lt "$target" ]; do
     const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
     if (closeBtn) closeBtn.click();
 
-    return JSON.stringify({status:'ok', has_ai:hasAI, collected:collected, btn_found:collectBtnFound});
+    return JSON.stringify({
+      status:'ok', 
+      has_ai:hasAI, 
+      collected:collected, 
+      btn_found:collectBtnFound,
+      sections: sections,
+      detail_summary: detailText.substring(0, 500)
+    });
   })()
   " --session boss)
 
@@ -406,12 +428,21 @@ while [ "$COLLECTED" -lt "$target" ]; do
     continue
   fi
 
+  # 提取详情段落
+  WORK_EXP=$(echo "$DETAIL_DATA" | jq -r '.sections.work_exp // ""')
+  PROJECT_EXP=$(echo "$DETAIL_DATA" | jq -r '.sections.project_exp // ""')
+  DETAIL_SUMMARY=$(echo "$DETAIL_DATA" | jq -r '.detail_summary // ""')
+
   if [ "$HAS_AI" = "true" ]; then
     REFINED_COUNT=$((REFINED_COUNT + 1))
     if [ "$WAS_COLLECTED" = "true" ]; then
       COLLECTED=$((COLLECTED + 1))
       echo "  ★ 已收藏 [$COLLECTED/$target]"
+      # 输出详细信息供 LLM 后续分析
+      echo "    工作经历: ${WORK_EXP:0:150}"
+      echo "    项目经验: ${PROJECT_EXP:0:150}"
       COLLECTED_LIST="${COLLECTED_LIST}${COLLECTED}. ${CAND_NAME} | ${CAND_YEARS}年 | ${CAND_SCHOOL} | ${CAND_AI}\n"
+      COLLECTED_DETAILS="${COLLECTED_DETAILS}--- 候选人 ${COLLECTED}: ${CAND_NAME} ---\n年限: ${CAND_YEARS}年 | 学校: ${CAND_SCHOOL} | 关键词: ${CAND_AI}\n工作经历: ${WORK_EXP:0:200}\n项目经验: ${PROJECT_EXP:0:200}\n详情摘要: ${DETAIL_SUMMARY:0:300}\n\n"
       # 追加到已处理 ID
       if [ -z "$NEW_IDS" ]; then
         NEW_IDS="$CAND_ID"
@@ -470,6 +501,29 @@ if [ -n "$NEW_IDS" ]; then
       "$job_id" "$IDS_ARRAY" "$REFINED_COUNT" "$COLLECTED" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$CACHE_FILE"
   fi
   echo "缓存已更新: $CACHE_FILE"
+fi
+```
+
+### Step 5: LLM 语义分析
+
+筛选完成后，输出候选人详情供 Claude 进行语义分析和评分。
+
+```bash
+if [ -n "$COLLECTED_DETAILS" ] && [ "$COLLECTED" -gt 0 ]; then
+  echo ""
+  echo "========== LLM 候选人分析 =========="
+  echo ""
+  printf '%b' "$COLLECTED_DETAILS"
+  echo "====================================="
+  echo ""
+  echo "请根据以上候选人详情，对每位候选人进行评估:"
+  echo "- 匹配度评分 (0-100)"
+  echo "- 核心优势"
+  echo "- 潜在风险"
+  echo "- 推荐优先级 (高/中/低)"
+  echo ""
+  echo "筛选条件: 年限 $min_years~$max_years 年, 关键词: $keywords"
+  echo "岗位要求: AI 相关项目研发经验"
 fi
 ```
 
