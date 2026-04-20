@@ -140,14 +140,16 @@ echo ""
 
 ### Step 3: 流式筛选主循环
 
-**架构说明**：每次循环处理一个候选人卡片（cursor 递增），初筛通过后执行三个步骤：
-- Eval 1：点击名字打开详情
-- sleep 2（等待详情面板渲染）
-- Eval 2a：提取详情文本（不执行收藏）
-- Claude 决策点：根据详情评估是否收藏
-- Eval 2b：根据 Claude 决策执行收藏或跳过
+**架构说明**：每次循环批量处理 3-5 个候选人卡片，通过两层 LLM 筛选：
+- Eval 1a：批量提取候选人卡片信息（3-5 个）
+- Claude 决策点（批量初筛）：选择值得点击详情的候选人
+- Eval 1b：逐个点击通过初筛的候选人
+  - 等待详情面板渲染
+  - Eval 2a：提取详情文本
+  - Claude 决策点（精筛）：评估是否收藏
+  - Eval 2b：执行收藏或跳过
 
-找到目标数量即停止，无需预先扫描全部候选人。
+找到目标数量即停止，两层 LLM 筛选确保候选人质量。
 
 ```bash
 COLLECTED=0
@@ -155,6 +157,7 @@ REFINED_COUNT=0
 CURSOR=0
 SCROLL_COUNT=0
 MAX_SCROLL=5
+BATCH_SIZE=5
 COLLECTED_LIST=""
 NEW_IDS=""
 
@@ -163,8 +166,8 @@ echo ""
 
 while [ "$COLLECTED" -lt "$target" ]; do
 
-  # ── Eval 1: 初筛当前 cursor 位置的候选人 ──────────────────────────
-  SCAN=$(stealth-browser eval "
+  # ── Eval 1a: 批量提取候选人卡片信息 ──────────────────────────
+  BATCH=$(stealth-browser eval "
   (() => {
     const iframe = document.querySelector('iframe');
     if (!iframe || !iframe.contentDocument) return JSON.stringify({status:'error',msg:'iframe not found'});
@@ -172,64 +175,49 @@ while [ "$COLLECTED" -lt "$target" ]; do
     const cards = Array.from(doc.querySelectorAll('.recommend-wrap [class*=\"candidate\"]')).slice(1);
 
     const cursor = $CURSOR;
+    const batchSize = $BATCH_SIZE;
+    const endIdx = Math.min(cursor + batchSize, cards.length);
+    
     if (cursor >= cards.length) return JSON.stringify({status:'no_more',total:cards.length});
 
-    const card = cards[cursor];
-    const nameEl = card.querySelector('.name');
-    const name = nameEl ? nameEl.textContent.trim() : '';
-    if (!name) return JSON.stringify({status:'skip',reason:'no name',cursor:cursor+1});
+    const batch = [];
+    for (let i = cursor; i < endIdx; i++) {
+      const card = cards[i];
+      const nameEl = card.querySelector('.name');
+      const name = nameEl ? nameEl.textContent.trim() : '';
+      if (!name) continue;
 
-    const candidateId = name + '_' + card.textContent.substring(0,50).replace(/\s+/g,'');
-    const processedIds = '$PROCESSED_IDS'.split(',').filter(Boolean);
-    if (processedIds.includes(candidateId)) return JSON.stringify({status:'skip',reason:'cached',cursor:cursor+1});
-
-    const text = card.textContent;
-    const yearsMatch = text.match(/(\d+)年/);
-    const years = yearsMatch ? parseInt(yearsMatch[1]) : 0;
-    if (years < $min_years || years > $max_years) return JSON.stringify({status:'skip',reason:'years',cursor:cursor+1});
-
-    const keywords = '$keywords'.split(',').map(k=>k.trim());
-    const aiMatched = keywords.filter(k=>text.includes(k));
-    if (aiMatched.length === 0) return JSON.stringify({status:'skip',reason:'no keywords',cursor:cursor+1});
-
-    const schoolMatch = text.match(/([\u4e00-\u9fa5]{2,10}(?:大学|学院|学校))/);
-    const school = schoolMatch ? schoolMatch[1] : '';
-
-    // 点击打开详情
-    nameEl.click();
+      const text = card.textContent;
+      const yearsMatch = text.match(/(\d+)年/);
+      const years = yearsMatch ? parseInt(yearsMatch[1]) : 0;
+      const schoolMatch = text.match(/([\u4e00-\u9fa5]{2,10}(?:大学|学院|学校))/);
+      const school = schoolMatch ? schoolMatch[1] : '';
+      
+      const snippet = text.replace(/\s+/g, ' ').substring(0, 200);
+      
+      batch.push({
+        index: i,
+        name: name,
+        years: years,
+        school: school,
+        snippet: snippet
+      });
+    }
 
     return JSON.stringify({
-      status:'clicked',
-      cursor:cursor+1,
-      id:candidateId,
-      name:name,
-      years:years,
-      school:school,
-      ai_keywords:aiMatched.join(',')
+      status: 'ok',
+      batch: batch,
+      total: cards.length,
+      next_cursor: endIdx
     });
   })()
   " --session boss)
 
-  SCAN_DATA=$(echo "$SCAN" | jq -r '.data.result // "{}"' 2>/dev/null)
-  if [ $? -ne 0 ] || [ -z "$SCAN_DATA" ] || [ "$SCAN_DATA" = "{}" ]; then
-    echo "扫描数据解析失败，原始内容:"
-    echo "$SCAN" | head -c 200
-    CURSOR=$((CURSOR + 1))
-    continue
-  fi
-  
-  SCAN_STATUS=$(echo "$SCAN_DATA" | jq -r '.status // "error"')
-  NEW_CURSOR=$(echo "$SCAN_DATA" | jq -r '.cursor // 0')
-
-  # 更新 cursor
-  if [ "$NEW_CURSOR" != "0" ]; then
-    CURSOR=$NEW_CURSOR
-  else
-    CURSOR=$((CURSOR + 1))
-  fi
+  BATCH_DATA=$(echo "$BATCH" | jq -r '.data.result // "{}"' 2>/dev/null)
+  BATCH_STATUS=$(echo "$BATCH_DATA" | jq -r '.status // "error"')
 
   # 无更多候选人 → 滚动加载
-  if [ "$SCAN_STATUS" = "no_more" ]; then
+  if [ "$BATCH_STATUS" = "no_more" ]; then
     if [ "$SCROLL_COUNT" -ge "$MAX_SCROLL" ]; then
       echo "已滚动 $MAX_SCROLL 次，无更多候选人，停止"
       break
@@ -246,47 +234,119 @@ while [ "$COLLECTED" -lt "$target" ]; do
     " --session boss > /dev/null
     sleep 3
     SCROLL_COUNT=$((SCROLL_COUNT + 1))
-    # cursor 不重置，继续从当前位置往后扫
     continue
   fi
 
-  # 跳过（年限/关键词/缓存不符）
-  if [ "$SCAN_STATUS" = "skip" ]; then
+  if [ "$BATCH_STATUS" = "error" ]; then
+    echo "批量提取失败，跳过"
+    CURSOR=$((CURSOR + BATCH_SIZE))
     continue
   fi
 
-  # 错误
-  if [ "$SCAN_STATUS" = "error" ]; then
-    MSG=$(echo "$SCAN_DATA" | jq -r '.msg // "unknown"')
-    echo "扫描错误: $MSG"
-    sleep 1
+  # ── Claude 决策点（批量初筛）────────────────────────────────
+  CANDIDATES=$(echo "$BATCH_DATA" | jq -r '.batch // "[]"')
+  CANDIDATE_COUNT=$(echo "$CANDIDATES" | jq 'length')
+
+  if [ "$CANDIDATE_COUNT" -eq 0 ]; then
+    echo "本批次无有效候选人，继续下一批"
+    NEXT_CURSOR=$(echo "$BATCH_DATA" | jq -r '.next_cursor // 0')
+    CURSOR=$NEXT_CURSOR
     continue
   fi
 
-  # ── 初筛通过，等待详情面板渲染 ────────────────────────────────────
-  CAND_NAME=$(echo "$SCAN_DATA" | jq -r '.name')
-  CAND_YEARS=$(echo "$SCAN_DATA" | jq -r '.years')
-  CAND_SCHOOL=$(echo "$SCAN_DATA" | jq -r '.school')
-  CAND_AI=$(echo "$SCAN_DATA" | jq -r '.ai_keywords')
-  CAND_ID=$(echo "$SCAN_DATA" | jq -r '.id')
+  echo ""
+  echo "========== 批量初筛 (LLM 模式) =========="
+  echo "本批次候选人数: $CANDIDATE_COUNT"
+  echo ""
 
-  echo "精筛: $CAND_NAME (${CAND_YEARS}年, $CAND_SCHOOL)"
-  
-  # 等待详情面板出现（替代固定 sleep）
-  WAIT_RESULT=$(stealth-browser eval "
-  (() => {
-    const iframe = document.querySelector('iframe');
-    if (!iframe || !iframe.contentDocument) return 'no_iframe';
-    const doc = iframe.contentDocument;
-    const popup = doc.querySelector('.boss-popup__content');
-    return popup ? 'ready' : 'not_ready';
-  })()
-  " --session boss)
-  
-  WAIT_STATUS=$(echo "$WAIT_RESULT" | jq -r '.data.result // "error"')
-  if [ "$WAIT_STATUS" != "ready" ]; then
-    # 面板未出现，等待 2s 后重试一次
+  # 输出每个候选人的卡片信息
+  echo "$CANDIDATES" | jq -r '.[] | "[\(.index)] \(.name) | \(.years)年 | \(.school)\n  简介: \(.snippet)\n"'
+
+  echo "筛选条件:"
+  echo "- 年限要求: $min_years ~ $max_years 年"
+  echo "- 关键词: $keywords"
+  echo "- 岗位要求: AI 相关项目研发经验"
+  echo "=========================================="
+  echo ""
+
+  # ★★★ Claude 批量初筛决策点 ★★★
+  # 
+  # Claude: 请根据以上候选人卡片信息，进行批量初筛
+  #
+  # 评估标准:
+  # 1. 年限是否在要求范围内
+  # 2. 简介中是否包含 AI 相关关键词
+  # 3. 学校背景（985/211 优先）
+  # 4. 简介中是否体现相关项目经验
+  #
+  # 决策规则:
+  # - 选择值得点击详情的候选人索引（逗号分隔）
+  # - 如果全部不符合，设置 SELECTED_INDICES=""
+  # - 如果有符合的，设置 SELECTED_INDICES="0,2,4"（示例）
+  #
+  # 请在执行下一个 bash 代码块之前，临时执行一个命令来设置 SELECTED_INDICES 变量
+  # 例如: SELECTED_INDICES="0,2"  # 理由: 候选人 0 和 2 有 AI 项目经验
+
+  # 默认值: 如果 Claude 未设置，默认为空（跳过本批次）
+  : ${SELECTED_INDICES:=""}
+
+  if [ -z "$SELECTED_INDICES" ]; then
+    echo "  ✗ 本批次无候选人通过初筛，跳过"
+    NEXT_CURSOR=$(echo "$BATCH_DATA" | jq -r '.next_cursor // 0')
+    CURSOR=$NEXT_CURSOR
+    continue
+  fi
+
+  echo "  ✓ 通过初筛的候选人索引: $SELECTED_INDICES"
+  echo ""
+
+  # ── Eval 1b: 逐个处理通过初筛的候选人 ──────────────────────
+  IFS=',' read -ra INDICES <<< "$SELECTED_INDICES"
+
+  for idx in "${INDICES[@]}"; do
+    idx=$(echo "$idx" | tr -d ' ')
+    
+    CAND_INFO=$(echo "$CANDIDATES" | jq -r ".[] | select(.index == $idx)")
+    if [ -z "$CAND_INFO" ] || [ "$CAND_INFO" = "null" ]; then
+      echo "  ✗ 候选人索引 $idx 无效，跳过"
+      continue
+    fi
+    
+    CAND_NAME=$(echo "$CAND_INFO" | jq -r '.name')
+    CAND_YEARS=$(echo "$CAND_INFO" | jq -r '.years')
+    CAND_SCHOOL=$(echo "$CAND_INFO" | jq -r '.school')
+    CAND_INDEX=$(echo "$CAND_INFO" | jq -r '.index')
+    
+    echo "精筛: $CAND_NAME (${CAND_YEARS}年, $CAND_SCHOOL)"
+    
+    # 点击候选人打开详情
+    CLICK_RESULT=$(stealth-browser eval "
+    (() => {
+      const iframe = document.querySelector('iframe');
+      if (!iframe || !iframe.contentDocument) return JSON.stringify({status:'error',msg:'iframe not found'});
+      const doc = iframe.contentDocument;
+      const cards = Array.from(doc.querySelectorAll('.recommend-wrap [class*=\"candidate\"]')).slice(1);
+      
+      const card = cards[$CAND_INDEX];
+      if (!card) return JSON.stringify({status:'error',msg:'card not found'});
+      
+      const nameEl = card.querySelector('.name');
+      if (!nameEl) return JSON.stringify({status:'error',msg:'name element not found'});
+      
+      nameEl.click();
+      return JSON.stringify({status:'ok'});
+    })()
+    " --session boss)
+    
+    CLICK_STATUS=$(echo "$CLICK_RESULT" | jq -r '.data.result.status // "error"')
+    if [ "$CLICK_STATUS" != "ok" ]; then
+      echo "  ✗ 点击失败，跳过"
+      continue
+    fi
+    
+    # 等待详情面板出现
     sleep 2
+    
     WAIT_RESULT=$(stealth-browser eval "
     (() => {
       const iframe = document.querySelector('iframe');
@@ -296,201 +356,207 @@ while [ "$COLLECTED" -lt "$target" ]; do
       return popup ? 'ready' : 'not_ready';
     })()
     " --session boss)
+    
     WAIT_STATUS=$(echo "$WAIT_RESULT" | jq -r '.data.result // "error"')
     if [ "$WAIT_STATUS" != "ready" ]; then
-      echo "  ✗ 详情面板加载超时，跳过"
-      continue
+      sleep 2
+      WAIT_RESULT=$(stealth-browser eval "
+      (() => {
+        const iframe = document.querySelector('iframe');
+        if (!iframe || !iframe.contentDocument) return 'no_iframe';
+        const doc = iframe.contentDocument;
+        const popup = doc.querySelector('.boss-popup__content');
+        return popup ? 'ready' : 'not_ready';
+      })()
+      " --session boss)
+      WAIT_STATUS=$(echo "$WAIT_RESULT" | jq -r '.data.result // "error"')
+      if [ "$WAIT_STATUS" != "ready" ]; then
+        echo "  ✗ 详情面板加载超时，跳过"
+        continue
+      fi
     fi
-  fi
 
-  # ── Eval 2a: 提取详情文本（不执行收藏）────────────────────
-  DETAIL=$(stealth-browser eval "
-  (() => {
-    const iframe = document.querySelector('iframe');
-    if (!iframe || !iframe.contentDocument) return JSON.stringify({status:'error',msg:'iframe lost'});
-    const doc = iframe.contentDocument;
-    const popup = doc.querySelector('.boss-popup__content');
-    if (!popup) return JSON.stringify({status:'no_popup'});
-
-    const detailText = popup.textContent.replace(/\s+/g,' ');
-    
-    // 提取关键段落供 LLM 分析
-    const extractSection = (title) => {
-      const regex = new RegExp(title + '[：:]?([^]*?)(?=工作经历|项目经验|教育经历|个人优势|期望职位|$)', 'i');
-      const match = detailText.match(regex);
-      return match ? match[1].trim().substring(0, 400) : '';
-    };
-    
-    return JSON.stringify({
-      status: 'ok',
-      full_text: detailText.substring(0, 800),
-      work_exp: extractSection('工作经历'),
-      project_exp: extractSection('项目经验'),
-      education: extractSection('教育经历'),
-      advantage: extractSection('个人优势')
-    });
-  })()
-  " --session boss)
-
-  DETAIL_DATA=$(echo "$DETAIL" | jq -r '.data.result // "{}"' 2>/dev/null)
-  if [ $? -ne 0 ] || [ -z "$DETAIL_DATA" ] || [ "$DETAIL_DATA" = "{}" ]; then
-    echo "  ✗ 详情数据解析失败，原始内容:"
-    echo "$DETAIL" | head -c 200
-    # 关闭面板
-    stealth-browser eval "
+    # ── Eval 2a: 提取详情文本（不执行收藏）────────────────────
+    DETAIL=$(stealth-browser eval "
     (() => {
       const iframe = document.querySelector('iframe');
+      if (!iframe || !iframe.contentDocument) return JSON.stringify({status:'error',msg:'iframe lost'});
       const doc = iframe.contentDocument;
-      const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
-      if (closeBtn) closeBtn.click();
-      return 'closed';
-    })()
-    " --session boss > /dev/null
-    continue
-  fi
-  
-  DETAIL_STATUS=$(echo "$DETAIL_DATA" | jq -r '.status // "error"')
+      const popup = doc.querySelector('.boss-popup__content');
+      if (!popup) return JSON.stringify({status:'no_popup'});
 
-  if [ "$DETAIL_STATUS" = "no_popup" ]; then
-    echo "  ✗ 详情面板未出现，跳过"
-    continue
-  fi
-
-  # 提取详情字段
-  FULL_TEXT=$(echo "$DETAIL_DATA" | jq -r '.full_text // ""')
-  WORK_EXP=$(echo "$DETAIL_DATA" | jq -r '.work_exp // ""')
-  PROJECT_EXP=$(echo "$DETAIL_DATA" | jq -r '.project_exp // ""')
-  EDUCATION=$(echo "$DETAIL_DATA" | jq -r '.education // ""')
-  ADVANTAGE=$(echo "$DETAIL_DATA" | jq -r '.advantage // ""')
-
-  # ── Claude 决策点: 评估候选人匹配度 ────────────────────────
-  echo ""
-  echo "=========================================="
-  echo "候选人: $CAND_NAME"
-  echo "年限: $CAND_YEARS 年 | 学校: $CAND_SCHOOL"
-  echo "初筛关键词: $CAND_AI"
-  echo ""
-  echo "【工作经历】"
-  echo "$WORK_EXP"
-  echo ""
-  echo "【项目经验】"
-  echo "$PROJECT_EXP"
-  echo ""
-  echo "【教育经历】"
-  echo "$EDUCATION"
-  echo ""
-  echo "【个人优势】"
-  echo "$ADVANTAGE"
-  echo ""
-  echo "筛选条件:"
-  echo "- 年限要求: $min_years ~ $max_years 年"
-  echo "- 关键词: $keywords"
-  echo "- 岗位要求: AI 相关项目研发经验"
-  echo "=========================================="
-  echo ""
-
-  # ★★★ Claude 决策点 ★★★
-  # 
-  # Claude: 请根据以上候选人详情，评估其与岗位的匹配度
-  #
-  # 评估维度:
-  # 1. 工作经历中是否有实质性的 AI 项目经验（权重 40%）
-  # 2. 项目经验的技术深度和业务价值（权重 30%）
-  # 3. 技术栈与岗位要求的匹配度（权重 20%）
-  # 4. 教育背景和个人优势（权重 10%）
-  #
-  # 决策规则:
-  # - 如果综合评估匹配度 >= 70 分: 在下一个 bash 代码块前执行 SHOULD_COLLECT="yes"
-  # - 如果综合评估匹配度 < 70 分: 在下一个 bash 代码块前执行 SHOULD_COLLECT="no"
-  #
-  # 请在执行下一个 bash 代码块之前，临时执行一个命令来设置 SHOULD_COLLECT 变量
-  # 例如: SHOULD_COLLECT="yes"  # 理由: 有 3 年 LLM 应用开发经验，参与过 RAG 项目
-
-  # ── Eval 2b: 根据 Claude 决策执行收藏或跳过 ──────────────
-  # 默认值: 如果 Claude 未设置 SHOULD_COLLECT，默认为 no
-  : ${SHOULD_COLLECT:="no"}
-
-  if [ "$SHOULD_COLLECT" = "yes" ]; then
-    echo "  ✓ Claude 评估: 符合要求，执行收藏"
-    
-    # 收藏逻辑（包含已收藏检查）
-    COLLECT_RESULT=$(stealth-browser eval "
-    (() => {
-      const iframe = document.querySelector('iframe');
-      const doc = iframe.contentDocument;
-      const likeBtn = doc.querySelector('.like-icon-and-text');
+      const detailText = popup.textContent.replace(/\s+/g,' ');
       
-      if (!likeBtn) {
-        const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
-        if (closeBtn) closeBtn.click();
-        return JSON.stringify({status:'error', msg:'收藏按钮未找到'});
-      }
+      const extractSection = (title) => {
+        const regex = new RegExp(title + '[：:]?([^]*?)(?=工作经历|项目经验|教育经历|个人优势|期望职位|$)', 'i');
+        const match = detailText.match(regex);
+        return match ? match[1].trim().substring(0, 400) : '';
+      };
       
-      // 检查是否已收藏
-      const iconEl = likeBtn.querySelector('.like-icon');
-      const btnText = likeBtn.querySelector('.btn-text');
-      const alreadyFavorited = (iconEl && iconEl.className.includes('like-icon-active')) ||
-                               (btnText && btnText.textContent.trim() === '已收藏');
-      
-      if (alreadyFavorited) {
-        const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
-        if (closeBtn) closeBtn.click();
-        return JSON.stringify({status:'ok', collected:true, already_favorited:true});
-      }
-      
-      likeBtn.click();
-      
-      return new Promise(resolve => {
-        setTimeout(() => {
-          const iconEl = likeBtn.querySelector('.like-icon');
-          const btnText = likeBtn.querySelector('.btn-text');
-          const collected = (iconEl && iconEl.className.includes('like-icon-active')) || 
-                          (btnText && btnText.textContent.trim() === '已收藏');
-          
-          const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
-          if (closeBtn) closeBtn.click();
-          
-          resolve(JSON.stringify({status:'ok', collected:collected}));
-        }, 1000);
+      return JSON.stringify({
+        status: 'ok',
+        full_text: detailText.substring(0, 800),
+        work_exp: extractSection('工作经历'),
+        project_exp: extractSection('项目经验'),
+        education: extractSection('教育经历'),
+        advantage: extractSection('个人优势')
       });
     })()
     " --session boss)
-    
-    COLLECT_STATUS=$(echo "$COLLECT_RESULT" | jq -r '.data.result.status // "error"')
-    WAS_COLLECTED=$(echo "$COLLECT_RESULT" | jq -r '.data.result.collected // false')
-    
-    if [ "$WAS_COLLECTED" = "true" ]; then
-      COLLECTED=$((COLLECTED + 1))
-      REFINED_COUNT=$((REFINED_COUNT + 1))
-      echo "  ★ 已收藏 [$COLLECTED/$target]"
-      COLLECTED_LIST="${COLLECTED_LIST}${COLLECTED}. ${CAND_NAME} | ${CAND_YEARS}年 | ${CAND_SCHOOL}\n"
-      
-      # 追加到已处理 ID
-      if [ -z "$NEW_IDS" ]; then
-        NEW_IDS="$CAND_ID"
-      else
-        NEW_IDS="${NEW_IDS},${CAND_ID}"
-      fi
+
+    DETAIL_DATA=$(echo "$DETAIL" | jq -r '.data.result // "{}"' 2>/dev/null)
+    if [ $? -ne 0 ] || [ -z "$DETAIL_DATA" ] || [ "$DETAIL_DATA" = "{}" ]; then
+      echo "  ✗ 详情数据解析失败"
+      stealth-browser eval "
+      (() => {
+        const iframe = document.querySelector('iframe');
+        const doc = iframe.contentDocument;
+        const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
+        if (closeBtn) closeBtn.click();
+        return 'closed';
+      })()
+      " --session boss > /dev/null
+      continue
     fi
-  else
-    echo "  ✗ Claude 评估: 不符合要求，跳过收藏"
     
-    # 关闭详情面板
-    stealth-browser eval "
-    (() => {
-      const iframe = document.querySelector('iframe');
-      const doc = iframe.contentDocument;
-      const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
-      if (closeBtn) closeBtn.click();
-      return 'closed';
-    })()
-    " --session boss > /dev/null
-  fi
+    DETAIL_STATUS=$(echo "$DETAIL_DATA" | jq -r '.status // "error"')
 
-  # 重置决策变量，准备下一个候选人
-  unset SHOULD_COLLECT
+    if [ "$DETAIL_STATUS" = "no_popup" ]; then
+      echo "  ✗ 详情面板未出现，跳过"
+      continue
+    fi
 
-  sleep 1
+    FULL_TEXT=$(echo "$DETAIL_DATA" | jq -r '.full_text // ""')
+    WORK_EXP=$(echo "$DETAIL_DATA" | jq -r '.work_exp // ""')
+    PROJECT_EXP=$(echo "$DETAIL_DATA" | jq -r '.project_exp // ""')
+    EDUCATION=$(echo "$DETAIL_DATA" | jq -r '.education // ""')
+    ADVANTAGE=$(echo "$DETAIL_DATA" | jq -r '.advantage // ""')
+
+    # ── Claude 决策点: 评估候选人匹配度 ────────────────────────
+    echo ""
+    echo "=========================================="
+    echo "候选人: $CAND_NAME"
+    echo "年限: $CAND_YEARS 年 | 学校: $CAND_SCHOOL"
+    echo ""
+    echo "【工作经历】"
+    echo "$WORK_EXP"
+    echo ""
+    echo "【项目经验】"
+    echo "$PROJECT_EXP"
+    echo ""
+    echo "【教育经历】"
+    echo "$EDUCATION"
+    echo ""
+    echo "【个人优势】"
+    echo "$ADVANTAGE"
+    echo ""
+    echo "筛选条件:"
+    echo "- 年限要求: $min_years ~ $max_years 年"
+    echo "- 关键词: $keywords"
+    echo "- 岗位要求: AI 相关项目研发经验"
+    echo "=========================================="
+    echo ""
+
+    # ★★★ Claude 决策点 ★★★
+    # 
+    # Claude: 请根据以上候选人详情，评估其与岗位的匹配度
+    #
+    # 评估维度:
+    # 1. 工作经历中是否有实质性的 AI 项目经验（权重 40%）
+    # 2. 项目经验的技术深度和业务价值（权重 30%）
+    # 3. 技术栈与岗位要求的匹配度（权重 20%）
+    # 4. 教育背景和个人优势（权重 10%）
+    #
+    # 决策规则:
+    # - 如果综合评估匹配度 >= 70 分: 在下一个 bash 代码块前执行 SHOULD_COLLECT="yes"
+    # - 如果综合评估匹配度 < 70 分: 在下一个 bash 代码块前执行 SHOULD_COLLECT="no"
+    #
+    # 请在执行下一个 bash 代码块之前，临时执行一个命令来设置 SHOULD_COLLECT 变量
+    # 例如: SHOULD_COLLECT="yes"  # 理由: 有 3 年 LLM 应用开发经验，参与过 RAG 项目
+
+    # ── Eval 2b: 根据 Claude 决策执行收藏或跳过 ──────────────
+    : ${SHOULD_COLLECT:="no"}
+
+    if [ "$SHOULD_COLLECT" = "yes" ]; then
+      echo "  ✓ Claude 评估: 符合要求，执行收藏"
+      
+      COLLECT_RESULT=$(stealth-browser eval "
+      (() => {
+        const iframe = document.querySelector('iframe');
+        const doc = iframe.contentDocument;
+        const likeBtn = doc.querySelector('.like-icon-and-text');
+        
+        if (!likeBtn) {
+          const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
+          if (closeBtn) closeBtn.click();
+          return JSON.stringify({status:'error', msg:'收藏按钮未找到'});
+        }
+        
+        const iconEl = likeBtn.querySelector('.like-icon');
+        const btnText = likeBtn.querySelector('.btn-text');
+        const alreadyFavorited = (iconEl && iconEl.className.includes('like-icon-active')) ||
+                                 (btnText && btnText.textContent.trim() === '已收藏');
+        
+        if (alreadyFavorited) {
+          const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
+          if (closeBtn) closeBtn.click();
+          return JSON.stringify({status:'ok', collected:true, already_favorited:true});
+        }
+        
+        likeBtn.click();
+        
+        return new Promise(resolve => {
+          setTimeout(() => {
+            const iconEl = likeBtn.querySelector('.like-icon');
+            const btnText = likeBtn.querySelector('.btn-text');
+            const collected = (iconEl && iconEl.className.includes('like-icon-active')) || 
+                            (btnText && btnText.textContent.trim() === '已收藏');
+            
+            const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
+            if (closeBtn) closeBtn.click();
+            
+            resolve(JSON.stringify({status:'ok', collected:collected}));
+          }, 1000);
+        });
+      })()
+      " --session boss)
+      
+      COLLECT_STATUS=$(echo "$COLLECT_RESULT" | jq -r '.data.result.status // "error"')
+      WAS_COLLECTED=$(echo "$COLLECT_RESULT" | jq -r '.data.result.collected // false')
+      
+      if [ "$WAS_COLLECTED" = "true" ]; then
+        COLLECTED=$((COLLECTED + 1))
+        REFINED_COUNT=$((REFINED_COUNT + 1))
+        echo "  ★ 已收藏 [$COLLECTED/$target]"
+        COLLECTED_LIST="${COLLECTED_LIST}${COLLECTED}. ${CAND_NAME} | ${CAND_YEARS}年 | ${CAND_SCHOOL}\n"
+        
+        if [ -z "$NEW_IDS" ]; then
+          NEW_IDS="${CAND_NAME}_${CAND_INDEX}"
+        else
+          NEW_IDS="${NEW_IDS},${CAND_NAME}_${CAND_INDEX}"
+        fi
+      fi
+    else
+      echo "  ✗ Claude 评估: 不符合要求，跳过收藏"
+      
+      stealth-browser eval "
+      (() => {
+        const iframe = document.querySelector('iframe');
+        const doc = iframe.contentDocument;
+        const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
+        if (closeBtn) closeBtn.click();
+        return 'closed';
+      })()
+      " --session boss > /dev/null
+    fi
+
+    unset SHOULD_COLLECT
+    sleep 1
+  done
+
+  NEXT_CURSOR=$(echo "$BATCH_DATA" | jq -r '.next_cursor // 0')
+  CURSOR=$NEXT_CURSOR
+  unset SELECTED_INDICES
 done
 ```
 
