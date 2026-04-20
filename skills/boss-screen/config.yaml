@@ -1,0 +1,20 @@
+# Boss 直聘候选人筛选默认配置
+defaults:
+  min_years: 1
+  max_years: 3
+  keywords: "AI,大模型,LLM,机器学习,深度学习,NLP,CV,AIGC,RAG,向量数据库"
+  target: 3
+  job_id: "default"
+
+cache:
+  enabled: true
+  filename_pattern: "boss_screening_{job_id}.json"
+
+session:
+  name: "boss_screening"
+  timeout: 300
+
+stealth:
+  wait_after_click: 1
+  wait_after_open: 3
+  scroll_delay: 2
