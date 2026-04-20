@@ -45,7 +45,13 @@ websockify \
 sleep 1
 echo "[browser-node] noVNC started"
 
-# ── 4. Browser Node API ───────────────────────────────────────
+# ── 4. Pre-download CloakBrowser binary ──────────────────────
+echo "[browser-node] Ensuring CloakBrowser binary is available..."
+python -c "import cloakbrowser; print('CloakBrowser binary:', cloakbrowser.ensure_binary())" || {
+    echo "[browser-node] WARNING: CloakBrowser binary download failed, will retry on first use"
+}
+
+# ── 5. Browser Node API ───────────────────────────────────────
 echo "[browser-node] Starting Browser Node API on :8080..."
 cd /app
 exec python -m uvicorn stealth_browser.browser.node_api:app \
