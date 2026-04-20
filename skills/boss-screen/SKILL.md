@@ -320,6 +320,20 @@ while [ "$COLLECTED" -lt "$target" ]; do
       const likeBtn = doc.querySelector('.like-icon-and-text');
       if (likeBtn) {
         collectBtnFound = true;
+        
+        // Check if already favorited before clicking
+        const iconEl = likeBtn.querySelector('.like-icon');
+        const btnText = likeBtn.querySelector('.btn-text');
+        const alreadyFavorited = (iconEl && iconEl.className.includes('like-icon-active')) ||
+                                 (btnText && btnText.textContent.trim() === '已收藏');
+        
+        if (alreadyFavorited) {
+          // Already favorited, skip click
+          const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
+          if (closeBtn) closeBtn.click();
+          return JSON.stringify({status:'ok', has_ai:hasAI, collected:true, btn_found:true, already_favorited:true});
+        }
+        
         likeBtn.click();
         
         // 使用 Promise 等待状态更新
@@ -343,6 +357,15 @@ while [ "$COLLECTED" -lt "$target" ]; do
           .find(e => e.textContent.trim().includes('收藏'));
         if (favBtn) {
           collectBtnFound = true;
+          
+          // Check if already favorited before clicking
+          if (favBtn.textContent.trim() === '已收藏') {
+            // Already favorited, skip click
+            const closeBtn = doc.querySelector('.boss-dialog__close,[class*=\"close\"]');
+            if (closeBtn) closeBtn.click();
+            return JSON.stringify({status:'ok', has_ai:hasAI, collected:true, btn_found:true, already_favorited:true});
+          }
+          
           favBtn.click();
           
           return new Promise(resolve => {
